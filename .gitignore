@@ -3,3 +3,5 @@
 *.o
 *.depend
 *.layout
+*.sln
+*.vcxproj*
