@@ -138,7 +138,7 @@ int main(int argc, char** argv)
     int* p1 = new int[size];
     int* p2 = new int[size];
     int* p3 = new int[size];
-    mt19937 mt(time(0));
+    mt19937 mt(static_cast<unsigned>(time(0)));
     uniform_int_distribution<int> uid(0, 10000);
     for (int i = 0; i < size; ++i)
         p1[i] = p3[i] = uid(mt);

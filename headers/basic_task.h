@@ -132,7 +132,7 @@ namespace auto_parallel
     int task_environment::create_task(task_environment::task_info* ti)
     {
         created_tasks.push_back({task_creator<Type>::get_id(), ti});
-        return created_tasks.size() - 1;
+        return static_cast<int>(created_tasks.size() - 1);
     }
 
     template<class Type>
@@ -196,7 +196,7 @@ namespace auto_parallel
     {
         if (task_creator<Type>::get_id() > -1)
             return;
-        task_creator<Type>::my_id = v.size();
+        task_creator<Type>::my_id = static_cast<int>(v.size());
         v.push_back(new task_creator<Type>);
     }
 

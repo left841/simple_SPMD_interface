@@ -32,7 +32,7 @@ namespace auto_parallel
 
             std::vector<int> v;
             cmd previous;
-            int prev_pos;
+            size_t prev_pos;
 
             void add_cmd(cmd id);
 

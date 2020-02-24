@@ -3,24 +3,21 @@
 namespace auto_parallel
 {
 
-    parallelizer::instruction::instruction() : sendable()
-    {
-        previous = cmd::UNDEFINED;
-        prev_pos = -1;
-    }
+    parallelizer::instruction::instruction() : sendable(), previous(cmd::UNDEFINED), prev_pos()
+    { }
 
     parallelizer::instruction::~instruction()
     { }
 
     void parallelizer::instruction::send(const sender& se)
     {
-        se.send(v.data(), v.size(), MPI_INT);
+        se.send(v.data(), static_cast<int>(v.size()), MPI_INT);
     }
 
     void parallelizer::instruction::recv(const receiver& re)
     {
         v.resize(re.probe(MPI_INT));
-        re.recv(v.data(), v.size(), MPI_INT);
+        re.recv(v.data(), static_cast<int>(v.size()), MPI_INT);
     }
 
     int& parallelizer::instruction::operator[](size_t n)
@@ -100,10 +97,10 @@ namespace auto_parallel
         add_cmd(cmd::TASK_CREATE);
         v.push_back(id);
         v.push_back(type);
-        v.push_back(data.size());
+        v.push_back(static_cast<int>(data.size()));
         for (int i : data)
             v.push_back(i);
-        v.push_back(c_data.size());
+        v.push_back(static_cast<int>(c_data.size()));
         for (int i : c_data)
             v.push_back(i);
     }
@@ -116,27 +113,27 @@ namespace auto_parallel
         std::vector<task_environment::task_data>& td = env.get_c_tasks();
 
         v.push_back(id);
-        v.push_back(md.size());
+        v.push_back(static_cast<int>(md.size()));
         for (int i = 0; i < md.size(); ++i)
             v.push_back(md[i].type);
-        v.push_back(mpd.size());
+        v.push_back(static_cast<int>(mpd.size()));
         for (int i = 0; i < mpd.size(); ++i)
         {
             v.push_back(mpd[i].type);
             v.push_back(mpd[i].sourse.id);
             v.push_back(static_cast<int>(mpd[i].sourse.ms));
         }
-        v.push_back(td.size());
+        v.push_back(static_cast<int>(td.size()));
         for (int i = 0; i < td.size(); ++i)
         {
             v.push_back(td[i].type);
-            v.push_back(td[i].ti->data.size());
+            v.push_back(static_cast<int>(td[i].ti->data.size()));
             for (task_environment::mes_id j : td[i].ti->data)
             {
                 v.push_back(j.id);
                 v.push_back(static_cast<int>(j.ms));
             }
-            v.push_back(td[i].ti->c_data.size());
+            v.push_back(static_cast<int>(td[i].ti->c_data.size()));
             for (task_environment::mes_id j : td[i].ti->c_data)
             {
                 v.push_back(j.id);

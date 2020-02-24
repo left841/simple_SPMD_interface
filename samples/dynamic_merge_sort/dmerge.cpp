@@ -136,7 +136,7 @@ public:
 
     void perform(task_environment& env)
     {
-        mt19937 mt(time(0));
+        mt19937 mt(static_cast<int>(time(0)));
         uniform_int_distribution<int> uid(0, 10000);
         m_array& a1 = dynamic_cast<m_array&>(*data[0]);
         m_array& a2 = dynamic_cast<m_array&>(*data[1]);

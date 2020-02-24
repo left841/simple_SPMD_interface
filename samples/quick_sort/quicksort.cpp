@@ -51,7 +51,10 @@ public:
         long long size;
 
         part_info()
-        { offset = size = 0; }
+        { 
+            offset = 0;
+            size = 0;
+        }
 
         void send(const sender& se)
         {
@@ -85,10 +88,10 @@ public:
     }
 
     void send(const sender& se)
-    { se.isend(p, size, MPI_INT); }
+    { se.isend(p, static_cast<int>(size), MPI_INT); }
 
     void recv(const receiver& re)
-    { re.irecv(p, size, MPI_INT); }
+    { re.irecv(p, static_cast<int>(size), MPI_INT); }
 };
 
 class quick_task: public task
@@ -139,7 +142,7 @@ public:
     {
         arrray& a1 = dynamic_cast<arrray&>(*data[0]);
         int* a = a1.p;
-        int sz = a1.size;
+        int sz = static_cast<int>(a1.size);
 
         if (sz < pred)
             simple_quicksort(a, sz);
@@ -170,10 +173,10 @@ public:
             if (r + 1 > 1)
             {
                 arrray::init_info* ii1 = new arrray::init_info;
-                ii1->size = r + 1;
+                ii1->size = static_cast<size_t>(r) + 1;
                 arrray::part_info* pi1 = new arrray::part_info;
                 pi1->offset = 0;
-                pi1->size = r + 1;
+                pi1->size = static_cast<size_t>(r) + 1;
                 task_environment::task_info* ti1 = new task_environment::task_info;
                 ti1->data.push_back(env.create_message<arrray>(ii1, pi1, env.get_arg_id(0)));
                 env.create_task<quick_task>(ti1);
@@ -182,10 +185,10 @@ public:
             if (sz - (r + 1) > 1)
             {
                 arrray::init_info* ii2 = new arrray::init_info;
-                ii2->size = sz - (r + 1);
+                ii2->size = static_cast<long long>(sz) - (static_cast<size_t>(r) + 1);
                 arrray::part_info* pi2 = new arrray::part_info;
                 pi2->offset = r + 1;
-                pi2->size = sz - (r + 1);
+                pi2->size = static_cast<size_t>(sz) - (static_cast<size_t>(r) + 1);
                 task_environment::task_info* ti2 = new task_environment::task_info;
                 ti2->data.push_back(env.create_message<arrray>(ii2, pi2, env.get_arg_id(0)));
                 env.create_task<quick_task>(ti2);
@@ -207,7 +210,7 @@ public:
 
     void perform(task_environment& env)
     {
-        mt19937 mt(time(0));
+        mt19937 mt(static_cast<unsigned>(time(0)));
         uniform_int_distribution<int> uid(0, 10000);
         arrray& a1 = dynamic_cast<arrray&>(*data[0]);
         arrray& a2 = dynamic_cast<arrray&>(*data[1]);
@@ -240,7 +243,7 @@ public:
 //                goto gh;
 //            }
 //        cout << "correct\n";
-        gh:
+//        gh:
         cout << tm1 - t.time << '\n';
         //cout << tm2 - tm1;
         cout.flush();

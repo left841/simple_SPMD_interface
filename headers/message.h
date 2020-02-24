@@ -150,7 +150,7 @@ namespace auto_parallel
     {
         if (message_creator<Type>::my_id >= 0)
             return;
-        message_creator<Type>::my_id = v.size();
+        message_creator<Type>::my_id = static_cast<int>(v.size());
         v.push_back(new message_creator<Type>());
     }
 
@@ -159,7 +159,7 @@ namespace auto_parallel
     {
         if (message_creator<Type>::my_part_id >= 0)
             return;
-        message_creator<Type>::my_part_id = v_part.size();
+        message_creator<Type>::my_part_id = static_cast<int>(v_part.size());
         v_part.push_back(new message_creator<Type>());
     }
 
