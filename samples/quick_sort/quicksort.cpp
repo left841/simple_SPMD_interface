@@ -252,6 +252,7 @@ public:
 
 int main(int argc, char** argv)
 {
+    parallel_engine pe(&argc, &argv);
     int sz = 100000;
     if (argc > 1)
     {
@@ -263,7 +264,7 @@ int main(int argc, char** argv)
     message_factory::add_part<arrray>();
     task_factory::add<quick_task>();
 
-    parallelizer pz(&argc, &argv);
+    parallelizer pz;
 
     int comm_size = pz.get_proc_count();
     quick_task::pred = sz / (3 * comm_size / 2);

@@ -133,6 +133,7 @@ class init_task : public task
 
 int main(int argc, char** argv)
 {
+    parallel_engine pe(&argc, &argv);
     if (argc > 1)
     {
         n = atoi(argv[1]);
@@ -150,7 +151,7 @@ int main(int argc, char** argv)
     tn = m;
     for(int i = 0; i < m; i++)
         b[i] = tn--;
-    parallelizer pz(&argc, &argv);
+    parallelizer pz;
     task_graph gr;
     mymessage* w = new mymessage(m, b);
     mymessage* cw = new mymessage(n, c);
@@ -190,6 +191,6 @@ int main(int argc, char** argv)
     if (pz.get_current_proc() == 0)
     {
         double time = MPI_Wtime();
-        cout << time - pz.get_start_time();
+        cout << time - parallel_engine::get_start_time();
     }
 }

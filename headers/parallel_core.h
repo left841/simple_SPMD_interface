@@ -11,17 +11,16 @@ namespace auto_parallel
     private:
 
         static double start_time;
-        static size_t object_count;
 
     public:
 
         parallel_engine(int* argc = nullptr, char*** argv = nullptr);
         virtual ~parallel_engine();
 
-        double get_start_time();
+        void init_library(int* argc, char*** argv);
+        void finalize_library();
 
-        virtual void execution() = 0;
-        
+        static double get_start_time();
     };
 
 }

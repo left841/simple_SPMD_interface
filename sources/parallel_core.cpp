@@ -4,9 +4,18 @@ namespace auto_parallel
 {
 
     double parallel_engine::start_time;
-    size_t parallel_engine::object_count = 0;
 
     parallel_engine::parallel_engine(int* argc, char*** argv)
+    {
+        init_library(argc, argv);
+    }
+
+    parallel_engine::~parallel_engine()
+    {
+        finalize_library();
+    }
+
+    void parallel_engine::init_library(int* argc, char*** argv)
     {
         int flag;
         MPI_Initialized(&flag);
@@ -15,13 +24,13 @@ namespace auto_parallel
             MPI_Init(argc, argv);
             start_time = MPI_Wtime();
         }
-        ++object_count;
     }
 
-    parallel_engine::~parallel_engine()
+    void parallel_engine::finalize_library()
     {
-        --object_count;
-        if (object_count == 0)
+        int flag;
+        MPI_Initialized(&flag);
+        if (flag)
             MPI_Finalize();
     }
 

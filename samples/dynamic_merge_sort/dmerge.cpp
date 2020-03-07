@@ -231,7 +231,6 @@ public:
         }
         cout << endl;
 
-        cout << "waltype" << endl;
         for (int i = 0; i < out.get_size(); ++i)
             cout << out.get_p()[i] << ' ';
         cout << endl;
@@ -255,7 +254,6 @@ public:
         ido1 = env.create_message<m_array>(iio1, pio1, env.get_arg_id(0));
         ido2 = env.create_message<m_array>(iio2, pio2, env.get_arg_id(0));
 
-        cout << "chifir" << endl;
         cout << src.layer << ' ' << max_layer << endl;
         if (src.layer >= max_layer)
         {
@@ -302,7 +300,6 @@ public:
 
     void perform(task_environment& env)
     {
-        cout << "lul" << endl;
         const time_cl& t = dynamic_cast<const time_cl&>(*c_data[0]);
         m_array& a1 = dynamic_cast<m_array&>(*data[0]);
         m_array& a2 = dynamic_cast<m_array&>(*data[1]);
@@ -331,6 +328,7 @@ public:
 
 int main(int argc, char** argv)
 {
+    parallel_engine pe(&argc, &argv);
     int layers = 2;
     int size = 1000;
     if (argc > 1)

@@ -14,7 +14,7 @@
 namespace auto_parallel
 {
 
-    class parallelizer: public parallel_engine
+    class parallelizer
     {
     private:
 
@@ -111,8 +111,8 @@ namespace auto_parallel
 
         const static int main_proc;
 
-        parallelizer(int* argc = NULL, char*** argv = NULL);
-        parallelizer(task_graph& _tg, int* argc = NULL, char*** argv = NULL);
+        parallelizer();
+        parallelizer(task_graph& _tg);
         ~parallelizer();
 
         int get_current_proc();

@@ -5,10 +5,10 @@ namespace auto_parallel
 
     const int parallelizer::main_proc = 0;
 
-    parallelizer::parallelizer(int* argc, char*** argv): parallel_engine(argc, argv), comm(MPI_COMM_WORLD), instr_comm(comm)
+    parallelizer::parallelizer(): comm(MPI_COMM_WORLD), instr_comm(comm)
     { }
 
-    parallelizer::parallelizer(task_graph& _tg, int* argc, char*** argv): parallel_engine(argc, argv), comm(MPI_COMM_WORLD), instr_comm(comm)
+    parallelizer::parallelizer(task_graph& _tg): comm(MPI_COMM_WORLD), instr_comm(comm)
     { init(_tg); }
 
     parallelizer::~parallelizer()
