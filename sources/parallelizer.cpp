@@ -85,7 +85,7 @@ namespace auto_parallel
 
     void parallelizer::execution()
     {
-        if (comm.get_rank() == main_proc)
+        if (comm.rank() == main_proc)
             master();
         else
             worker();
@@ -96,32 +96,32 @@ namespace auto_parallel
 
     void parallelizer::master()
     {
-        std::vector<std::set<int>> versions(comm.get_size());
+        std::vector<std::set<int>> versions(comm.size());
         for (std::set<int>& i: versions)
             for (int j = 0; j < data_v.size(); ++j)
                 i.insert(j);
 
-        std::vector<std::set<int>> contained(comm.get_size());
-        for (int i = 0; i < comm.get_size(); ++i)
+        std::vector<std::set<int>> contained(comm.size());
+        for (int i = 0; i < comm.size(); ++i)
             for (int j = 0; j < data_v.size(); ++j)
                 contained[i].insert(j);
 
-        std::vector<std::set<int>> contained_tasks(comm.get_size());
-        for (int i = 0; i < comm.get_size(); ++i)
+        std::vector<std::set<int>> contained_tasks(comm.size());
+        for (int i = 0; i < comm.size(); ++i)
             for (int j = 0; j < task_v.size(); ++j)
                 contained_tasks[i].insert(j);
 
-        std::vector<instruction> ins(comm.get_size());
-        std::vector<std::vector<int>> assigned(comm.get_size());
+        std::vector<instruction> ins(comm.size());
+        std::vector<std::vector<int>> assigned(comm.size());
 
         while (ready_tasks.size())
         {
-            size_t sub = ready_tasks.size() / comm.get_size();
-            size_t per = ready_tasks.size() % comm.get_size();
+            size_t sub = ready_tasks.size() / comm.size();
+            size_t per = ready_tasks.size() % comm.size();
 
-            for (size_t i = 1; i < comm.get_size(); ++i)
+            for (size_t i = 1; i < comm.size(); ++i)
             {
-                size_t px = sub + ((comm.get_size() - i <= per) ? 1: 0);
+                size_t px = sub + ((comm.size() - i <= per) ? 1: 0);
                 for (int j = 0; j < px; ++j)
                 {
                     send_task_data(ready_tasks.front(), static_cast<int>(i), ins[i], versions, contained);
@@ -135,13 +135,13 @@ namespace auto_parallel
                 ready_tasks.pop();
             }
 
-            for (int i = 1; i < comm.get_size(); ++i)
+            for (int i = 1; i < comm.size(); ++i)
                 for (int j: assigned[i])
                 {
                     assign_task(j, i, ins[i], contained_tasks);
                 }
 
-            for (int i = 1; i < comm.get_size(); ++i)
+            for (int i = 1; i < comm.size(); ++i)
             {
                 send_instruction(i, ins[i]);
                 ins[i].clear();
@@ -168,7 +168,7 @@ namespace auto_parallel
             }
             assigned[0].clear();
 
-            for (int i = 1; i < comm.get_size(); ++i)
+            for (int i = 1; i < comm.size(); ++i)
             {
                 for (int j = 0; j < assigned[i].size(); ++j)
                     wait_task(i, versions, contained, contained_tasks);
@@ -178,7 +178,7 @@ namespace auto_parallel
 
         instruction end;
         end.add_end();
-        for (int i = 1; i < instr_comm.get_size(); ++i)
+        for (int i = 1; i < instr_comm.size(); ++i)
             instr_comm.send(&end, i);
     }
 
@@ -328,7 +328,7 @@ namespace auto_parallel
             size_t s_id = mpd[i].sourse.id;
             if ((mpd[i].sourse.ms != task_environment::message_source::TASK_ARG) && (mpd[i].sourse.ms != task_environment::message_source::TASK_ARG_C))
                 s_id += new_mes;
-            for (int k = 1; k < comm.get_size(); ++k)
+            for (int k = 1; k < comm.size(); ++k)
                 ver[k].erase(static_cast<int>(s_id));
             message* m = message_factory::get_part(mpd[i].type, data_v[s_id].d, mpd[i].pib);
             d_info di = {m, mpd[i].type, mpd[i].iib, mpd[i].pib, static_cast<int>(s_id), data_v[s_id].version};
@@ -372,7 +372,7 @@ namespace auto_parallel
         std::vector<int>& d = task_v[tid].data_id;
         for (int i = 0; i < d.size(); ++i)
         {
-            for (int k = 0; k < comm.get_size(); ++k)
+            for (int k = 0; k < comm.size(); ++k)
                 ver[k].erase(d[i]);
             ver[main_proc].insert(d[i]);
             data_v[d[i]].version++;
@@ -414,7 +414,7 @@ namespace auto_parallel
         for (int i = 0; i < d.size(); ++i)
         {
             comm.recv(data_v[d[i]].d, proc);
-            for (int k = 0; k < comm.get_size(); ++k)
+            for (int k = 0; k < comm.size(); ++k)
                 ver[k].erase(d[i]);
             ver[main_proc].insert(d[i]);
             ver[proc].insert(d[i]);
@@ -449,7 +449,7 @@ namespace auto_parallel
             if ((s_src != task_environment::message_source::TASK_ARG) && (s_src != task_environment::message_source::TASK_ARG_C))
                 s_id += new_mes;
             data_v[s_id].d->wait_requests();
-            for (int k = 1; k < comm.get_size(); ++k)
+            for (int k = 1; k < comm.size(); ++k)
                 ver[k].erase(static_cast<int>(s_id));
             message* m = message_factory::get_part(type, data_v[s_id].d, pib);
             d_info di = {m, type, iib, pib, static_cast<int>(s_id), data_v[s_id].version};
@@ -687,9 +687,9 @@ namespace auto_parallel
     }
 
     int parallelizer::get_current_proc()
-    { return comm.get_rank(); }
+    { return comm.rank(); }
 
     int parallelizer::get_proc_count()
-    { return comm.get_size(); }
+    { return comm.size(); }
 
 }

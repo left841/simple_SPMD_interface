@@ -11,7 +11,7 @@ namespace auto_parallel
     protected:
 
         MPI_Comm comm;
-        int rank;
+        int comm_rank;
         int comm_size;
         bool created;
 
@@ -23,9 +23,9 @@ namespace auto_parallel
 
         ~communicator();
 
-        int get_rank() const;
+        int rank() const;
         MPI_Comm get_comm() const;
-        int get_size() const;
+        int size() const;
 
     };
 

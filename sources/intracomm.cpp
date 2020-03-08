@@ -31,17 +31,17 @@ namespace auto_parallel
 
     void intracomm::bcast(sendable* mes, int proc)
     {
-        int my_pos = (rank - proc + comm_size) % comm_size;
+        int my_pos = (comm_rank - proc + comm_size) % comm_size;
         int i = 1;
         if (my_pos > 0)
         {
             for (int sum = 1; sum < my_pos; i <<= 1, sum += i);
-            recv(mes, (rank - i + comm_size) % comm_size);
+            recv(mes, (comm_rank - i + comm_size) % comm_size);
         }
         for (; i < comm_size; i <<= 1)
         {
             if ((my_pos < i) && (my_pos + i < comm_size))
-                send(mes, (rank + i) % comm_size);
+                send(mes, (comm_rank + i) % comm_size);
         }
     }
 
