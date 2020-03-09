@@ -70,6 +70,7 @@ namespace auto_parallel
         void clear();
 
         friend class parallelizer;
+        friend class memory_manager;
     };
 
 }

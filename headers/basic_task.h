@@ -173,6 +173,7 @@ namespace auto_parallel
 
         friend class task_graph;
         friend class parallelizer;
+        friend class memory_manager;
     };
 
     class task_factory

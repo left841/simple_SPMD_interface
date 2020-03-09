@@ -16,11 +16,7 @@ namespace auto_parallel
 
     void parallelizer::init(task_graph& _tg)
     {
-        while (ready_tasks.size())
-            ready_tasks.pop();
-
-        task_v.clear();
-        data_v.clear();
+        clear();
         task_v.resize(_tg.t_map.size());
         data_v.resize(_tg.d_map.size());
 
@@ -78,9 +74,6 @@ namespace auto_parallel
             }
         }
         _tg.clear();
-
-        top_versions.resize(data_v.size());
-        top_versions.assign(data_v.size(), 0);
     }
 
     void parallelizer::execution()
@@ -90,8 +83,7 @@ namespace auto_parallel
         else
             worker();
 
-        task_v.clear();
-        data_v.clear();
+        clear();
     }
 
     void parallelizer::master()
@@ -691,5 +683,14 @@ namespace auto_parallel
 
     int parallelizer::get_proc_count()
     { return comm.size(); }
+
+    void parallelizer::clear()
+    {
+        while (ready_tasks.size())
+            ready_tasks.pop();
+
+        task_v.clear();
+        data_v.clear();
+    }
 
 }

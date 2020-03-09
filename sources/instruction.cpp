@@ -1,47 +1,47 @@
-#include "parallelizer.h"
+#include "instruction.h"
 
 namespace auto_parallel
 {
 
-    parallelizer::instruction::instruction() : sendable(), previous(cmd::UNDEFINED), prev_pos()
+    instruction::instruction() : sendable(), previous(cmd::UNDEFINED), prev_pos()
     { }
 
-    parallelizer::instruction::~instruction()
+    instruction::~instruction()
     { }
 
-    void parallelizer::instruction::send(const sender& se)
+    void instruction::send(const sender& se)
     {
         se.send(v.data(), static_cast<int>(v.size()), MPI_INT);
     }
 
-    void parallelizer::instruction::recv(const receiver& re)
+    void instruction::recv(const receiver& re)
     {
         v.resize(re.probe(MPI_INT));
         re.recv(v.data(), static_cast<int>(v.size()), MPI_INT);
     }
 
-    int& parallelizer::instruction::operator[](size_t n)
+    int& instruction::operator[](size_t n)
     {
         return v[n];
     }
 
-    const int& parallelizer::instruction::operator[](size_t n) const
+    const int& instruction::operator[](size_t n) const
     {
         return v[n];
     }
 
-    size_t parallelizer::instruction::size()
+    size_t instruction::size()
     {
         return v.size();
     }
 
-    void parallelizer::instruction::clear()
+    void instruction::clear()
     {
         v.clear();
         previous = cmd::UNDEFINED;
     }
 
-    void parallelizer::instruction::add_cmd(cmd id)
+    void instruction::add_cmd(cmd id)
     {
         if (id == previous)
             ++v[prev_pos + 1];
@@ -54,31 +54,31 @@ namespace auto_parallel
         }
     }
 
-    void parallelizer::instruction::add_end()
+    void instruction::add_end()
     {
         add_cmd(cmd::END);
     }
 
-    void parallelizer::instruction::add_message_sending(int id)
+    void instruction::add_message_sending(int id)
     {
         add_cmd(cmd::MES_SEND);
         v.push_back(id);
     }
 
-    void parallelizer::instruction::add_message_receiving(int id)
+    void instruction::add_message_receiving(int id)
     {
         add_cmd(cmd::MES_RECV);
         v.push_back(id);
     }
 
-    void parallelizer::instruction::add_message_creation(int id, int type)
+    void instruction::add_message_creation(int id, int type)
     {
         add_cmd(cmd::MES_CREATE);
         v.push_back(id);
         v.push_back(type);
     }
 
-    void parallelizer::instruction::add_message_part_creation(int id, int type, int source)
+    void instruction::add_message_part_creation(int id, int type, int source)
     {
         add_cmd(cmd::MES_P_CREATE);
         v.push_back(id);
@@ -86,13 +86,13 @@ namespace auto_parallel
         v.push_back(source);
     }
 
-    void parallelizer::instruction::add_task_execution(int id)
+    void instruction::add_task_execution(int id)
     {
         add_cmd(cmd::TASK_EXE);
         v.push_back(id);
     }
 
-    void parallelizer::instruction::add_task_creation(int id, int type, std::vector<int> data, std::vector<int> c_data)
+    void instruction::add_task_creation(int id, int type, std::vector<int> data, std::vector<int> c_data)
     {
         add_cmd(cmd::TASK_CREATE);
         v.push_back(id);
@@ -105,7 +105,7 @@ namespace auto_parallel
             v.push_back(i);
     }
 
-    void parallelizer::instruction::add_task_result(int id, task_environment& env)
+    void instruction::add_task_result(int id, task_environment& env)
     {
         add_cmd(cmd::TASK_RES);
         std::vector<task_environment::message_data>& md = env.get_c_messages();

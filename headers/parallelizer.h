@@ -5,8 +5,11 @@
 #include <queue>
 #include <map>
 #include <set>
+#include <limits>
 #include "mpi.h"
 #include "parallel_core.h"
+#include "instruction.h"
+#include "memory_manager.h"
 #include "task_graph.h"
 #include "intracomm.h"
 #include "it_queue.h"
@@ -18,49 +21,8 @@ namespace auto_parallel
     {
     private:
 
-        class instruction: public sendable
-        {
-        public:
-
-            enum class cmd: int
-            {
-                UNDEFINED, END, MES_SEND, MES_RECV, MES_CREATE,
-                MES_P_CREATE, TASK_EXE, TASK_CREATE, TASK_RES
-            };
-
-        private:
-
-            std::vector<int> v;
-            cmd previous;
-            size_t prev_pos;
-
-            void add_cmd(cmd id);
-
-        public:
-
-            instruction();
-            ~instruction();
-
-            void send(const sender& se);
-            void recv(const receiver& re);
-
-            int& operator[](size_t n);
-            const int& operator[](size_t n) const;
-
-            size_t size();
-
-            void clear();
-
-            void add_end();
-            void add_message_sending(int id);
-            void add_message_receiving(int id);
-            void add_message_creation(int id, int type);
-            void add_message_part_creation(int id, int type, int source);
-            void add_task_execution(int id);
-            void add_task_creation(int id, int type, std::vector<int> data, std::vector<int> c_data);
-            void add_task_result(int id, task_environment& env);
-
-        };
+        typedef size_t task_id;
+        typedef size_t message_id;
 
         struct d_info
         {
@@ -106,6 +68,8 @@ namespace auto_parallel
         void create_part(int id, int type, int source, int proc);
         int create_task(int* inst);
         void execute_task(int id);
+
+        void clear();
 
     public:
 
