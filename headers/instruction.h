@@ -50,7 +50,7 @@ namespace auto_parallel
         void add_message_creation(int id, int type);
         void add_message_part_creation(int id, int type, int source);
         void add_task_execution(int id);
-        void add_task_creation(int id, int type, std::vector<int> data, std::vector<int> c_data);
+        void add_task_creation(size_t id, size_t type, std::vector<message_id> data, std::vector<message_id> c_data);
         void add_task_result(int id, task_environment& env);
 
     };

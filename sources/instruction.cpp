@@ -92,16 +92,16 @@ namespace auto_parallel
         v.push_back(id);
     }
 
-    void instruction::add_task_creation(int id, int type, std::vector<int> data, std::vector<int> c_data)
+    void instruction::add_task_creation(size_t id, size_t type, std::vector<message_id> data, std::vector<message_id> c_data)
     {
         add_cmd(cmd::TASK_CREATE);
         v.push_back(id);
         v.push_back(type);
         v.push_back(static_cast<int>(data.size()));
-        for (int i : data)
+        for (message_id i : data)
             v.push_back(i);
         v.push_back(static_cast<int>(c_data.size()));
-        for (int i : c_data)
+        for (message_id i : c_data)
             v.push_back(i);
     }
 

@@ -7,6 +7,12 @@ namespace auto_parallel
     { }
 
     memory_manager::memory_manager(task_graph& _tg)
+    { init(_tg); }
+
+    memory_manager::~memory_manager()
+    { clear(); }
+
+    void memory_manager::init(task_graph& _tg)
     {
         clear();
 
@@ -54,8 +60,14 @@ namespace auto_parallel
         _tg.clear();
     }
 
-    memory_manager::~memory_manager()
-    { clear(); }
+    it_queue<task_id> memory_manager::get_ready_tasks()
+    {
+        it_queue<task_id> q;
+        for (task_id i = 0; i < task_v.size(); ++i)
+            if ((task_v[i].t != nullptr) && (task_v[i].parents_count == 0))
+                q.push(i);
+        return q;
+    }
 
     message_id memory_manager::add_message(message* ptr, size_t type)
     { 
@@ -206,5 +218,104 @@ namespace auto_parallel
             delete_task(i);
         task_v.clear();
     }
+
+    void memory_manager::set_message(message_id id, message* new_message)
+    { data_v[id].d = new_message; }
+
+    void memory_manager::set_message_type(message_id id, size_t new_type)
+    { data_v[id].type = new_type; }
+
+    void memory_manager::set_message_init_info(message_id id, message::init_info_base* new_iib)
+    { data_v[id].iib = new_iib; }
+
+    void memory_manager::set_message_part_info(message_id id, message::part_info_base* new_pib)
+    { data_v[id].pib = new_pib; }
+
+    void memory_manager::set_message_parent(message_id id, size_t new_parent)
+    { data_v[id].parent = new_parent; }
+
+    void memory_manager::set_message_version(message_id id, size_t new_version)
+    { data_v[id].version = new_version; }
+
+    void memory_manager::set_task(task_id id, task* new_task)
+    { task_v[id].t = new_task; }
+
+    void memory_manager::set_task_type(task_id id, size_t new_type)
+    { task_v[id].type = new_type; }
+
+    void memory_manager::set_task_parent(task_id id, size_t new_parent)
+    { task_v[id].parent = new_parent; }
+
+    void memory_manager::set_task_parents_count(task_id id, size_t new_parents_count)
+    { task_v[id].parents_count = new_parents_count; }
+
+    void memory_manager::set_task_created_childs(task_id id, size_t new_created_childs)
+    { task_v[id].created_childs = new_created_childs; }
+
+    void memory_manager::set_task_childs(task_id id, std::vector<task_id> new_childs)
+    { task_v[id].childs = new_childs; }
+
+    void memory_manager::set_task_data(task_id id, std::vector<message_id> new_data)
+    { task_v[id].data = new_data; }
+
+    void memory_manager::set_task_const_data(task_id id, std::vector<message_id> new_const_data)
+    { task_v[id].const_data = new_const_data; }
+
+    size_t memory_manager::message_count()
+    { return data_v.size(); }
+
+    message* memory_manager::get_message(message_id id)
+    { return data_v[id].d; }
+
+    size_t memory_manager::get_message_type(message_id id)
+    { return data_v[id].type; }
+
+    message::init_info_base* memory_manager::get_message_init_info(message_id id)
+    { return data_v[id].iib; }
+
+    message::part_info_base* memory_manager::get_message_part_info(message_id id)
+    { return data_v[id].pib; }
+
+    size_t memory_manager::get_message_parent(message_id id)
+    { return data_v[id].parent; }
+
+    size_t memory_manager::get_message_version(message_id id)
+    { return data_v[id].version; }
+
+    size_t memory_manager::task_count()
+    { return task_v.size(); }
+
+    task* memory_manager::get_task(task_id id)
+    { return task_v[id].t; }
+
+    size_t memory_manager::get_task_type(task_id id)
+    { return task_v[id].type; }
+
+    size_t memory_manager::get_task_parent(task_id id)
+    { return task_v[id].parent; }
+
+    size_t memory_manager::get_task_parents_count(task_id id)
+    { return task_v[id].parents_count; }
+
+    size_t memory_manager::get_task_created_childs(task_id id)
+    { return task_v[id].created_childs; }
+
+    std::vector<task_id>& memory_manager::get_task_childs(task_id id)
+    { return task_v[id].childs; }
+
+    std::vector<message_id>& memory_manager::get_task_data(task_id id)
+    { return task_v[id].data; }
+
+    std::vector<message_id>& memory_manager::get_task_const_data(task_id id)
+    { return task_v[id].const_data; }
+
+    size_t memory_manager::get_task_parents_count(task_id id)
+    { return task_v[id].parents_count; }
+
+    bool memory_manager::message_has_parent(message_id id)
+    { return data_v[id].parent != std::numeric_limits<size_t>::max(); }
+
+    bool memory_manager::task_has_parent(task_id id)
+    { return task_v[id].parent != std::numeric_limits<size_t>::max(); }
 
 }

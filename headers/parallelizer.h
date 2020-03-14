@@ -49,11 +49,10 @@ namespace auto_parallel
         intracomm comm;
         intracomm instr_comm;
 
-        it_queue<int> ready_tasks;
-        std::vector<t_info> task_v;
-        std::vector<d_info> data_v;
-
-        std::vector<int> top_versions;
+        it_queue<task_id> ready_tasks;
+        //std::vector<t_info> task_v;
+        //std::vector<d_info> data_v;
+        memory_manager memory;
 
         void master();
         void worker();

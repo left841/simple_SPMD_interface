@@ -5,6 +5,7 @@
 #include "message.h"
 #include "basic_task.h"
 #include "task_graph.h"
+#include "it_queue.h"
 
 namespace auto_parallel
 {
@@ -21,7 +22,7 @@ namespace auto_parallel
             size_t type;
             message::init_info_base* iib;
             message::part_info_base* pib;
-            size_t parent;
+            message_id parent;
             size_t version;
             bool created;
         };
@@ -30,7 +31,7 @@ namespace auto_parallel
         {
             task* t;
             size_t type;
-            size_t parent;
+            task_id parent;
             size_t parents_count;
             size_t created_childs;
             std::vector<task_id> childs;
@@ -46,6 +47,10 @@ namespace auto_parallel
         memory_manager();
         memory_manager(task_graph& _tg);
         ~memory_manager();
+
+        void init(task_graph& _tg);
+
+        it_queue<task_id> get_ready_tasks();
 
         message_id add_message(message* ptr, size_t type = std::numeric_limits<size_t>::max());
         task_id add_task(task* ptr, size_t type = std::numeric_limits<size_t>::max());
@@ -67,9 +72,9 @@ namespace auto_parallel
 
         void set_message(message_id id, message* new_message);
         void set_message_type(message_id id, size_t new_type);
-        void set_message_init_info(message_id id, message::init_info_base*);
-        void set_message_part_info(message_id id, message::part_info_base*);
-        void set_message_parent(message_id id, size_t parent);
+        void set_message_init_info(message_id id, message::init_info_base* new_iib);
+        void set_message_part_info(message_id id, message::part_info_base* new_pib);
+        void set_message_parent(message_id id, size_t new_parent);
         void set_message_version(message_id id, size_t new_version);
 
         void set_task(task_id id, task* new_task);
@@ -81,6 +86,7 @@ namespace auto_parallel
         void set_task_data(task_id id, std::vector<message_id> new_data);
         void set_task_const_data(task_id id, std::vector<message_id> new_const_data);
 
+        size_t message_count();
         message* get_message(message_id id);
         size_t get_message_type(message_id id);
         message::init_info_base* get_message_init_info(message_id id);
@@ -88,6 +94,7 @@ namespace auto_parallel
         size_t get_message_parent(message_id id);
         size_t get_message_version(message_id id);
 
+        size_t task_count();
         task* get_task(task_id id);
         size_t get_task_type(task_id id);
         size_t get_task_parent(task_id id);
@@ -96,6 +103,9 @@ namespace auto_parallel
         std::vector<task_id>& get_task_childs(task_id id);
         std::vector<message_id>& get_task_data(task_id id);
         std::vector<message_id>& get_task_const_data(task_id id);
+
+        bool message_has_parent(message_id id);
+        bool task_has_parent(task_id id);
 
         void delete_message(message_id id);
         void delete_task(task_id id);
