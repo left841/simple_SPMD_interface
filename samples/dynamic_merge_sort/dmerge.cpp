@@ -257,25 +257,13 @@ public:
         cout << src.layer << ' ' << max_layer << endl;
         if (src.layer >= max_layer)
         {
-            task_environment::task_info* ti1 = new task_environment::task_info;
-            ti1->data.push_back(ido1);
-            ti1->data.push_back(ids1);
-            env.create_task<merge_t_all>(ti1);
-            task_environment::task_info* ti2 = new task_environment::task_info;
-            ti2->data.push_back(ido2);
-            ti2->data.push_back(ids2);
-            env.create_task<merge_t_all>(ti2);
+            env.create_task<merge_t_all>({ido1, ids1}, {});
+            env.create_task<merge_t_all>({ido2, ids2}, {});
         }
         else
         {
-            task_environment::task_info* ti1 = new task_environment::task_info;
-            ti1->data.push_back(ids1);
-            ti1->c_data.push_back(ido1);
-            env.create_task<merge_t>(ti1);
-            task_environment::task_info* ti2 = new task_environment::task_info;
-            ti2->data.push_back(ids2);
-            ti2->c_data.push_back(ido2);
-            env.create_task<merge_t>(ti2);
+            env.create_task<merge_t_all>({ids1, ido1}, {});
+            env.create_task<merge_t_all>({ids2, ido2}, {});
         }
     }
 

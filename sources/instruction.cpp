@@ -127,14 +127,14 @@ namespace auto_parallel
         for (int i = 0; i < td.size(); ++i)
         {
             v.push_back(td[i].type);
-            v.push_back(static_cast<int>(td[i].ti->data.size()));
-            for (task_environment::mes_id j : td[i].ti->data)
+            v.push_back(static_cast<int>(td[i].data.size()));
+            for (task_environment::mes_id j : td[i].data)
             {
                 v.push_back(j.id);
                 v.push_back(static_cast<int>(j.ms));
             }
-            v.push_back(static_cast<int>(td[i].ti->c_data.size()));
-            for (task_environment::mes_id j : td[i].ti->c_data)
+            v.push_back(static_cast<int>(td[i].c_data.size()));
+            for (task_environment::mes_id j : td[i].c_data)
             {
                 v.push_back(j.id);
                 v.push_back(static_cast<int>(j.ms));

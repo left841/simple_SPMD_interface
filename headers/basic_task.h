@@ -34,7 +34,7 @@ namespace auto_parallel
         ~task_creator();
 
         task* get_task(std::vector<message*>& data, std::vector<const message*>& c_data);
-        static int get_id();
+        static int get_type();
 
         friend class task_factory;
     };
@@ -55,7 +55,7 @@ namespace auto_parallel
     { return new Type(data, c_data); }
 
     template<typename Type>
-    int task_creator<Type>::get_id()
+    int task_creator<Type>::get_type()
     { return my_id; }
 
     class task_environment
@@ -74,15 +74,10 @@ namespace auto_parallel
             message_source ms;
         };
 
-        struct task_info
-        {
-            std::vector<mes_id> data, c_data;
-        };
-
         struct task_data
         {
             int type;
-            task_info* ti;
+            std::vector<mes_id> data, c_data;
         };
 
         struct message_data
@@ -112,7 +107,7 @@ namespace auto_parallel
         task_environment(task_data&& td);
 
         template<class Type>
-        int create_task(task_info* ti);
+        int create_task(const std::vector<mes_id>& data, const std::vector<mes_id>& const_data);
         template<class Type>
         mes_id create_message(message::init_info_base* iib);
         template<class Type>
@@ -129,9 +124,9 @@ namespace auto_parallel
     };
 
     template<class Type>
-    int task_environment::create_task(task_environment::task_info* ti)
+    int task_environment::create_task(const std::vector<mes_id>& data, const std::vector<mes_id>& const_data)
     {
-        created_tasks.push_back({task_creator<Type>::get_id(), ti});
+        created_tasks.push_back({task_creator<Type>::get_type(), data, const_data});
         return static_cast<int>(created_tasks.size() - 1);
     }
 
@@ -195,7 +190,7 @@ namespace auto_parallel
     template<typename Type>
     void task_factory::add()
     {
-        if (task_creator<Type>::get_id() > -1)
+        if (task_creator<Type>::get_type() > -1)
             return;
         task_creator<Type>::my_id = static_cast<int>(v.size());
         v.push_back(new task_creator<Type>);

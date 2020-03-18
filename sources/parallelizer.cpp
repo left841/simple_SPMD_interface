@@ -83,12 +83,12 @@ namespace auto_parallel
 
             for (task_id i: assigned[0])
             {
-                task_environment::task_info ti;
+                std::vector<task_environment::mes_id> data, c_data;
                 for (message_id j: memory.get_task_data(static_cast<size_t>(i)))
-                    ti.data.push_back({static_cast<int>(j), task_environment::message_source::TASK_ARG});
+                    data.push_back({static_cast<int>(j), task_environment::message_source::TASK_ARG});
                 for (message_id j: memory.get_task_const_data(i))
-                    ti.c_data.push_back({static_cast<int>(j), task_environment::message_source::TASK_ARG_C});
-                task_environment::task_data td = {memory.get_task_type(i), &ti};
+                    c_data.push_back({static_cast<int>(j), task_environment::message_source::TASK_ARG_C});
+                task_environment::task_data td = {memory.get_task_type(i), data, c_data};
                 task_environment te(td);
 
                 for (message_id j: memory.get_task_data(i))
@@ -272,23 +272,23 @@ namespace auto_parallel
         memory.set_task_created_childs(tid, memory.get_task_created_childs(tid) + td.size());
         for (int i = 0; i < td.size(); ++i)
         {
-            std::vector<message_id> data_id(td[i].ti->data.size());
-            for (int k = 0; k < td[i].ti->data.size(); ++k)
+            std::vector<message_id> data_id(td[i].data.size());
+            for (int k = 0; k < td[i].data.size(); ++k)
             {
-                if ((td[i].ti->data[k].ms != task_environment::message_source::TASK_ARG) && (td[i].ti->data[k].ms != task_environment::message_source::TASK_ARG_C))
-                    data_id[k] = created_message_id[td[i].ti->data[k].id];
+                if ((td[i].data[k].ms != task_environment::message_source::TASK_ARG) && (td[i].data[k].ms != task_environment::message_source::TASK_ARG_C))
+                    data_id[k] = created_message_id[td[i].data[k].id];
                 else
-                    data_id[k] = td[i].ti->data[k].id;
+                    data_id[k] = td[i].data[k].id;
             }
 
-            std::vector<message_id> const_data_id(td[i].ti->c_data.size());
-            for (int k = 0; k < td[i].ti->c_data.size(); ++k)
+            std::vector<message_id> const_data_id(td[i].c_data.size());
+            for (int k = 0; k < td[i].c_data.size(); ++k)
             {
-                size_t id = td[i].ti->c_data[k].id;
-                if ((td[i].ti->c_data[k].ms != task_environment::message_source::TASK_ARG) && (td[i].ti->c_data[k].ms != task_environment::message_source::TASK_ARG_C))
-                    const_data_id[k] = created_message_id[td[i].ti->data[k].id];
+                size_t id = td[i].c_data[k].id;
+                if ((td[i].c_data[k].ms != task_environment::message_source::TASK_ARG) && (td[i].c_data[k].ms != task_environment::message_source::TASK_ARG_C))
+                    const_data_id[k] = created_message_id[td[i].data[k].id];
                 else
-                    const_data_id[k] = td[i].ti->c_data[k].id;
+                    const_data_id[k] = td[i].c_data[k].id;
             }
 
             task_id id = memory.create_task(td[i].type, data_id, const_data_id);
@@ -565,13 +565,13 @@ namespace auto_parallel
 
     void parallelizer::execute_task(task_id id)
     {
-        task_environment::task_info ti;
+        std::vector<task_environment::mes_id> data, c_data;
         for (message_id i: memory.get_task_data(id))
-            ti.data.push_back({static_cast<int>(i), task_environment::message_source::TASK_ARG});
+            data.push_back({static_cast<int>(i), task_environment::message_source::TASK_ARG});
         for (message_id i: memory.get_task_const_data(id))
-            ti.c_data.push_back({static_cast<int>(i), task_environment::message_source::TASK_ARG_C});
+            c_data.push_back({static_cast<int>(i), task_environment::message_source::TASK_ARG_C});
 
-        task_environment::task_data td = {memory.get_task_type(id), &ti};
+        task_environment::task_data td = {memory.get_task_type(id), data, c_data};
         task_environment env(std::move(td));
 
         for (message_id i: memory.get_task_data(id))
