@@ -21,6 +21,8 @@ namespace auto_parallel
         it_queue();
         ~it_queue();
 
+        it_queue<type>& operator=(const it_queue<type>& src);
+
         const type& front();
         void push(const type& val);
         void pop();
@@ -41,15 +43,33 @@ namespace auto_parallel
     template<typename type>
     it_queue<type>::it_queue()
     {
-        first = last = 0u;
+        first = last = 0;
         full = true;
-        _size = _capacity = 0u;
+        _size = _capacity = 0;
         _value = nullptr;
     }
 
     template<typename type>
     it_queue<type>::~it_queue()
     { delete[] _value; }
+
+    template<typename type>
+    it_queue<type>& it_queue<type>::operator=(const it_queue<type>& src)
+    {
+        if (&src == this)
+            return *this;
+        if (_value != nullptr)
+            delete[] _value;
+        _capacity = src._capacity;
+        _size = src._size;
+        full = src.full;
+        first = src.first;
+        last = src.last;
+        _value = new type[_capacity];
+        for (size_t i = 0; i < _capacity; ++i)
+            _value[i] = src._value[i];
+        return *this;
+    }
 
     template<typename type>
     const type& it_queue<type>::front()

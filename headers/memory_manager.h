@@ -6,12 +6,10 @@
 #include "basic_task.h"
 #include "task_graph.h"
 #include "it_queue.h"
+#include "parallel_defs.h"
 
 namespace auto_parallel
 {
-
-    typedef size_t task_id;
-    typedef size_t message_id;
 
     class memory_manager
     {
@@ -50,7 +48,7 @@ namespace auto_parallel
 
         void init(task_graph& _tg);
 
-        it_queue<task_id> get_ready_tasks();
+        std::queue<task_id> get_ready_tasks();
 
         message_id add_message(message* ptr, size_t type = std::numeric_limits<size_t>::max());
         task_id add_task(task* ptr, size_t type = std::numeric_limits<size_t>::max());

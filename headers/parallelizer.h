@@ -21,52 +21,26 @@ namespace auto_parallel
     {
     private:
 
-        typedef size_t task_id;
-        typedef size_t message_id;
-
-        struct d_info
-        {
-            message* d;
-            int type;
-            message::init_info_base* iib;
-            message::part_info_base* pib;
-            int parent;
-            int version;
-        };
-
-        struct t_info
-        {
-            task* t;
-            int type;
-            int parent;
-            int parents;
-            int c_childs;
-            std::vector<int> childs;
-            std::vector<int> data_id;
-            std::vector<int> const_data_id;
-        };
-
         intracomm comm;
         intracomm instr_comm;
 
-        it_queue<task_id> ready_tasks;
-        //std::vector<t_info> task_v;
-        //std::vector<d_info> data_v;
+        std::queue<task_id> ready_tasks;
+        //it_queue<task_id> ready_tasks;
         memory_manager memory;
 
         void master();
         void worker();
 
-        void send_task_data(int tid, int proc, instruction& ins, std::vector<std::set<int>>& ver, std::vector<std::set<int>>& con);
-        void assign_task(int tid, int proc, instruction& ins, std::vector<std::set<int>>& com);
+        void send_task_data(task_id tid, int proc, instruction& ins, std::vector<std::set<message_id>>& ver, std::vector<std::set<int>>& con);
+        void assign_task(task_id tid, int proc, instruction& ins, std::vector<std::set<int>>& com);
         void send_instruction(int proc, instruction& ins);
-        void end_main_task(int tid, task_environment& te, std::vector<std::set<int>>& ver, std::vector<std::set<int>>& con, std::vector<std::set<int>>& con_t);
-        void wait_task(int proc, std::vector<std::set<int>>& ver, std::vector<std::set<int>>& con, std::vector<std::set<int>>& con_t);
+        void end_main_task(int tid, task_environment& te, std::vector<std::set<message_id>>& ver, std::vector<std::set<int>>& con, std::vector<std::set<int>>& con_t);
+        void wait_task(int proc, std::vector<std::set<message_id>>& ver, std::vector<std::set<int>>& con, std::vector<std::set<int>>& con_t);
 
         void create_message(int id, int type, int proc);
         void create_part(int id, int type, int source, int proc);
         int create_task(int* inst);
-        void execute_task(int id);
+        void execute_task(task_id id);
 
         void clear();
 

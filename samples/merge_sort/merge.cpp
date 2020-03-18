@@ -143,7 +143,8 @@ int main(int argc, char** argv)
     uniform_int_distribution<int> uid(0, 10000);
     for (int i = 0; i < size; ++i)
         p1[i] = p3[i] = uid(mt);
-
+    
+    double true_start_time = MPI_Wtime();
     parallelizer pz;
     task_graph tg;
 
@@ -249,7 +250,7 @@ int main(int argc, char** argv)
         //    cout << "wrong\n";
         //else
         //    cout << "correct\n";
-        cout << dt - parallel_engine::get_start_time();// << '\n' << pt - dt;
+        cout << dt - true_start_time;//parallel_engine::get_start_time();// << '\n' << pt - dt;
         cout.flush();
     }
 }

@@ -60,9 +60,9 @@ namespace auto_parallel
         _tg.clear();
     }
 
-    it_queue<task_id> memory_manager::get_ready_tasks()
+    std::queue<task_id> memory_manager::get_ready_tasks()
     {
-        it_queue<task_id> q;
+        std::queue<task_id> q;
         for (task_id i = 0; i < task_v.size(); ++i)
             if ((task_v[i].t != nullptr) && (task_v[i].parents_count == 0))
                 q.push(i);
@@ -184,9 +184,9 @@ namespace auto_parallel
                 delete data_v[id].pib;
             data_v[id].created = false;
         }
-        if (id == data_v.size() - 1)
-            data_v.pop_back();
-        else
+        //if (id == data_v.size() - 1)
+            //data_v.pop_back();
+        //else
         {
             data_v[id].d = nullptr;
             data_v[id].iib = nullptr;
@@ -198,9 +198,9 @@ namespace auto_parallel
     {
         if (task_v[id].created)
             delete task_v[id].t;
-        if (id == task_v.size() - 1)
-            data_v.pop_back();
-        else
+        //if (id == task_v.size() - 1)
+            //data_v.pop_back();
+        //else
         {
             task_v[id].childs.clear();
             task_v[id].data.clear();
@@ -308,9 +308,6 @@ namespace auto_parallel
 
     std::vector<message_id>& memory_manager::get_task_const_data(task_id id)
     { return task_v[id].const_data; }
-
-    size_t memory_manager::get_task_parents_count(task_id id)
-    { return task_v[id].parents_count; }
 
     bool memory_manager::message_has_parent(message_id id)
     { return data_v[id].parent != std::numeric_limits<size_t>::max(); }

@@ -1,15 +1,13 @@
 #ifndef __INSTRUCTION_H__
 #define __INSTRUCTION_H__
 
+#include "parallel_defs.h"
 #include "message.h"
 #include "basic_task.h"
 #include "transfer.h"
 
 namespace auto_parallel
 {
-
-    typedef size_t task_id;
-    typedef size_t message_id;
 
     class instruction: public sendable
     {
