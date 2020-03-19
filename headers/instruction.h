@@ -9,23 +9,21 @@
 namespace auto_parallel
 {
 
+    enum class INSTRUCTION: int
+    {
+        UNDEFINED, END, MES_SEND, MES_RECV, MES_CREATE,
+        MES_P_CREATE, TASK_EXE, TASK_CREATE, TASK_RES
+    };
+
     class instruction: public sendable
     {
-    public:
-
-        enum class cmd: int
-        {
-            UNDEFINED, END, MES_SEND, MES_RECV, MES_CREATE,
-            MES_P_CREATE, TASK_EXE, TASK_CREATE, TASK_RES
-        };
-
     private:
 
         std::vector<int> v;
-        cmd previous;
+        INSTRUCTION previous;
         size_t prev_pos;
 
-        void add_cmd(cmd id);
+        void add_cmd(INSTRUCTION id);
 
     public:
 

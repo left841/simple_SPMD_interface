@@ -9,28 +9,28 @@ namespace auto_parallel
     task_creator_base::~task_creator_base()
     { }
 
-    task_environment::task_environment(task_environment::task_data& td)
+    task_environment::task_environment(task_data& td)
     { this_task = td; }
 
     task_environment::task_environment(task_data&& td): this_task(std::move(td))
     { }
 
-    std::vector<task_environment::task_data>& task_environment::get_c_tasks()
+    std::vector<task_data>& task_environment::get_c_tasks()
     { return created_tasks; }
 
-    std::vector<task_environment::message_data>& task_environment::get_c_messages()
+    std::vector<message_data>& task_environment::get_c_messages()
     { return created_messages; }
 
-    std::vector<task_environment::message_part_data>& task_environment::get_c_parts()
+    std::vector<message_part_data>& task_environment::get_c_parts()
     { return created_parts; }
 
-    task_environment::mes_id task_environment::get_arg_id(int n)
+    local_message_id task_environment::get_arg_id(int n)
     { return this_task.data[n]; }
 
-    task_environment::mes_id task_environment::get_c_arg_id(int n)
+    local_message_id task_environment::get_c_arg_id(int n)
     { return this_task.c_data[n]; }
 
-    task_environment::task_data task_environment::get_this_task_data()
+    task_data task_environment::get_this_task_data()
     { return this_task; }
 
     task::task()

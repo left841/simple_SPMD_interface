@@ -58,42 +58,40 @@ namespace auto_parallel
     int task_creator<Type>::get_type()
     { return my_id; }
 
+    enum class MESSAGE_SOURCE
+    {
+        TASK_ARG, TASK_ARG_C,
+        CREATED, PART
+    };
+
+    struct local_message_id
+    {
+        int id;
+        MESSAGE_SOURCE ms;
+    };
+
+    struct task_data
+    {
+        int type;
+        std::vector<local_message_id> data, c_data;
+    };
+
+    struct message_data
+    {
+        int type;
+        message::init_info_base* iib;
+    };
+
+    struct message_part_data
+    {
+        int type;
+        local_message_id sourse;
+        message::init_info_base* iib;
+        message::part_info_base* pib;
+    };
+
     class task_environment
     {
-    public:
-
-        enum class message_source
-        {
-            TASK_ARG, TASK_ARG_C,
-            CREATED, PART
-        };
-
-        struct mes_id
-        {
-            int id;
-            message_source ms;
-        };
-
-        struct task_data
-        {
-            int type;
-            std::vector<mes_id> data, c_data;
-        };
-
-        struct message_data
-        {
-            int type;
-            message::init_info_base* iib;
-        };
-
-        struct message_part_data
-        {
-            int type;
-            mes_id sourse;
-            message::init_info_base* iib;
-            message::part_info_base* pib;
-        };
-
     private:
 
         task_data this_task;
@@ -107,41 +105,41 @@ namespace auto_parallel
         task_environment(task_data&& td);
 
         template<class Type>
-        int create_task(const std::vector<mes_id>& data, const std::vector<mes_id>& const_data);
+        int create_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
         template<class Type>
-        mes_id create_message(message::init_info_base* iib);
+        local_message_id create_message(message::init_info_base* iib);
         template<class Type>
-        mes_id create_message(message::init_info_base* iib, message::part_info_base* pib, mes_id sourse);
+        local_message_id create_message(message::init_info_base* iib, message::part_info_base* pib, local_message_id sourse);
 
         std::vector<task_data>& get_c_tasks();
         std::vector<message_data>& get_c_messages();
         std::vector<message_part_data>& get_c_parts();
 
-        mes_id get_arg_id(int n);
-        mes_id get_c_arg_id(int n);
+        local_message_id get_arg_id(int n);
+        local_message_id get_c_arg_id(int n);
         task_data get_this_task_data();
 
     };
 
     template<class Type>
-    int task_environment::create_task(const std::vector<mes_id>& data, const std::vector<mes_id>& const_data)
+    int task_environment::create_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
     {
         created_tasks.push_back({task_creator<Type>::get_type(), data, const_data});
         return static_cast<int>(created_tasks.size() - 1);
     }
 
     template<class Type>
-    task_environment::mes_id task_environment::create_message(message::init_info_base* iib)
+    local_message_id task_environment::create_message(message::init_info_base* iib)
     {
         created_messages.push_back({message_creator<Type>::get_id(), iib});
-        return {static_cast<int>(created_messages.size() - 1), message_source::CREATED};
+        return {static_cast<int>(created_messages.size() - 1), MESSAGE_SOURCE::CREATED};
     }
 
     template<class Type>
-    task_environment::mes_id task_environment::create_message(message::init_info_base* iib, message::part_info_base* pib, task_environment::mes_id sourse)
+    local_message_id task_environment::create_message(message::init_info_base* iib, message::part_info_base* pib, local_message_id sourse)
     {
         created_parts.push_back({message_creator<Type>::get_part_id(), sourse, iib, pib});
-        return {static_cast<int>(created_parts.size() - 1), message_source::PART};
+        return {static_cast<int>(created_parts.size() - 1), MESSAGE_SOURCE::PART};
     }
 
     class task

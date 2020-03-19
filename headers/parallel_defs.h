@@ -11,8 +11,12 @@ const MPI_Datatype SIZE_MPI_DATATYPE = (sizeof(size_t) > 4) ? MPI_UNSIGNED_LONG_
 
 namespace auto_parallel
 {
+
     typedef size_t task_id;
     typedef size_t message_id;
+    typedef size_t task_type;
+    typedef size_t message_type;
+
 }
 
 #endif // __PARALLEL_DEFS_H__

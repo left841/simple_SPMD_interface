@@ -248,7 +248,7 @@ public:
         pis2->size = pio2->size = src.get_size() - h_size;
         pis1->offset = pio1->offset = 0;
         pis2->offset = pio2->offset = h_size;
-        task_environment::mes_id ids1, ids2, ido1, ido2;
+        local_message_id ids1, ids2, ido1, ido2;
         ids1 = env.create_message<m_array>(iis1, pis1, env.get_c_arg_id(0));
         ids2 = env.create_message<m_array>(iis2, pis2, env.get_c_arg_id(0));
         ido1 = env.create_message<m_array>(iio1, pio1, env.get_arg_id(0));

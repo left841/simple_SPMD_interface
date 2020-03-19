@@ -31,14 +31,14 @@ namespace auto_parallel
         void master();
         void worker();
 
-        void send_task_data(task_id tid, int proc, instruction& ins, std::vector<std::set<message_id>>& ver, std::vector<std::set<int>>& con);
+        void send_task_data(task_id tid, int proc, instruction& ins, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con);
         void assign_task(task_id tid, int proc, instruction& ins, std::vector<std::set<int>>& com);
         void send_instruction(int proc, instruction& ins);
-        void end_main_task(int tid, task_environment& te, std::vector<std::set<message_id>>& ver, std::vector<std::set<int>>& con, std::vector<std::set<int>>& con_t);
-        void wait_task(int proc, std::vector<std::set<message_id>>& ver, std::vector<std::set<int>>& con, std::vector<std::set<int>>& con_t);
+        void end_main_task(task_id tid, task_environment& te, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<int>>& con_t);
+        void wait_task(int proc, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<int>>& con_t);
 
-        void create_message(int id, int type, int proc);
-        void create_part(int id, int type, int source, int proc);
+        void create_message(message_id id, int type, int proc);
+        void create_part(message_id id, int type, int source, int proc);
         int create_task(int* inst);
         void execute_task(task_id id);
 

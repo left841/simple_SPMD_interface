@@ -3,7 +3,7 @@
 namespace auto_parallel
 {
 
-    instruction::instruction() : sendable(), previous(cmd::UNDEFINED), prev_pos()
+    instruction::instruction() : sendable(), previous(INSTRUCTION::UNDEFINED), prev_pos()
     { }
 
     instruction::~instruction()
@@ -38,10 +38,10 @@ namespace auto_parallel
     void instruction::clear()
     {
         v.clear();
-        previous = cmd::UNDEFINED;
+        previous = INSTRUCTION::UNDEFINED;
     }
 
-    void instruction::add_cmd(cmd id)
+    void instruction::add_cmd(INSTRUCTION id)
     {
         if (id == previous)
             ++v[prev_pos + 1];
@@ -56,31 +56,31 @@ namespace auto_parallel
 
     void instruction::add_end()
     {
-        add_cmd(cmd::END);
+        add_cmd(INSTRUCTION::END);
     }
 
     void instruction::add_message_sending(int id)
     {
-        add_cmd(cmd::MES_SEND);
+        add_cmd(INSTRUCTION::MES_SEND);
         v.push_back(id);
     }
 
     void instruction::add_message_receiving(int id)
     {
-        add_cmd(cmd::MES_RECV);
+        add_cmd(INSTRUCTION::MES_RECV);
         v.push_back(id);
     }
 
     void instruction::add_message_creation(int id, int type)
     {
-        add_cmd(cmd::MES_CREATE);
+        add_cmd(INSTRUCTION::MES_CREATE);
         v.push_back(id);
         v.push_back(type);
     }
 
     void instruction::add_message_part_creation(int id, int type, int source)
     {
-        add_cmd(cmd::MES_P_CREATE);
+        add_cmd(INSTRUCTION::MES_P_CREATE);
         v.push_back(id);
         v.push_back(type);
         v.push_back(source);
@@ -88,13 +88,13 @@ namespace auto_parallel
 
     void instruction::add_task_execution(int id)
     {
-        add_cmd(cmd::TASK_EXE);
+        add_cmd(INSTRUCTION::TASK_EXE);
         v.push_back(id);
     }
 
     void instruction::add_task_creation(size_t id, size_t type, std::vector<message_id> data, std::vector<message_id> c_data)
     {
-        add_cmd(cmd::TASK_CREATE);
+        add_cmd(INSTRUCTION::TASK_CREATE);
         v.push_back(id);
         v.push_back(type);
         v.push_back(static_cast<int>(data.size()));
@@ -107,10 +107,10 @@ namespace auto_parallel
 
     void instruction::add_task_result(int id, task_environment& env)
     {
-        add_cmd(cmd::TASK_RES);
-        std::vector<task_environment::message_data>& md = env.get_c_messages();
-        std::vector<task_environment::message_part_data>& mpd = env.get_c_parts();
-        std::vector<task_environment::task_data>& td = env.get_c_tasks();
+        add_cmd(INSTRUCTION::TASK_RES);
+        std::vector<message_data>& md = env.get_c_messages();
+        std::vector<message_part_data>& mpd = env.get_c_parts();
+        std::vector<task_data>& td = env.get_c_tasks();
 
         v.push_back(id);
         v.push_back(static_cast<int>(md.size()));
@@ -128,13 +128,13 @@ namespace auto_parallel
         {
             v.push_back(td[i].type);
             v.push_back(static_cast<int>(td[i].data.size()));
-            for (task_environment::mes_id j : td[i].data)
+            for (local_message_id j : td[i].data)
             {
                 v.push_back(j.id);
                 v.push_back(static_cast<int>(j.ms));
             }
             v.push_back(static_cast<int>(td[i].c_data.size()));
-            for (task_environment::mes_id j : td[i].c_data)
+            for (local_message_id j : td[i].c_data)
             {
                 v.push_back(j.id);
                 v.push_back(static_cast<int>(j.ms));
