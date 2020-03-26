@@ -4,6 +4,7 @@
 #include <queue>
 #include <vector>
 #include "mpi.h"
+#include "parallel_defs.h"
 #include "transfer.h"
 
 namespace auto_parallel
@@ -60,8 +61,8 @@ namespace auto_parallel
     {
     private:
 
-        static int my_id;
-        static int my_part_id;
+        static message_type my_type;
+        static message_type my_part_type;
 
     public:
 
@@ -73,17 +74,17 @@ namespace auto_parallel
         message::init_info_base* get_init_info();
         message::part_info_base* get_part_info();
 
-        static int get_id();
-        static int get_part_id();
+        static message_type get_id();
+        static message_type get_part_id();
 
         friend class message_factory;
     };
 
     template<typename Type>
-    int message_creator<Type>::my_id = -1;
+    message_type message_creator<Type>::my_type = MESSAGE_TYPE_UNDEFINED;
 
     template<typename Type>
-    int message_creator<Type>::my_part_id = -1;
+    message_type message_creator<Type>::my_part_type = MESSAGE_TYPE_UNDEFINED;
 
     template<typename Type>
     message_creator<Type>::message_creator()
@@ -116,12 +117,12 @@ namespace auto_parallel
     { return new typename Type::part_info; }
 
     template<typename Type>
-    int message_creator<Type>::get_id()
-    { return my_id; }
+    message_type message_creator<Type>::get_id()
+    { return my_type; }
 
     template<typename Type>
-    int message_creator<Type>::get_part_id()
-    { return my_part_id; }
+    message_type message_creator<Type>::get_part_id()
+    { return my_part_type; }
 
     class message_factory
     {
@@ -129,7 +130,7 @@ namespace auto_parallel
 
         static std::vector<message_creator_base*> v;
         static std::vector<message_creator_base*> v_part;
-        message_factory();
+        message_factory() = delete;
 
     public:
 
@@ -139,27 +140,27 @@ namespace auto_parallel
         template<typename Type>
         static void add_part();
 
-        static message* get(size_t id, message::init_info_base* info);
-        static message* get_part(size_t id, message* p, message::part_info_base* info);
-        static message::init_info_base* get_info(size_t id);
-        static message::part_info_base* get_part_info(size_t id);
+        static message* get(message_type id, message::init_info_base* info);
+        static message* get_part(message_type id, message* p, message::part_info_base* info);
+        static message::init_info_base* get_info(message_type id);
+        static message::part_info_base* get_part_info(message_type id);
     };
 
     template<typename Type>
     void message_factory::add()
     {
-        if (message_creator<Type>::my_id >= 0)
+        if (message_creator<Type>::my_type != MESSAGE_TYPE_UNDEFINED)
             return;
-        message_creator<Type>::my_id = static_cast<int>(v.size());
+        message_creator<Type>::my_type = static_cast<message_type>(v.size());
         v.push_back(new message_creator<Type>());
     }
 
     template<typename Type>
     void message_factory::add_part()
     {
-        if (message_creator<Type>::my_part_id >= 0)
+        if (message_creator<Type>::my_part_type != MESSAGE_TYPE_UNDEFINED)
             return;
-        message_creator<Type>::my_part_id = static_cast<int>(v_part.size());
+        message_creator<Type>::my_part_type = static_cast<message_type>(v_part.size());
         v_part.push_back(new message_creator<Type>());
     }
 

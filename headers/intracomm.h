@@ -2,6 +2,7 @@
 #define __INTRACOMM_H__
 
 #include "mpi.h"
+#include "parallel_defs.h"
 #include "communicator.h"
 #include "transfer.h"
 #include "message.h"
@@ -19,9 +20,9 @@ namespace auto_parallel
         intracomm(const intracomm& c, int color, int key);
         ~intracomm();
 
-        void send(sendable* mes, int proc);
-        void recv(sendable* mes, int proc);
-        void bcast(sendable* mes, int proc);
+        void send(sendable* mes, process proc);
+        void recv(sendable* mes, process proc);
+        void bcast(sendable* mes, process proc);
 
         void barrier();
         void abort(int err);

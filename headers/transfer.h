@@ -4,6 +4,7 @@
 #include <queue>
 #include <climits>
 #include "mpi.h"
+#include "parallel_defs.h"
 
 namespace auto_parallel
 {
@@ -13,13 +14,13 @@ namespace auto_parallel
     private:
 
         MPI_Comm comm;
-        int proc;
+        process proc;
         mutable int tag;
         std::queue<MPI_Request>* q;
 
     public:
 
-        sender(MPI_Comm _comm, int _proc, std::queue<MPI_Request>* _q);
+        sender(MPI_Comm _comm, process _proc, std::queue<MPI_Request>* _q);
 
         void send(void* buf, int size, MPI_Datatype type) const;
         void isend(void* buf, int size, MPI_Datatype type) const;
@@ -49,13 +50,13 @@ namespace auto_parallel
     private:
 
         MPI_Comm comm;
-        int proc;
+        process proc;
         mutable int tag;
         std::queue<MPI_Request>* q;
 
     public:
 
-        receiver(MPI_Comm _comm, int _proc, std::queue<MPI_Request>* _q);
+        receiver(MPI_Comm _comm, process _proc, std::queue<MPI_Request>* _q);
 
         void recv(void* buf, int size, MPI_Datatype type) const;
         void irecv(void* buf, int size, MPI_Datatype type) const;

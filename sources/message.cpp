@@ -33,16 +33,16 @@ namespace auto_parallel
     std::vector<message_creator_base*> message_factory::v;
     std::vector<message_creator_base*> message_factory::v_part;
 
-    message* message_factory::get(size_t id, message::init_info_base* info)
+    message* message_factory::get(message_type id, message::init_info_base* info)
     { return v[id]->get_message(info); }
 
-    message* message_factory::get_part(size_t id, message* p, message::part_info_base* info)
+    message* message_factory::get_part(message_type id, message* p, message::part_info_base* info)
     { return v_part[id]->get_part_from(p, info); }
 
-    message::init_info_base* message_factory::message_factory::get_info(size_t id)
+    message::init_info_base* message_factory::message_factory::get_info(message_type id)
     { return v[id]->get_init_info(); }
 
-    message::part_info_base* message_factory::get_part_info(size_t id)
+    message::part_info_base* message_factory::get_part_info(message_type id)
     { return v_part[id]->get_part_info(); }
 
 }

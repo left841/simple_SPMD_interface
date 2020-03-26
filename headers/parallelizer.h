@@ -7,6 +7,7 @@
 #include <set>
 #include <limits>
 #include "mpi.h"
+#include "parallel_defs.h"
 #include "parallel_core.h"
 #include "instruction.h"
 #include "memory_manager.h"
@@ -25,34 +26,30 @@ namespace auto_parallel
         intracomm instr_comm;
 
         std::queue<task_id> ready_tasks;
-        //it_queue<task_id> ready_tasks;
         memory_manager memory;
 
         void master();
         void worker();
 
-        void send_task_data(task_id tid, int proc, instruction& ins, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con);
-        void assign_task(task_id tid, int proc, instruction& ins, std::vector<std::set<int>>& com);
-        void send_instruction(int proc, instruction& ins);
-        void end_main_task(task_id tid, task_environment& te, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<int>>& con_t);
-        void wait_task(int proc, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<int>>& con_t);
+        void send_task_data(task_id tid, process proc, instruction& ins, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con);
+        void assign_task(task_id tid, process proc, instruction& ins, std::vector<std::set<task_id>>& com);
+        void send_instruction(process proc, instruction& ins);
+        void end_main_task(task_id tid, task_environment& te, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<task_id>>& con_t);
+        void wait_task(process proc, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<task_id>>& con_t);
 
-        void create_message(message_id id, int type, int proc);
-        void create_part(message_id id, int type, int source, int proc);
-        int create_task(int* inst);
         void execute_task(task_id id);
 
         void clear();
 
     public:
 
-        const static int main_proc;
+        const static process main_proc;
 
         parallelizer();
         parallelizer(task_graph& _tg);
         ~parallelizer();
 
-        int get_current_proc();
+        process get_current_proc();
         int get_proc_count();
 
         void init(task_graph& _tg);

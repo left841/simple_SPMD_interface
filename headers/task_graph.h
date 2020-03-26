@@ -1,6 +1,7 @@
 #ifndef __TASK_GRAPH_H__
 #define __TASK_GRAPH_H__
 
+#include "parallel_defs.h"
 #include "basic_task.h"
 #include <vector>
 #include <map>
@@ -14,23 +15,23 @@ namespace auto_parallel
     {
     protected:
 
-        int base_task_id;
-        int base_data_id;
+        task_id base_task_id;
+        message_id base_data_id;
 
         struct d_id
         {
-            const int id;
+            const message_id id;
             int ref_count;
-            d_id(const int nid = 0): id(nid)
+            d_id(const message_id nid = 0): id(nid)
             { ref_count = 0; }
         };
 
         struct t_id
         {
-            const int id;
+            const task_id id;
             std::set<task*> childs;
             std::set<task*> parents;
-            t_id(const int nid = 0): id(nid)
+            t_id(const task_id nid = 0): id(nid)
             { }
         };
 

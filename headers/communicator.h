@@ -2,6 +2,7 @@
 #define __COMMUNICATOR_H__
 
 #include "mpi.h"
+#include "parallel_defs.h"
 
 namespace auto_parallel
 {
@@ -11,7 +12,7 @@ namespace auto_parallel
     protected:
 
         MPI_Comm comm;
-        int comm_rank;
+        process comm_rank;
         int comm_size;
         bool created;
 
@@ -23,7 +24,7 @@ namespace auto_parallel
 
         ~communicator();
 
-        int rank() const;
+        process rank() const;
         MPI_Comm get_comm() const;
         int size() const;
 
