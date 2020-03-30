@@ -37,6 +37,9 @@ namespace auto_parallel
         void end_main_task(task_id tid, task_environment& te, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<task_id>>& con_t);
         void wait_task(process proc, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<task_id>>& con_t);
 
+
+        void update_ready_tasks(task_id tid);
+
         void execute_task(task_id id);
 
         void clear();

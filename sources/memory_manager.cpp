@@ -16,10 +16,10 @@ namespace auto_parallel
     {
         clear();
 
-        std::map<task*, int> tmp;
-        std::map<message*, int> dmp;
-        std::map<int, task*> tmpr;
-        std::map<int, message*> dmpr;
+        std::map<task*, size_t> tmp;
+        std::map<message*, size_t> dmp;
+        std::map<size_t, task*> tmpr;
+        std::map<size_t, message*> dmpr;
 
         for (auto it = _tg.d_map.begin(); it != _tg.d_map.end(); ++it)
             dmpr[(*it).second.id] = (*it).first;

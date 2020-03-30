@@ -1,4 +1,7 @@
 #include "instruction.h"
+//#include <iostream>
+//using std::cout;
+//using std::endl;
 
 namespace auto_parallel
 {
@@ -42,9 +45,7 @@ namespace auto_parallel
     { v.clear(); }
 
     void instruction::add_cmd(INSTRUCTION id)
-    {
-        v.push_back(static_cast<size_t>(id));
-    }
+    { v.push_back(static_cast<size_t>(id)); }
 
     std::vector<std::function<const instruction_block* (const size_t* const)>> instruction::block_factory::constructors =
     {
@@ -273,26 +274,38 @@ namespace auto_parallel
 
     // TASK_RES
     instruction_task_result::instruction_task_result(const size_t* const p): instruction_block(p)
-    { }
-
-    size_t instruction_task_result::size() const
     {
-        size_t n = 4 + ins[2] + ins[3 + ins[2]] * 3, m = n + 1;
-        for (size_t i = 0; i < ins[n]; ++i)
+        offsets[0] = 2;
+        offsets[1] = 3 + ins[2];
+        offsets[2] = 4 + ins[2] + ins[3 + ins[2]] * 3;
+        size_t m = offsets[2] + 1;
+        for (size_t i = 0; i < ins[offsets[2]]; ++i)
         {
             m += 1;
             m += ins[m] * 2 + 1;
             m += ins[m] * 2 + 1;
         }
-        return  m;
+        offsets[3] = m;
+        ++m;
+        for (size_t i = 0; i < ins[offsets[3]]; ++i)
+        {
+            m += 1;
+            m += ins[m] * 2 + 1;
+            m += ins[m] * 2 + 1;
+        }
+        offsets[4] = m;
+        offsets[5] = ins[m] * 4 + m + 1;
     }
+
+    size_t instruction_task_result::size() const
+    { return offsets[5]; }
 
     task_id instruction_task_result::id() const
     { return static_cast<task_id>(ins[1]); }
 
     std::vector<message_type> instruction_task_result::created_messages() const
     {
-        std::vector<message_type> v(ins[2]);
+        std::vector<message_type> v(ins[offsets[0]]);
         for (size_t i = 0; i < v.size(); ++i)
             v[i] = ins[3 + i];
         return v;
@@ -300,8 +313,8 @@ namespace auto_parallel
 
     std::vector<std::pair<message_type, local_message_id>> instruction_task_result::created_parts() const
     {
-        size_t n = 4 + ins[2];
-        std::vector<std::pair<message_type, local_message_id>> v(ins[3 + ins[2]]);
+        size_t n = offsets[1] + 1;
+        std::vector<std::pair<message_type, local_message_id>> v(ins[offsets[1]]);
         for (size_t i = 0; i < v.size(); ++i)
         {
             v[i] = {static_cast<message_type>(ins[n]), {ins[n + 1], static_cast<MESSAGE_SOURCE>(ins[n + 2])}};
@@ -310,9 +323,9 @@ namespace auto_parallel
         return v;
     }
 
-    std::vector<task_data> instruction_task_result::created_tasks() const
+    std::vector<task_data> instruction_task_result::created_child_tasks() const
     {
-        size_t n = 4 + ins[2] + ins[3 + ins[2]] * 3;
+        size_t n = offsets[2];
         std::vector<task_data> v = read_vector<task_data>(n, [this](size_t& n)->task_data
         {
             task_data td {static_cast<task_type>(this->ins[n++]), {}, {}};
@@ -335,12 +348,51 @@ namespace auto_parallel
         return v;
     }
 
+    std::vector<task_data> instruction_task_result::created_tasks() const
+    {
+        size_t n = offsets[3];
+        std::vector<task_data> v = read_vector<task_data>(n, [this](size_t& n)->task_data
+            {
+                task_data td{static_cast<task_type>(this->ins[n++]), {}, {}};
+                td.data = read_vector<local_message_id>(n, [this](size_t& n)->local_message_id
+                    {
+                        local_message_id id;
+                        id.id = this->ins[n++];
+                        id.ms = static_cast<MESSAGE_SOURCE>(this->ins[n++]);
+                        return id;
+                    });
+                td.c_data = read_vector<local_message_id>(n, [this](size_t& n)->local_message_id
+                    {
+                        local_message_id id;
+                        id.id = this->ins[n++];
+                        id.ms = static_cast<MESSAGE_SOURCE>(this->ins[n++]);
+                        return id;
+                    });
+                return td;
+            });
+        return v;
+    }
+
+    std::vector<task_dependence> instruction_task_result::created_task_dependences() const
+    {
+        size_t n = offsets[4];
+        std::vector<task_dependence> v = read_vector<task_dependence>(n, [this](size_t& n)->task_dependence
+        {
+            task_dependence dp {ins[n], static_cast<TASK_SOURCE>(ins[n + 1]), ins[n + 2], static_cast<TASK_SOURCE>(ins[n + 3])};
+            n += 4;
+            return dp;
+        });
+        return v;
+    }
+
     void instruction::add_task_result(task_id id, task_environment& env)
     {
         add_cmd(INSTRUCTION::TASK_RES);
         std::vector<message_data>& md = env.created_messages();
         std::vector<message_part_data>& mpd = env.created_parts();
-        std::vector<task_data>& td = env.created_tasks();
+        std::vector<task_data>& td = env.created_child_tasks();
+        std::vector<task_data>& cre_t = env.created_tasks();
+        std::vector<task_dependence>& dep = env.created_dependences();
 
         v.push_back(id);
         v.push_back(md.size());
@@ -369,6 +421,31 @@ namespace auto_parallel
                 v.push_back(j.id);
                 v.push_back(static_cast<size_t>(j.ms));
             }
+        }
+        v.push_back(cre_t.size());
+        for (task_data& i: cre_t)
+        {
+            v.push_back(i.type);
+            v.push_back(i.data.size());
+            for (local_message_id j: i.data)
+            {
+                v.push_back(j.id);
+                v.push_back(static_cast<size_t>(j.ms));
+            }
+            v.push_back(i.c_data.size());
+            for (local_message_id j: i.c_data)
+            {
+                v.push_back(j.id);
+                v.push_back(static_cast<size_t>(j.ms));
+            }
+        }
+        v.push_back(dep.size());
+        for (task_dependence& i: dep)
+        {
+            v.push_back(i.parent.id);
+            v.push_back(static_cast<size_t>(i.parent.src));
+            v.push_back(i.child.id);
+            v.push_back(static_cast<size_t>(i.child.src));
         }
     }
 

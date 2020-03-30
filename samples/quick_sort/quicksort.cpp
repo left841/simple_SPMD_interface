@@ -177,7 +177,7 @@ public:
                 arrray::part_info* pi1 = new arrray::part_info;
                 pi1->offset = 0;
                 pi1->size = static_cast<size_t>(r) + 1;
-                env.create_task<quick_task>({env.create_message<arrray>(ii1, pi1, env.get_arg_id(0))}, {});
+                env.create_child_task<quick_task>({env.create_message<arrray>(ii1, pi1, env.get_arg_id(0))}, {});
             }
 
             if (sz - (r + 1) > 1)
@@ -187,7 +187,7 @@ public:
                 arrray::part_info* pi2 = new arrray::part_info;
                 pi2->offset = r + 1;
                 pi2->size = static_cast<size_t>(sz) - (static_cast<size_t>(r) + 1);
-                env.create_task<quick_task>({env.create_message<arrray>(ii2, pi2, env.get_arg_id(0))}, {});
+                env.create_child_task<quick_task>({env.create_message<arrray>(ii2, pi2, env.get_arg_id(0))}, {});
             }
         }
     }

@@ -65,7 +65,16 @@ namespace auto_parallel
         CREATED, PART
     };
 
-    typedef size_t local_task_id;
+    enum class TASK_SOURCE: size_t
+    {
+        GLOBAL, CREATED, CHILD
+    };
+
+    struct local_task_id
+    {
+        size_t id;
+        TASK_SOURCE src;
+    };
 
     struct local_message_id
     {
@@ -93,6 +102,12 @@ namespace auto_parallel
         message::part_info_base* pib;
     };
 
+    struct task_dependence
+    {
+        local_task_id parent;
+        local_task_id child;
+    };
+
     class task_result
     {
     private:
@@ -115,36 +130,53 @@ namespace auto_parallel
     private:
 
         task_data this_task;
+        local_task_id this_task_id;
         task_result res;
+        std::vector<task_data> created_tasks_v;
+        std::vector<task_dependence> dependence_v;
 
     public:
 
-        task_environment(task_data& td);
-        task_environment(task_data&& td);
+        task_environment(task_data& td, task_id id);
+        task_environment(task_data&& td, task_id id);
 
         template<class Type>
         local_task_id create_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
+        template<class Type>
+        local_task_id create_child_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
         template<class Type>
         local_message_id create_message(message::init_info_base* iib);
         template<class Type>
         local_message_id create_message(message::init_info_base* iib, message::part_info_base* pib, local_message_id source);
 
+        void add_dependence(local_task_id parent, local_task_id child);
+
         task_result& get_result();
         std::vector<task_data>& created_tasks();
+        std::vector<task_data>& created_child_tasks();
         std::vector<message_data>& created_messages();
         std::vector<message_part_data>& created_parts();
+        std::vector<task_dependence>& created_dependences();
 
         local_message_id get_arg_id(size_t n);
         local_message_id get_c_arg_id(size_t n);
         task_data get_this_task_data();
+        local_task_id get_this_task_id();
 
     };
 
     template<class Type>
     local_task_id task_environment::create_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
     {
+        created_tasks_v.push_back({task_creator<Type>::get_type(), data, const_data});
+        return {created_tasks_v.size() - 1, TASK_SOURCE::CREATED};
+    }
+
+    template<class Type>
+    local_task_id task_environment::create_child_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
+    {
         res.created_tasks().push_back({task_creator<Type>::get_type(), data, const_data});
-        return res.created_tasks().size() - 1;
+        return {res.created_tasks().size() - 1, TASK_SOURCE::CHILD};
     }
 
     template<class Type>

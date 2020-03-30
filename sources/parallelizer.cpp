@@ -1,4 +1,7 @@
 #include "parallelizer.h"
+//#include <iostream>
+//using std::cout;
+//using std::endl;
 
 namespace auto_parallel
 {
@@ -89,7 +92,7 @@ namespace auto_parallel
                 for (message_id j: memory.get_task_const_data(i))
                     c_data.push_back({j, MESSAGE_SOURCE::TASK_ARG_C});
                 task_data td = {memory.get_task_type(i), data, c_data};
-                task_environment te(td);
+                task_environment te(td, i);
 
                 for (message_id j: memory.get_task_data(i))
                     memory.get_message(j)->wait_requests();
@@ -221,13 +224,14 @@ namespace auto_parallel
 
     void parallelizer::end_main_task(task_id tid, task_environment& te, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<task_id>>& con_t)
     {
-        size_t new_mes = memory.message_count();
-        std::vector<task_data>& td = te.created_tasks();
         std::vector<message_data>& md = te.created_messages();
         std::vector<message_part_data>& mpd = te.created_parts();
+        std::vector<task_data>& td = te.created_child_tasks();
+        std::vector<task_data>& cre_t = te.created_tasks();
+        std::vector<task_dependence>& dep = te.created_dependences();
 
         std::vector<message_id> created_message_id;
-        for (int i = 0; i < md.size(); ++i)
+        for (size_t i = 0; i < md.size(); ++i)
         {
             message_id id = memory.create_message(md[i].type, md[i].iib);
             con[main_proc].insert(id);
@@ -235,98 +239,150 @@ namespace auto_parallel
             created_message_id.push_back(id);
         }
 
-        for (int i = 0; i < mpd.size(); ++i)
+        std::vector<message_id> created_part_id;
+        for (size_t i = 0; i < mpd.size(); ++i)
         {
             message_id s_id;
-            if ((mpd[i].sourse.ms != MESSAGE_SOURCE::TASK_ARG) && (mpd[i].sourse.ms != MESSAGE_SOURCE::TASK_ARG_C))
+            if ((mpd[i].sourse.ms == MESSAGE_SOURCE::TASK_ARG) || (mpd[i].sourse.ms == MESSAGE_SOURCE::TASK_ARG_C))
+                s_id = mpd[i].sourse.id;
+            else if (mpd[i].sourse.ms == MESSAGE_SOURCE::CREATED)
                 s_id = created_message_id[mpd[i].sourse.id];
             else
-                s_id = mpd[i].sourse.id;
+                s_id = created_part_id[mpd[i].sourse.id];
 
-            for (int k = 1; k < comm.size(); ++k)
+            for (process k = 1; k < comm.size(); ++k)
                 ver[k].erase(s_id);
             message_id id = memory.create_message(mpd[i].type, s_id, mpd[i].pib, mpd[i].iib);
             con[main_proc].insert(id);
             ver[main_proc].insert(id);
-            created_message_id.push_back(id);
+            created_part_id.push_back(id);
         }
 
+        std::vector<task_id> created_child_task_id;
         memory.set_task_created_childs(tid, memory.get_task_created_childs(tid) + td.size());
-        for (int i = 0; i < td.size(); ++i)
+        for (task_data& i: td)
         {
-            std::vector<message_id> data_id(td[i].data.size());
-            for (int k = 0; k < td[i].data.size(); ++k)
+            std::vector<message_id> data_id;
+            data_id.reserve(i.data.size());
+            for (local_message_id k: i.data)
             {
-                if ((td[i].data[k].ms != MESSAGE_SOURCE::TASK_ARG) && (td[i].data[k].ms != MESSAGE_SOURCE::TASK_ARG_C))
-                    data_id[k] = created_message_id[td[i].data[k].id];
+                if ((k.ms == MESSAGE_SOURCE::TASK_ARG) || (k.ms == MESSAGE_SOURCE::TASK_ARG_C))
+                    data_id.push_back(k.id);
+                else if (k.ms == MESSAGE_SOURCE::CREATED)
+                    data_id.push_back(created_message_id[k.id]);
                 else
-                    data_id[k] = td[i].data[k].id;
+                    data_id.push_back(created_part_id[k.id]);
             }
 
-            std::vector<message_id> const_data_id(td[i].c_data.size());
-            for (int k = 0; k < td[i].c_data.size(); ++k)
+            std::vector<message_id> const_data_id;
+            const_data_id.reserve(i.c_data.size());
+            for (local_message_id k: i.c_data)
             {
-                size_t id = td[i].c_data[k].id;
-                if ((td[i].c_data[k].ms != MESSAGE_SOURCE::TASK_ARG) && (td[i].c_data[k].ms != MESSAGE_SOURCE::TASK_ARG_C))
-                    const_data_id[k] = created_message_id[td[i].data[k].id];
+                if ((k.ms == MESSAGE_SOURCE::TASK_ARG) || (k.ms == MESSAGE_SOURCE::TASK_ARG_C))
+                    const_data_id.push_back(k.id);
+                else if (k.ms == MESSAGE_SOURCE::CREATED)
+                    const_data_id.push_back(created_message_id[k.id]);
                 else
-                    const_data_id[k] = td[i].c_data[k].id;
+                    const_data_id.push_back(created_part_id[k.id]);
             }
 
-            task_id id = memory.create_task(td[i].type, data_id, const_data_id);
+            task_id id = memory.create_task(i.type, data_id, const_data_id);
             memory.set_task_parent(id, tid);
             con_t[main_proc].insert(id);
-            ready_tasks.push(id);
+            created_child_task_id.push_back(id);
+        }
+
+        std::vector<task_id> created_task_id;
+        for (task_data& i: cre_t)
+        {
+            std::vector<message_id> data_id;
+            data_id.reserve(i.data.size());
+            for (local_message_id k: i.data)
+            {
+                if ((k.ms == MESSAGE_SOURCE::TASK_ARG) || (k.ms == MESSAGE_SOURCE::TASK_ARG_C))
+                    data_id.push_back(k.id);
+                else if (k.ms == MESSAGE_SOURCE::CREATED)
+                    data_id.push_back(created_message_id[k.id]);
+                else
+                    data_id.push_back(created_part_id[k.id]);
+            }
+
+            std::vector<message_id> const_data_id;
+            const_data_id.reserve(i.c_data.size());
+            for (local_message_id k: i.c_data)
+            {
+                if ((k.ms == MESSAGE_SOURCE::TASK_ARG) || (k.ms == MESSAGE_SOURCE::TASK_ARG_C))
+                    const_data_id.push_back(k.id);
+                else if (k.ms == MESSAGE_SOURCE::CREATED)
+                    const_data_id.push_back(created_message_id[k.id]);
+                else
+                    const_data_id.push_back(created_part_id[k.id]);
+            }
+
+            task_id id = memory.create_task(i.type, data_id, const_data_id);
+            con_t[main_proc].insert(id);
+            created_task_id.push_back(id);
+        }
+
+        for (task_dependence& i: dep)
+        {
+            task_id parent;
+            task_id child;
+            if (i.parent.src == TASK_SOURCE::CHILD)
+                parent = created_child_task_id[i.parent.id];
+            else if (i.parent.src == TASK_SOURCE::CREATED)
+                parent = created_task_id[i.parent.id];
+            else
+                parent = i.parent.id;
+
+            if (i.child.src == TASK_SOURCE::CHILD)
+                child = created_child_task_id[i.child.id];
+            else if (i.child.src == TASK_SOURCE::CREATED)
+                child = created_task_id[i.child.id];
+            else
+                child = i.child.id;
+            memory.add_dependence(parent, child);
+        }
+
+        for (task_id i: created_child_task_id)
+        {
+            if (memory.get_task_parents_count(i) == 0)
+                ready_tasks.push(i);
+        }
+
+        for (task_id i: created_task_id)
+        {
+            if (memory.get_task_parents_count(i) == 0)
+                ready_tasks.push(i);
         }
 
         for (message_id i: memory.get_task_data(tid))
         {
-            for (int k = 0; k < comm.size(); ++k)
+            for (process k = 0; k < comm.size(); ++k)
                 ver[k].erase(i);
             ver[main_proc].insert(i);
         }
         memory.update_message_versions(tid);
 
-        task_id c_t = tid;
-        while (1)
-        {
-            if (memory.get_task_created_childs(c_t) == 0)
-                for (task_id i: memory.get_task_childs(c_t))
-                {
-                    memory.set_task_parents_count(i, memory.get_task_parents_count(i) - 1);
-                    if (memory.get_task_parents_count(i) == 0)
-                        ready_tasks.push(i);
-                }
-            else
-                break;
-            if (!memory.task_has_parent(c_t))
-                break;
-            else
-            {
-                c_t = memory.get_task_parent(c_t);
-                memory.set_task_created_childs(c_t, memory.get_task_created_childs(c_t) - 1);
-            }
-        }
+        update_ready_tasks(tid);
     }
 
     void parallelizer::wait_task(process proc, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<task_id>>& con_t)
     {
         instruction res_ins;
         instr_comm.recv(&res_ins, proc);
-
         instruction::const_iterator it = res_ins.begin();
         const instruction_block& ins = *it;
-
         if (ins.command() != INSTRUCTION::TASK_RES)
             comm.abort(111);
         const instruction_task_result& result = dynamic_cast<const instruction_task_result&>(ins);
 
         std::vector<message_type>& mes_created = result.created_messages();
         std::vector<std::pair<message_type, local_message_id>>& part_created = result.created_parts();
+        std::vector<task_data>& task_child_created = result.created_child_tasks();
         std::vector<task_data>& task_created = result.created_tasks();
-
+        std::vector<task_dependence>& dependence_created = result.created_task_dependences();
         task_id tid = result.id();
-        std::vector<message_id> created_id;
 
         for (message_id i: memory.get_task_data(tid))
         {
@@ -341,16 +397,18 @@ namespace auto_parallel
         for (message_id i: memory.get_task_data(tid))
             memory.get_message(i)->wait_requests();
 
+        std::vector<message_id> created_message_id;
         for (message_type i: mes_created)
         {
             message::init_info_base* iib = message_factory::get_info(i);
             instr_comm.recv(iib, proc);
             message_id id = memory.create_message(i, iib);
-            created_id.push_back(id);
+            created_message_id.push_back(id);
             con[main_proc].insert(id);
             ver[main_proc].insert(id);
         }
 
+        std::vector<message_id> created_part_id;
         for (std::pair<message_type, local_message_id> i: part_created)
         {
             message::init_info_base* iib = message_factory::get_info(i.first);
@@ -359,10 +417,12 @@ namespace auto_parallel
             instr_comm.recv(pib, proc);
 
             message_id s_id;
-            if ((i.second.ms != MESSAGE_SOURCE::TASK_ARG) && (i.second.ms != MESSAGE_SOURCE::TASK_ARG_C))
-                s_id = created_id[i.second.id];
-            else
+            if ((i.second.ms == MESSAGE_SOURCE::TASK_ARG) || (i.second.ms == MESSAGE_SOURCE::TASK_ARG_C))
                 s_id = i.second.id;
+            else if (i.second.ms == MESSAGE_SOURCE::CREATED)
+                s_id = created_message_id[i.second.id];
+            else
+                s_id = created_part_id[i.second.id];
 
             memory.get_message(s_id)->wait_requests();
 
@@ -370,40 +430,114 @@ namespace auto_parallel
                 ver[k].erase(s_id);
 
             message_id id = memory.create_message(i.first, s_id, pib, iib);
-            created_id.push_back(id);
+            created_part_id.push_back(id);
             con[main_proc].insert(id);
             ver[main_proc].insert(id);
         }
 
-        memory.set_task_created_childs(tid, memory.get_task_created_childs(tid) + task_created.size());
-        for (task_data& i: task_created)
+        std::vector<task_id> created_child_task_id;
+        memory.set_task_created_childs(tid, memory.get_task_created_childs(tid) + task_child_created.size());
+        for (task_data& i: task_child_created)
         {
             std::vector<message_id> data_id;
             data_id.reserve(i.data.size());
             for (local_message_id k: i.data)
             {
-                if ((k.ms != MESSAGE_SOURCE::TASK_ARG) && (k.ms != MESSAGE_SOURCE::TASK_ARG_C))
-                    data_id.push_back(created_id[k.id]);
-                else
+                if ((k.ms == MESSAGE_SOURCE::TASK_ARG) || (k.ms == MESSAGE_SOURCE::TASK_ARG_C))
                     data_id.push_back(k.id);
+                else if (k.ms == MESSAGE_SOURCE::CREATED)
+                    data_id.push_back(created_message_id[k.id]);
+                else
+                    data_id.push_back(created_part_id[k.id]);
             }
 
             std::vector<message_id> const_data_id;
             const_data_id.reserve(i.c_data.size());
             for (local_message_id k: i.c_data)
             {
-                if ((k.ms != MESSAGE_SOURCE::TASK_ARG) && (k.ms != MESSAGE_SOURCE::TASK_ARG_C))
-                    const_data_id.push_back(created_id[k.id]);
-                else
+                if ((k.ms == MESSAGE_SOURCE::TASK_ARG) || (k.ms == MESSAGE_SOURCE::TASK_ARG_C))
                     const_data_id.push_back(k.id);
+                else if (k.ms == MESSAGE_SOURCE::CREATED)
+                    const_data_id.push_back(created_message_id[k.id]);
+                else
+                    const_data_id.push_back(created_part_id[k.id]);
             }
 
             task_id id = memory.create_task(i.type, data_id, const_data_id);
             memory.set_task_parent(id, tid);
             con_t[main_proc].insert(id);
-            ready_tasks.push(id);
+            created_child_task_id.push_back(id);
         }
 
+        std::vector<task_id> created_task_id;
+        for (task_data& i: task_created)
+        {
+            std::vector<message_id> data_id;
+            data_id.reserve(i.data.size());
+            for (local_message_id k: i.data)
+            {
+                if ((k.ms == MESSAGE_SOURCE::TASK_ARG) || (k.ms == MESSAGE_SOURCE::TASK_ARG_C))
+                    data_id.push_back(k.id);
+                else if (k.ms == MESSAGE_SOURCE::CREATED)
+                    data_id.push_back(created_message_id[k.id]);
+                else
+                    data_id.push_back(created_part_id[k.id]);
+            }
+
+            std::vector<message_id> const_data_id;
+            const_data_id.reserve(i.c_data.size());
+            for (local_message_id k: i.c_data)
+            {
+                if ((k.ms == MESSAGE_SOURCE::TASK_ARG) || (k.ms == MESSAGE_SOURCE::TASK_ARG_C))
+                    const_data_id.push_back(k.id);
+                else if (k.ms == MESSAGE_SOURCE::CREATED)
+                    const_data_id.push_back(created_message_id[k.id]);
+                else
+                    const_data_id.push_back(created_part_id[k.id]);
+            }
+
+            task_id id = memory.create_task(i.type, data_id, const_data_id);
+            con_t[main_proc].insert(id);
+            created_task_id.push_back(id);
+        }
+
+        for (task_dependence& i: dependence_created)
+        {
+            task_id parent;
+            task_id child;
+            if (i.parent.src == TASK_SOURCE::CHILD)
+                parent = created_child_task_id[i.parent.id];
+            else if (i.parent.src == TASK_SOURCE::CREATED)
+                parent = created_task_id[i.parent.id];
+            else
+                parent = i.parent.id;
+
+            if (i.child.src == TASK_SOURCE::CHILD)
+                child = created_child_task_id[i.child.id];
+            else if (i.child.src == TASK_SOURCE::CREATED)
+                child = created_task_id[i.child.id];
+            else
+                child = i.child.id;
+            memory.add_dependence(parent, child);
+        }
+
+        for (task_id i: created_child_task_id)
+        {
+            if (memory.get_task_parents_count(i) == 0)
+                ready_tasks.push(i);
+        }
+
+        for (task_id i: created_task_id)
+        {
+            if (memory.get_task_parents_count(i) == 0)
+                ready_tasks.push(i);
+        }
+
+        update_ready_tasks(tid);
+    }
+
+    void parallelizer::update_ready_tasks(task_id tid)
+    {
         task_id c_t = tid;
         while (1)
         {
@@ -501,7 +635,7 @@ namespace auto_parallel
             c_data.push_back({i, MESSAGE_SOURCE::TASK_ARG_C});
 
         task_data td = {memory.get_task_type(id), data, c_data};
-        task_environment env(std::move(td));
+        task_environment env(std::move(td), id);
 
         for (message_id i: memory.get_task_data(id))
             memory.get_message(i)->wait_requests();

@@ -5,6 +5,7 @@
 #include "message.h"
 #include "basic_task.h"
 #include "transfer.h"
+#include <array>
 
 namespace auto_parallel
 {
@@ -122,6 +123,8 @@ namespace auto_parallel
 
     class instruction_task_result: public instruction_block
     {
+    private:
+        std::array<size_t, 6> offsets;
     public:
         instruction_task_result(const size_t* const p);
 
@@ -129,7 +132,9 @@ namespace auto_parallel
         task_id id() const;
         std::vector<message_type> created_messages() const;
         std::vector<std::pair<message_type, local_message_id>> created_parts() const;
+        std::vector<task_data> created_child_tasks() const;
         std::vector<task_data> created_tasks() const;
+        std::vector<task_dependence> created_task_dependences() const;
     };
 
     class instruction: public sendable
