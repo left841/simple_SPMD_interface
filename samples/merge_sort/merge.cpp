@@ -33,10 +33,10 @@ public:
             delete[] p;
     }
     void send(const sender& se)
-    { se.isend(p, size, MPI_INT); }
+    { se.isend(p, size); }
 
     void recv(const receiver& re)
-    { re.irecv(p, size, MPI_INT); }
+    { re.irecv(p, size); }
 
     int* get_p() const
     { return p; }

@@ -18,10 +18,10 @@ public:
     { time = 0.0; }
 
     void send(const sender& se)
-    { se.send(&time, 1, MPI_DOUBLE); }
+    { se.send(&time, 1); }
 
     void recv(const receiver& re)
-    { re.recv(&time, 1, MPI_DOUBLE); }
+    { re.recv(&time, 1); }
 };
 
 class m_array: public message
@@ -41,12 +41,12 @@ public:
 
         void send(const sender& se)
         {
-            se.send(&size, 1, MPI_INT);
+            se.send(&size, 1);
         }
 
         void recv(const receiver& re)
         {
-            re.recv(&size, 1, MPI_INT);
+            re.recv(&size, 1);
         }
     };
 
@@ -59,14 +59,14 @@ public:
 
         void send(const sender& se)
         {
-            se.send(&offset, 1, MPI_INT);
-            se.send(&size, 1, MPI_INT);
+            se.send(&offset, 1);
+            se.send(&size, 1);
         }
 
         void recv(const receiver& re)
         {
-            re.recv(&offset, 1, MPI_INT);
-            re.recv(&size, 1, MPI_INT);
+            re.recv(&offset, 1);
+            re.recv(&size, 1);
         }
     };
 
@@ -100,10 +100,10 @@ public:
     }
 
     void send(const sender& se)
-    { se.isend(p, size, MPI_INT); }
+    { se.isend(p, size); }
 
     void recv(const receiver& re)
-    { re.irecv(p, size, MPI_INT); }
+    { re.irecv(p, size); }
 
     int* get_p() const
     { return p; }

@@ -18,10 +18,10 @@ public:
     { time = 0.0; }
 
     void send(const sender& se)
-    { se.send(&time, 1, MPI_DOUBLE); }
+    { se.send(&time, 1); }
 
     void recv(const receiver& re)
-    { re.recv(&time, 1, MPI_LONG_LONG); }
+    { re.recv(&time, 1); }
 };
 
 class arrray: public message
@@ -39,10 +39,10 @@ public:
         { size = 0; }
 
         void send(const sender& se)
-        { se.send(&size, 1, MPI_LONG_LONG); }
+        { se.send(&size, 1); }
 
         void recv(const receiver& re)
-        { re.recv(&size, 1, MPI_LONG_LONG); }
+        { re.recv(&size, 1); }
     };
 
     struct part_info: public part_info_base
@@ -58,14 +58,14 @@ public:
 
         void send(const sender& se)
         {
-            se.send(&offset, 1, MPI_INT);
-            se.send(&size, 1, MPI_LONG_LONG);
+            se.send(&offset, 1);
+            se.send(&size, 1);
         }
 
         void recv(const receiver& re)
         {
-            re.recv(&offset, 1, MPI_INT);
-            re.recv(&size, 1, MPI_LONG_LONG);
+            re.recv(&offset, 1);
+            re.recv(&size, 1);
         }
     };
 
@@ -88,10 +88,10 @@ public:
     }
 
     void send(const sender& se)
-    { se.isend(p, static_cast<int>(size), MPI_INT); }
+    { se.isend(p, static_cast<int>(size)); }
 
     void recv(const receiver& re)
-    { re.irecv(p, static_cast<int>(size), MPI_INT); }
+    { re.irecv(p, static_cast<int>(size)); }
 };
 
 class quick_task: public task

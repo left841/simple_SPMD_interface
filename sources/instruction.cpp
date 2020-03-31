@@ -23,13 +23,13 @@ namespace auto_parallel
 
     void instruction::send(const sender& se)
     {
-        se.send(v.data(), static_cast<int>(v.size()), SIZE_MPI_DATATYPE);
+        se.send(v.data(), static_cast<int>(v.size()));
     }
 
     void instruction::recv(const receiver& re)
     {
-        v.resize(re.probe(SIZE_MPI_DATATYPE));
-        re.recv(v.data(), static_cast<int>(v.size()), SIZE_MPI_DATATYPE);
+        v.resize(re.probe<size_t>());
+        re.recv(v.data(), static_cast<int>(v.size()));
     }
 
     size_t& instruction::operator[](size_t n)
