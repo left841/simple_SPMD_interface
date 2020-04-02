@@ -203,8 +203,8 @@ namespace auto_parallel
     public:
 
         task();
-        task(std::vector<message*>& mes_v);
-        task(std::vector<message*>& mes_v, std::vector<const message*>& c_mes_v);
+        task(const std::vector<message*>& mes_v);
+        task(const std::vector<message*>& mes_v, const std::vector<const message*>& c_mes_v);
         virtual ~task();
 
         virtual void perform(task_environment& env) = 0;

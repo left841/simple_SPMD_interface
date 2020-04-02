@@ -70,7 +70,7 @@ public:
 class mytask: public task
 {
 public:
-    mytask(std::vector<message*>& mes_v, std::vector<const message*>& cmes_v): task(mes_v, cmes_v)
+    mytask(const std::vector<message*>& mes_v, const std::vector<const message*>& cmes_v): task(mes_v, cmes_v)
     { }
     void perform(task_environment& env)
     {
@@ -89,7 +89,7 @@ public:
 class out_task: public task
 {
 public:
-    out_task(std::vector<message*>& mes_v, std::vector<const message*>& cmes_v): task(mes_v, cmes_v)
+    out_task(const std::vector<message*>& mes_v, const std::vector<const message*>& cmes_v): task(mes_v, cmes_v)
     { }
     void perform(task_environment& env)
     {
@@ -108,7 +108,7 @@ public:
 class init_task : public task
 {
     public:
-    init_task(std::vector<message*>& mes_v, std::vector<const message*>& cmes_v): task(mes_v, cmes_v)
+    init_task(const std::vector<message*>& mes_v, const std::vector<const message*>& cmes_v): task(mes_v, cmes_v)
     { }
     void perform(task_environment& env)
     {
@@ -156,11 +156,8 @@ int main(int argc, char** argv)
     mymessage* w = new mymessage(m, b);
     mymessage* cw = new mymessage(n, c);
     mytask** t = new mytask*[layers];
-    vector<message*> ve;
     vector<const message*> cve;
     vector<message*> vi;
-    vector<const message*> cvi;
-    ve.push_back(cw);
     int div = n / layers;
     int mod = n % layers;
     for (int i = 0; i < layers; ++i)
@@ -170,17 +167,12 @@ int main(int argc, char** argv)
             g += mod;
         matrix_part* p = new matrix_part(m, g);
         mymessage* q = new mymessage(div, new int[g]);
-        vector<message*> v;
-        vector<const message*> cv;
-        cv.push_back(p);
-        cv.push_back(w);
-        v.push_back(q);
         cve.push_back(q);
-        t[i] = new mytask(v,cv);
+        t[i] = new mytask({q}, {p, w});
         vi.push_back(p);
     }
-    out_task* te = new out_task(ve,cve);
-    init_task * ti = new init_task(vi, cvi);
+    out_task* te = new out_task({cw}, cve);
+    init_task * ti = new init_task(vi, {});
     for (int i = 0; i < layers; ++i)
     {
         gr.add_dependence(t[i], te);

@@ -50,7 +50,7 @@ class merge_t: public task
 public:
     merge_t(): task()
     { }
-    merge_t(vector<message*> vm, vector<const message*> cvm): task(vm, cvm)
+    merge_t(const vector<message*> vm, const vector<const message*> cvm): task(vm, cvm)
     { }
     void perform(task_environment& env)
     {
@@ -89,7 +89,7 @@ class merge_t_all: public task
 public:
     merge_t_all(): task()
     { }
-    merge_t_all(vector<message*> vm): task(vm)
+    merge_t_all(const vector<message*> vm): task(vm)
     { }
     void perform(task_environment& env)
     {
@@ -167,13 +167,11 @@ int main(int argc, char** argv)
     {
         if (layers % 2 == 0)
             swap(p1,p2);
-        vector<message*> w(1);
-        vector<const message*> cw(2);
-        cw[0] = new m_array(size / 2, p2);
-        cw[1] = new m_array(size - size / 2, p2 + size / 2);
-        w[0] = new m_array(size, p1);
-        v2.push_back(new merge_t(w, cw));
-        fin.push_back(w[0]);
+        m_array* arr1 = new m_array(size / 2, p2);
+        m_array* arr2 = new m_array(size - size / 2, p2 + size / 2);
+        m_array* arr_p1 = new m_array(size, p1);
+        v2.push_back(new merge_t({arr_p1}, {arr1, arr2}));
+        fin.push_back(arr_p1);
         for (int i = 1; i < layers; ++i)
         {
             int q = 1 << i;
@@ -193,39 +191,37 @@ int main(int argc, char** argv)
                     ptr = ((merge_t*)v2[j/2])->get_out()->get_p();
                 }
 
-                cw[0] = new m_array(me->get_size() / 2, ptr);
+                arr1 = new m_array(me->get_size() / 2, ptr);
 
-                cw[1] = new m_array(me->get_size() - me->get_size() / 2, ptr + me->get_size() / 2);
-                w[0] = me;
+                arr2 = new m_array(me->get_size() - me->get_size() / 2, ptr + me->get_size() / 2);
+                arr_p1 = me;
 
-                v1[j] = new merge_t(w, cw);
+                v1[j] = new merge_t({arr_p1}, {arr1, arr2});
 
                 tg.add_dependence(v1[j], v2[j/2]);
             }
             swap(v1, v2);
         }
 
-        w.resize(2);
         for (int i = 0; i < v2.size(); ++i)
         {
-            w[0] = new m_array(((merge_t*)v2[i])->get_first()->get_size(), ((merge_t*)v2[i])->get_out()->get_p());
-            w[1] = ((merge_t*)v2[i])->get_first();
-            tg.add_dependence(new merge_t_all(w), v2[i]);
-            w[0] = new m_array(((merge_t*)v2[i])->get_second()->get_size(), ((merge_t*)v2[i])->get_out()->get_p()
+            arr1 = new m_array(((merge_t*)v2[i])->get_first()->get_size(), ((merge_t*)v2[i])->get_out()->get_p());
+            arr2 = ((merge_t*)v2[i])->get_first();
+            tg.add_dependence(new merge_t_all({arr1, arr2}), v2[i]);
+            arr1 = new m_array(((merge_t*)v2[i])->get_second()->get_size(), ((merge_t*)v2[i])->get_out()->get_p()
                 + ((merge_t*)v2[i])->get_first()->get_size());
-            w[1] = ((merge_t*)v2[i])->get_second();
-            tg.add_dependence(new merge_t_all(w), v2[i]);
+            arr2 = ((merge_t*)v2[i])->get_second();
+            tg.add_dependence(new merge_t_all({arr1, arr2}), v2[i]);
         }
     }
     else
     {
-        vector<message*> w(2);
-        w[0] = new m_array(size, p1);
-        w[1] = new m_array(size, p2);
-        tg.add_task(new merge_t_all(w));
+        m_array* arr1 = new m_array(size, p1);
+        m_array* arr2 = new m_array(size, p2);
+        tg.add_task(new merge_t_all({arr1, arr2}));
         swap(p1, p2);
-        fin.push_back(w[0]);
-        fin.push_back(w[1]);
+        fin.push_back(arr1);
+        fin.push_back(arr2);
     }
 
     pz.init(tg);

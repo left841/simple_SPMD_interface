@@ -63,10 +63,10 @@ namespace auto_parallel
     task::task()
     { }
 
-    task::task(std::vector<message*>& mes_v): data(mes_v)
+    task::task(const std::vector<message*>& mes_v): data(mes_v)
     { }
 
-    task::task(std::vector<message*>& mes_v, std::vector<const message*>& c_mes_v): data(mes_v), c_data(c_mes_v)
+    task::task(const std::vector<message*>& mes_v, const std::vector<const message*>& c_mes_v): data(mes_v), c_data(c_mes_v)
     { }
 
     task::~task()

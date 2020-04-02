@@ -132,10 +132,10 @@ private:
 public:
     static int pred;
 
-    quick_task(vector<message*>& mes_v): task(mes_v)
+    quick_task(const vector<message*>& mes_v): task(mes_v)
     { }
 
-    quick_task(vector<message*>& mes_v, vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
+    quick_task(const vector<message*>& mes_v, const vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
     { }
 
     void perform(task_environment& env)
@@ -198,10 +198,10 @@ int quick_task::pred = 1000;
 class init_task: public task
 {
 public:
-    init_task(vector<message*>& mes_v) : task(mes_v)
+    init_task(const vector<message*>& mes_v) : task(mes_v)
     { }
 
-    init_task(vector<message*>& mes_v, vector<const message*>& c_mes_v) : task(mes_v, c_mes_v)
+    init_task(const vector<message*>& mes_v, const vector<const message*>& c_mes_v) : task(mes_v, c_mes_v)
     { }
 
     void perform(task_environment& env)
@@ -221,7 +221,7 @@ public:
 class check_task: public task
 {
 public:
-    check_task(vector<message*>& mes_v, vector<const message*>& c_mes_v) : task(mes_v, c_mes_v)
+    check_task(const vector<message*>& mes_v, const vector<const message*>& c_mes_v) : task(mes_v, c_mes_v)
     { }
 
     void perform(task_environment& env)
@@ -268,16 +268,12 @@ int main(int argc, char** argv)
     task_graph tg;
     arrray::init_info ii;
     ii.size = sz;
-    vector<message*> v;
-    vector<const message*> w(1);
     time_cl* p = new time_cl;
-    w[0] = p;
-    v.push_back(new arrray(&ii));
-    quick_task qt(v);
-    v.push_back(new arrray(&ii));
-    check_task ct(v, w);
-    v.push_back(p);
-    init_task it(v);
+    arrray* arr1 = new arrray(&ii);
+    arrray* arr2 = new arrray(&ii);
+    quick_task qt({arr1});
+    check_task ct({arr1, arr2}, {p});
+    init_task it({arr1, arr2, p});
     tg.add_dependence(it, qt);
     tg.add_dependence(qt, ct);
     pz.init(tg);

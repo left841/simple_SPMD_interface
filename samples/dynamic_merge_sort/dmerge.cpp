@@ -115,10 +115,10 @@ public:
 class init_task: public task
 {
 public:
-    init_task(vector<message*>& mes_v) : task(mes_v)
+    init_task(const vector<message*>& mes_v) : task(mes_v)
     { }
 
-    init_task(vector<message*>& mes_v, vector<const message*>& c_mes_v) : task(mes_v, c_mes_v)
+    init_task(const vector<message*>& mes_v, const vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
     { }
 
     void perform(task_environment& env)
@@ -140,7 +140,7 @@ class merge_t_all: public task
 public:
     merge_t_all(): task()
     { }
-    merge_t_all(vector<message*> vm, vector<const message*> cvm) : task(vm, cvm)
+    merge_t_all(const vector<message*> vm, const vector<const message*> cvm) : task(vm, cvm)
     { }
     void perform(task_environment& env)
     {
@@ -183,7 +183,7 @@ public:
 
     merge_t(): task()
     { }
-    merge_t(vector<message*> vm, vector<const message*> cvm): task(vm, cvm)
+    merge_t(const vector<message*> vm, const vector<const message*> cvm): task(vm, cvm)
     { }
     void perform(task_environment& env)
     {
@@ -221,7 +221,7 @@ public:
 
     static size_t pred;
 
-    merge_organizer(vector<message*> vm, vector<const message*> cvm): task(vm, cvm)
+    merge_organizer(const vector<message*> vm, const vector<const message*> cvm): task(vm, cvm)
     { }
 
     void perform(task_environment& env)
@@ -229,7 +229,7 @@ public:
         const m_array& in = dynamic_cast<const m_array&>(get_c(0));
         const m_array& out = dynamic_cast<const m_array&>(get_c(1));
 
-        if (in.get_size() < pred)
+        if (in.get_size() <= pred)
             env.create_child_task<merge_t_all>({env.get_c_arg_id(0), env.get_c_arg_id(1)}, {});
         else
         {
@@ -255,7 +255,7 @@ size_t merge_organizer::pred = 1000;
 class check_task: public task
 {
 public:
-    check_task(vector<message*>& mes_v, vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
+    check_task(const vector<message*>& mes_v, const vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
     { }
 
     void perform(task_environment& env)
@@ -305,8 +305,7 @@ int main(int argc, char** argv)
 
     parallelizer pz;
     task_graph tg;
-    m_array::init_info ii;
-    ii.size = size;
+    m_array::init_info ii(size);
 
     int comm_size = pz.get_proc_count();
     merge_organizer::pred = size / comm_size;
@@ -315,23 +314,9 @@ int main(int argc, char** argv)
     message* m2 = new m_array(&ii);
     message* m3 = new m_array(&ii);
     time_cl* p = new time_cl;
-    vector<message*> v;
-    v.push_back(m1);
-    v.push_back(m2);
-    v.push_back(m3);
-    v.push_back(p);
-    init_task it(v);
-    v.clear();
-    v.push_back(m3);
-    v.push_back(m2);
-    vector<const message*> w(1);
-    w[0] = p;
-    check_task ct(v, w);
-    v.clear();
-    w.clear();
-    w.push_back(m1);
-    w.push_back(m3);
-    merge_organizer* qt = new merge_organizer(v, w);
+    init_task it({m1, m2, m3, p});
+    check_task ct({m3, m2}, {p});
+    merge_organizer* qt = new merge_organizer({}, {m1, m3});
     tg.add_dependence(&it, qt);
     tg.add_dependence(qt, &ct);
     pz.init(tg);
