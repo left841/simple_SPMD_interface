@@ -69,9 +69,10 @@ namespace auto_parallel
         return q;
     }
 
-    message_id memory_manager::add_message(message* ptr, message_type type)
+    message_id memory_manager::add_message(message* ptr)
     { 
-        data_v.push_back({ptr, type, nullptr, nullptr, MESSAGE_ID_UNDEFINED, 0, false});
+        std::vector<message_id> childs;
+        data_v.push_back({ptr, nullptr, 0, FACTORY_TYPE::UNDEFINED, MESSAGE_TYPE_UNDEFINED, MESSAGE_ID_UNDEFINED, childs, false});
         return data_v.size() - 1;
     }
 
@@ -84,24 +85,25 @@ namespace auto_parallel
         return task_v.size() - 1;
     }
 
-    //message_id memory_manager::create_message(message_type type)
-    //{
-    //    message* mes = message_factory::get(type);
-    //    data_v.push_back({mes, type, nullptr, nullptr, MESSAGE_ID_UNDEFINED, 0, true});
-    //    return task_v.size() - 1;
-    //}
-
-    message_id memory_manager::create_message(message_type type, message::init_info_base* iib)
+    message_id memory_manager::create_message_init(message_type type, sendable* info)
     {
-        message* mes = message_factory::get(type, iib);
-        data_v.push_back({mes, type, iib, nullptr, MESSAGE_ID_UNDEFINED, 0, true});
+        message* mes = message_init_factory::get(type, *info);
+        std::vector<message_id> childs;
+        data_v.push_back({mes, info, 0, FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true});
         return data_v.size() - 1;
     }
 
-    message_id memory_manager::create_message(message_type type, message_id parent, message::part_info_base* pib, message::init_info_base* iib)
+    message_id memory_manager::create_message_child(message_type type, message_id parent, sendable* info)
     {
-        message* mes = message_factory::get_part(type, data_v[parent].d, pib);
-        data_v.push_back({mes, type, iib, pib, parent, 0, true});
+        message* mes;
+        if ((parent < data_v.size()) && (data_v[parent].d != nullptr))
+            mes = message_child_factory::get(type, *data_v[parent].d, *info);
+        else
+            mes = message_child_factory::get(type, *info);
+        std::vector<message_id> childs;
+        data_v.push_back({mes, info, 0, FACTORY_TYPE::CHILD, type, parent, childs, true});
+        if ((parent < data_v.size()) && (data_v[parent].d != nullptr))
+            data_v[parent].childs.push_back(data_v.size() - 1);
         return data_v.size() - 1;
     }
 
@@ -119,28 +121,43 @@ namespace auto_parallel
         return task_v.size() - 1;
     }
 
-    //void memory_manager::create_message_with_id(message_id id, message_type type)
-    //{
-    //    if (id >= data_v.size())
-    //        data_v.resize(id + 1);
-    //    message* mes = message_factory::get(type);
-    //    data_v[id] = {mes, type, nullptr, nullptr, MESSAGE_ID_UNDEFINED, 0, true};
-    //}
-
-    void memory_manager::create_message_with_id(message_id id, message_type type, message::init_info_base* iib)
+    void memory_manager::include_child_to_parent(message_id child)
     {
-        if (id >= data_v.size())
-            data_v.resize(id + 1);
-        message* mes = message_factory::get(type, iib);
-        data_v[id] = {mes, type, iib, nullptr, MESSAGE_ID_UNDEFINED, 0, true};
+        message_child_factory::include(data_v[child].type, *data_v[data_v[child].parent].d, *data_v[child].d, *data_v[child].info);
     }
 
-    void memory_manager::create_message_with_id(message_id id, message_type type, message_id parent, message::part_info_base* pib, message::init_info_base* iib)
+    void memory_manager::include_child_to_parent_recursive(message_id child)
+    {
+        message_id id = child;
+        while (data_v[child].parent != MESSAGE_ID_UNDEFINED)
+        {
+            include_child_to_parent(child);
+            child = data_v[child].parent;
+        }
+    }
+
+    void memory_manager::create_message_init_with_id(message_id id, message_type type, sendable* info)
     {
         if (id >= data_v.size())
             data_v.resize(id + 1);
-        message* mes = message_factory::get_part(type, data_v[parent].d, pib);
-        data_v[id] = {mes, type, iib, pib, parent, 0, true};
+        message* mes = message_init_factory::get(type, *info);
+        std::vector<message_id> childs;
+        data_v[id] = {mes, info, 0, FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true};
+    }
+
+    void memory_manager::create_message_child_with_id(message_id id, message_type type, message_id parent, sendable* info)
+    {
+        if (id >= data_v.size())
+            data_v.resize(id + 1);
+        std::vector<message_id> childs;
+        message* mes;
+        if ((parent < data_v.size()) && (data_v[parent].d != nullptr))
+            mes = message_child_factory::get(type, *data_v[parent].d, *info);
+        else
+            mes = message_child_factory::get(type, *info);
+        data_v[id] = {mes, info, 0, FACTORY_TYPE::CHILD, type, parent, childs, true};
+        if ((parent < data_v.size()) && (data_v[parent].d != nullptr))
+            data_v[parent].childs.push_back(data_v.size() - 1);
     }
 
     void memory_manager::create_task_with_id(task_id id, task_type type, std::vector<message_id> data, std::vector<message_id> const_data)
@@ -149,7 +166,7 @@ namespace auto_parallel
             task_v.resize(id + 1);
         std::vector<message*> mes_v;
         std::vector<const message*> const_mes_v;
-        for (message_id i : data)
+        for (message_id i: data)
             mes_v.push_back(data_v[i].d);
         for (message_id i : const_data)
             const_mes_v.push_back(data_v[i].d);
@@ -178,35 +195,23 @@ namespace auto_parallel
         if (data_v[id].created)
         {
             delete data_v[id].d;
-            if (data_v[id].iib != nullptr)
-                delete data_v[id].iib;
-            if (data_v[id].pib != nullptr)
-                delete data_v[id].pib;
+            if (data_v[id].info != nullptr)
+                delete data_v[id].info;
+            data_v[id].childs.clear();
             data_v[id].created = false;
         }
-        //if (id == data_v.size() - 1)
-            //data_v.pop_back();
-        //else
-        {
-            data_v[id].d = nullptr;
-            data_v[id].iib = nullptr;
-            data_v[id].pib = nullptr;
-        }
+        data_v[id].d = nullptr;
+        data_v[id].info = nullptr;
     }
 
     void memory_manager::delete_task(task_id id)
     {
         if (task_v[id].created)
             delete task_v[id].t;
-        //if (id == task_v.size() - 1)
-            //data_v.pop_back();
-        //else
-        {
-            task_v[id].childs.clear();
-            task_v[id].data.clear();
-            task_v[id].const_data.clear();
-            task_v[id].created = false;
-        }
+        task_v[id].childs.clear();
+        task_v[id].data.clear();
+        task_v[id].const_data.clear();
+        task_v[id].created = false;
     }
 
     void memory_manager::clear()
@@ -225,11 +230,8 @@ namespace auto_parallel
     void memory_manager::set_message_type(message_id id, message_type new_type)
     { data_v[id].type = new_type; }
 
-    void memory_manager::set_message_init_info(message_id id, message::init_info_base* new_iib)
-    { data_v[id].iib = new_iib; }
-
-    void memory_manager::set_message_part_info(message_id id, message::part_info_base* new_pib)
-    { data_v[id].pib = new_pib; }
+    void memory_manager::set_message_info(message_id id, sendable* info)
+    { data_v[id].info = info; }
 
     void memory_manager::set_message_parent(message_id id, message_id new_parent)
     { data_v[id].parent = new_parent; }
@@ -267,14 +269,14 @@ namespace auto_parallel
     message* memory_manager::get_message(message_id id)
     { return data_v[id].d; }
 
+    FACTORY_TYPE memory_manager::get_message_factory_type(message_id id)
+    { return data_v[id].f_type; }
+
     message_type memory_manager::get_message_type(message_id id)
     { return data_v[id].type; }
 
-    message::init_info_base* memory_manager::get_message_init_info(message_id id)
-    { return data_v[id].iib; }
-
-    message::part_info_base* memory_manager::get_message_part_info(message_id id)
-    { return data_v[id].pib; }
+    sendable* memory_manager::get_message_info(message_id id)
+    { return data_v[id].info; }
 
     message_id memory_manager::get_message_parent(message_id id)
     { return data_v[id].parent; }
@@ -308,6 +310,9 @@ namespace auto_parallel
 
     std::vector<message_id>& memory_manager::get_task_const_data(task_id id)
     { return task_v[id].const_data; }
+
+    bool memory_manager::message_contained(message_id id)
+    { return ((id) < data_v.size() && (data_v[id].d != nullptr)); }
 
     bool memory_manager::message_has_parent(message_id id)
     { return data_v[id].parent != MESSAGE_ID_UNDEFINED; }

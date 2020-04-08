@@ -5,6 +5,10 @@
 #include "parallel_defs.h"
 #include "communicator.h"
 #include "transfer.h"
+#include "standard_transfer.h"
+#include "buffer_transfer.h"
+#include "synchronous_transfer.h"
+#include "ready_transfer.h"
 #include "message.h"
 
 namespace auto_parallel
@@ -21,6 +25,9 @@ namespace auto_parallel
         ~intracomm();
 
         void send(sendable* mes, process proc);
+        void bsend(sendable* mes, process proc);
+        void ssend(sendable* mes, process proc);
+        void rsend(sendable* mes, process proc);
         void recv(sendable* mes, process proc);
         void bcast(sendable* mes, process proc);
 

@@ -18,14 +18,35 @@ namespace auto_parallel
     void intracomm::send(sendable* mes, process proc)
     {
         mes->wait_requests();
-        sender se(comm, proc, &(mes->req_q));
+        standard_sender se(comm, proc, &(mes->req_q));
+        mes->send(se);
+    }
+
+    void intracomm::bsend(sendable* mes, process proc)
+    {
+        mes->wait_requests();
+        buffer_sender se(comm, proc, &(mes->req_q));
+        mes->send(se);
+    }
+
+    void intracomm::ssend(sendable* mes, process proc)
+    {
+        mes->wait_requests();
+        synchronous_sender se(comm, proc, &(mes->req_q));
+        mes->send(se);
+    }
+
+    void intracomm::rsend(sendable* mes, process proc)
+    {
+        mes->wait_requests();
+        ready_sender se(comm, proc, &(mes->req_q));
         mes->send(se);
     }
 
     void intracomm::recv(sendable* mes, process proc)
     {
         mes->wait_requests();
-        receiver re(comm, proc, &(mes->req_q));
+        standard_receiver re(comm, proc, &(mes->req_q));
         mes->recv(re);
     }
 

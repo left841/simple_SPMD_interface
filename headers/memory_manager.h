@@ -17,11 +17,12 @@ namespace auto_parallel
         struct d_info
         {
             message* d;
-            message_type type;
-            message::init_info_base* iib;
-            message::part_info_base* pib;
-            message_id parent;
+            sendable* info;
             size_t version;
+            FACTORY_TYPE f_type;
+            message_type type;
+            message_id parent;
+            std::vector<message_id> childs;
             bool created;
         };
 
@@ -50,17 +51,19 @@ namespace auto_parallel
 
         std::queue<task_id> get_ready_tasks();
 
-        message_id add_message(message* ptr, message_type type = MESSAGE_TYPE_UNDEFINED);
+        message_id add_message(message* ptr);
         task_id add_task(task* ptr, task_type type = TASK_TYPE_UNDEFINED);
 
         message_id create_message(message_type type);
-        message_id create_message(message_type type, message::init_info_base* iib);
-        message_id create_message(message_type type, message_id parent, message::part_info_base* pib, message::init_info_base* iib = nullptr);
+        message_id create_message_init(message_type type, sendable* info);
+        message_id create_message_child(message_type type, message_id parent, sendable* info);
         task_id create_task(task_type type, std::vector<message_id> data, std::vector<message_id> const_data);
+        void include_child_to_parent(message_id child);
+        void include_child_to_parent_recursive(message_id child);
 
         void create_message_with_id(message_id id, message_type type);
-        void create_message_with_id(message_id id, message_type type, message::init_info_base* iib);
-        void create_message_with_id(message_id id, message_type type, message_id parent, message::part_info_base* pib, message::init_info_base* iib = nullptr);
+        void create_message_init_with_id(message_id id, message_type type, sendable* info);
+        void create_message_child_with_id(message_id id, message_type type, message_id parent, sendable* info);
         void create_task_with_id(task_id id, task_type type, std::vector<message_id> data, std::vector<message_id> const_data);
 
         void update_message_versions(task_id id);
@@ -70,8 +73,7 @@ namespace auto_parallel
 
         void set_message(message_id id, message* new_message);
         void set_message_type(message_id id, message_type new_type);
-        void set_message_init_info(message_id id, message::init_info_base* new_iib);
-        void set_message_part_info(message_id id, message::part_info_base* new_pib);
+        void set_message_info(message_id id, sendable* info);
         void set_message_parent(message_id id, message_id new_parent);
         void set_message_version(message_id id, size_t new_version);
 
@@ -86,9 +88,9 @@ namespace auto_parallel
 
         size_t message_count();
         message* get_message(message_id id);
+        FACTORY_TYPE get_message_factory_type(message_id id);
         message_type get_message_type(message_id id);
-        message::init_info_base* get_message_init_info(message_id id);
-        message::part_info_base* get_message_part_info(message_id id);
+        sendable* get_message_info(message_id id);
         message_id get_message_parent(message_id id);
         size_t get_message_version(message_id id);
 
@@ -102,6 +104,7 @@ namespace auto_parallel
         std::vector<message_id>& get_task_data(task_id id);
         std::vector<message_id>& get_task_const_data(task_id id);
 
+        bool message_contained(message_id id);
         bool message_has_parent(message_id id);
         bool task_has_parent(task_id id);
 

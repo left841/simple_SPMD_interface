@@ -3,12 +3,6 @@
 namespace auto_parallel
 {
 
-    task_creator_base::task_creator_base()
-    { }
-
-    task_creator_base::~task_creator_base()
-    { }
-
     task_result::task_result()
     { }
 
@@ -84,9 +78,19 @@ namespace auto_parallel
     const message& task::get_c(size_t id)
     { return *c_data[id]; }
 
-    std::vector<task_creator_base*> task_factory::v;
+    task_factory::creator_base::creator_base()
+    { }
+
+    task_factory::creator_base::~creator_base()
+    { }
+
+    std::vector<task_factory::creator_base*>& task_factory::task_vec()
+    {
+        static std::vector<creator_base*> v;
+        return v;
+    }
 
     task* task_factory::get(task_type id, std::vector<message*>& data, std::vector<const message*>& c_data)
-    { return v.at(id)->get_task(data, c_data); }
+    { return task_vec().at(id)->get_task(data, c_data); }
 
 }

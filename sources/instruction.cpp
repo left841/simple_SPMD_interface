@@ -1,7 +1,4 @@
 #include "instruction.h"
-//#include <iostream>
-//using std::cout;
-//using std::endl;
 
 namespace auto_parallel
 {

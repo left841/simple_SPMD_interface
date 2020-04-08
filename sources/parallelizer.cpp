@@ -1,7 +1,4 @@
 #include "parallelizer.h"
-//#include <iostream>
-//using std::cout;
-//using std::endl;
 
 namespace auto_parallel
 {
@@ -125,10 +122,10 @@ namespace auto_parallel
         {
             if (con[proc].find(i) == con[proc].end())
             {
-                if (memory.message_has_parent(i) && (con[proc].find(memory.get_message_parent(i)) != con[proc].end()))
+                if (memory.get_message_factory_type(i) == FACTORY_TYPE::CHILD)
                 {
                     ins.add_message_part_creation(i, memory.get_message_type(i), memory.get_message_parent(i));
-                    if (ver[proc].find(memory.get_message_parent(i)) == ver[proc].end())
+                    if ((con[proc].find(memory.get_message_parent(i)) == con[proc].end()) || (ver[proc].find(memory.get_message_parent(i)) == ver[proc].end()))
                         ins.add_message_receiving(i);
                 }
                 else
@@ -150,10 +147,10 @@ namespace auto_parallel
         {
             if (con[proc].find(i) == con[proc].end())
             {
-                if (memory.message_has_parent(i) && (con[proc].find(memory.get_message_parent(i)) != con[proc].end()))
+                if (memory.get_message_factory_type(i) == FACTORY_TYPE::CHILD)
                 {
                     ins.add_message_part_creation(i, memory.get_message_type(i), memory.get_message_parent(i));
-                    if (ver[proc].find(memory.get_message_parent(i)) == ver[proc].end())
+                    if ((con[proc].find(memory.get_message_parent(i)) == con[proc].end()) || (ver[proc].find(memory.get_message_parent(i)) == ver[proc].end()))
                         ins.add_message_receiving(i);
                 }
                 else
@@ -199,13 +196,13 @@ namespace auto_parallel
             case INSTRUCTION::MES_CREATE:
             {
                 const instruction_message_create& j = dynamic_cast<const instruction_message_create&>(i);
-                instr_comm.send(memory.get_message_init_info(j.id()), proc);
+                instr_comm.send(memory.get_message_info(j.id()), proc);
                 break;
             }
             case INSTRUCTION::MES_P_CREATE:
             {
                 const instruction_message_part_create& j = dynamic_cast<const instruction_message_part_create&>(i);
-                instr_comm.send(memory.get_message_part_info(j.id()), proc);
+                instr_comm.send(memory.get_message_info(j.id()), proc);
                 break;
             }
             case INSTRUCTION::TASK_CREATE:
@@ -230,10 +227,13 @@ namespace auto_parallel
         std::vector<task_data>& cre_t = te.created_tasks();
         std::vector<task_dependence>& dep = te.created_dependences();
 
+        for (message_id i: memory.get_task_data(tid))
+            memory.include_child_to_parent_recursive(i);
+
         std::vector<message_id> created_message_id;
         for (size_t i = 0; i < md.size(); ++i)
         {
-            message_id id = memory.create_message(md[i].type, md[i].iib);
+            message_id id = memory.create_message_init(md[i].type, md[i].iib);
             con[main_proc].insert(id);
             ver[main_proc].insert(id);
             created_message_id.push_back(id);
@@ -252,7 +252,7 @@ namespace auto_parallel
 
             for (process k = 1; k < comm.size(); ++k)
                 ver[k].erase(s_id);
-            message_id id = memory.create_message(mpd[i].type, s_id, mpd[i].pib, mpd[i].iib);
+            message_id id = memory.create_message_child(mpd[i].type, s_id, mpd[i].pib);
             con[main_proc].insert(id);
             ver[main_proc].insert(id);
             created_part_id.push_back(id);
@@ -395,14 +395,17 @@ namespace auto_parallel
         }
 
         for (message_id i: memory.get_task_data(tid))
+        {
             memory.get_message(i)->wait_requests();
+            memory.include_child_to_parent_recursive(i);
+        }
 
         std::vector<message_id> created_message_id;
         for (message_type i: mes_created)
         {
-            message::init_info_base* iib = message_factory::get_info(i);
+            sendable* iib = message_init_factory::get_info(i);
             instr_comm.recv(iib, proc);
-            message_id id = memory.create_message(i, iib);
+            message_id id = memory.create_message_init(i, iib);
             created_message_id.push_back(id);
             con[main_proc].insert(id);
             ver[main_proc].insert(id);
@@ -411,9 +414,7 @@ namespace auto_parallel
         std::vector<message_id> created_part_id;
         for (std::pair<message_type, local_message_id> i: part_created)
         {
-            message::init_info_base* iib = message_factory::get_info(i.first);
-            message::part_info_base* pib = message_factory::get_part_info(i.first);
-            instr_comm.recv(iib, proc);
+            sendable* pib = message_child_factory::get_info(i.first);
             instr_comm.recv(pib, proc);
 
             message_id s_id;
@@ -429,7 +430,7 @@ namespace auto_parallel
             for (process k = 1; k < comm.size(); ++k)
                 ver[k].erase(s_id);
 
-            message_id id = memory.create_message(i.first, s_id, pib, iib);
+            message_id id = memory.create_message_child(i.first, s_id, pib);
             created_part_id.push_back(id);
             con[main_proc].insert(id);
             ver[main_proc].insert(id);
@@ -586,18 +587,19 @@ namespace auto_parallel
                 case INSTRUCTION::MES_CREATE:
                 {
                     const instruction_message_create& j = dynamic_cast<const instruction_message_create&>(i);
-                    message::init_info_base* iib = message_factory::get_info(j.type());
+                    sendable* iib = message_init_factory::get_info(j.type());
                     instr_comm.recv(iib, main_proc);
-                    memory.create_message_with_id(j.id(), j.type(), iib);
+                    memory.create_message_init_with_id(j.id(), j.type(), iib);
                     break;
                 }
                 case INSTRUCTION::MES_P_CREATE:
                 {
                     const instruction_message_part_create& j = dynamic_cast<const instruction_message_part_create&>(i);
-                    message::part_info_base* pib = message_factory::get_part_info(j.type());
+                    sendable* pib = message_child_factory::get_info(j.type());
                     instr_comm.recv(pib, main_proc);
-                    memory.get_message(j.source())->wait_requests();
-                    memory.create_message_with_id(j.id(), j.type(), j.source(), pib);
+                    if (memory.message_contained(j.source()))
+                        memory.get_message(j.source())->wait_requests();
+                    memory.create_message_child_with_id(j.id(), j.type(), j.source(), pib);
                     break;
                 }
                 case INSTRUCTION::TASK_CREATE:
@@ -656,10 +658,7 @@ namespace auto_parallel
         for (int i = 0; i < env.created_messages().size(); ++i)
             instr_comm.send(env.created_messages()[i].iib, main_proc);
         for (int i = 0; i < env.created_parts().size(); ++i)
-        {
-            instr_comm.send(env.created_parts()[i].iib, main_proc);
             instr_comm.send(env.created_parts()[i].pib, main_proc);
-        }
     }
 
     int parallelizer::get_current_proc()

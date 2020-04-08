@@ -1,63 +1,13 @@
 #ifndef __BASIC_TASK_H__
 #define __BASIC_TASK_H__
 
+#include <vector>
 #include "parallel_defs.h"
 #include "message.h"
-#include <vector>
-#include <functional>
+#include "message_factory.h"
 
 namespace auto_parallel
 {
-
-    class task;
-
-    class task_creator_base
-    {
-    public:
-
-        task_creator_base();
-        virtual ~task_creator_base();
-
-        virtual task* get_task(std::vector<message*>& data, std::vector<const message*>& c_data) = 0;
-
-    };
-
-    template<typename Type>
-    class task_creator: public task_creator_base
-    {
-    private:
-
-        static task_type my_type;
-
-    public:
-
-        task_creator();
-        ~task_creator();
-
-        task* get_task(std::vector<message*>& data, std::vector<const message*>& c_data);
-        static task_type get_type();
-
-        friend class task_factory;
-    };
-
-    template<typename Type>
-    task_type task_creator<Type>::my_type = TASK_TYPE_UNDEFINED;
-
-    template<typename Type>
-    task_creator<Type>::task_creator()
-    { }
-
-    template<typename Type>
-    task_creator<Type>::~task_creator()
-    { }
-
-    template<typename Type>
-    task* task_creator<Type>::get_task(std::vector<message*>& data, std::vector<const message*>& c_data)
-    { return new Type(data, c_data); }
-
-    template<typename Type>
-    task_type task_creator<Type>::get_type()
-    { return my_type; }
 
     enum class MESSAGE_SOURCE: size_t
     {
@@ -91,15 +41,14 @@ namespace auto_parallel
     struct message_data
     {
         message_type type;
-        message::init_info_base* iib;
+        sendable* iib;
     };
 
     struct message_part_data
     {
         message_type type;
         local_message_id sourse;
-        message::init_info_base* iib;
-        message::part_info_base* pib;
+        sendable* pib;
     };
 
     struct task_dependence
@@ -144,10 +93,10 @@ namespace auto_parallel
         local_task_id create_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
         template<class Type>
         local_task_id create_child_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
-        template<class Type>
-        local_message_id create_message(message::init_info_base* iib);
-        template<class Type>
-        local_message_id create_message(message::init_info_base* iib, message::part_info_base* pib, local_message_id source);
+        template<class Type, class InfoType>
+        local_message_id create_message_init(sendable* info);
+        template<class Type, class ParentType, class InfoType>
+        local_message_id create_message_child(local_message_id source, sendable* info);
 
         void add_dependence(local_task_id parent, local_task_id child);
 
@@ -168,28 +117,28 @@ namespace auto_parallel
     template<class Type>
     local_task_id task_environment::create_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
     {
-        created_tasks_v.push_back({task_creator<Type>::get_type(), data, const_data});
+        created_tasks_v.push_back({ task_factory::get_type<Type>(), data, const_data});
         return {created_tasks_v.size() - 1, TASK_SOURCE::CREATED};
     }
 
     template<class Type>
     local_task_id task_environment::create_child_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
     {
-        res.created_tasks().push_back({task_creator<Type>::get_type(), data, const_data});
+        res.created_tasks().push_back({task_factory::get_type<Type>(), data, const_data});
         return {res.created_tasks().size() - 1, TASK_SOURCE::CHILD};
     }
 
-    template<class Type>
-    local_message_id task_environment::create_message(message::init_info_base* iib)
+    template<class Type, class InfoType>
+    local_message_id task_environment::create_message_init(sendable* info)
     {
-        res.created_messages().push_back({message_creator<Type>::get_id(), iib});
+        res.created_messages().push_back({message_init_factory::get_type<Type, InfoType>(), info});
         return {created_messages.size() - 1, MESSAGE_SOURCE::CREATED};
     }
 
-    template<class Type>
-    local_message_id task_environment::create_message(message::init_info_base* iib, message::part_info_base* pib, local_message_id source)
+    template<class Type, class ParentType, class InfoType>
+    local_message_id task_environment::create_message_child(local_message_id source, sendable* info)
     {
-        res.created_parts().push_back({message_creator<Type>::get_part_id(), source, iib, pib});
+        res.created_parts().push_back({message_child_factory::get_type<Type, ParentType, InfoType>(), source, info});
         return {res.created_parts().size() - 1, MESSAGE_SOURCE::PART};
     }
 
@@ -224,26 +173,90 @@ namespace auto_parallel
     {
     private:
 
-        static std::vector<task_creator_base*> v;
+        class creator_base
+        {
+        public:
+
+            creator_base();
+            virtual ~creator_base();
+
+            virtual task* get_task(std::vector<message*>& data, std::vector<const message*>& c_data) = 0;
+
+        };
+
+        template<typename Type>
+        struct id
+        {
+            task_type value;
+            id();
+        };
+
+        template<typename Type>
+        class creator: public creator_base
+        {
+        private:
+
+            static id<Type> my_type;
+
+        public:
+
+            creator();
+            ~creator();
+
+            task* get_task(std::vector<message*>& data, std::vector<const message*>& c_data);
+            static task_type get_type();
+
+            friend class task_factory;
+        };
+
         task_factory() = delete;
+        static std::vector<creator_base*>& task_vec();
+
+        template<typename Type>
+        static task_type add();
 
     public:
 
-        template<typename Type>
-        static void add();
-
         static task* get(task_type id, std::vector<message*>& data, std::vector<const message*>& c_data);
+
+        template<typename Type>
+        static task_type get_type();
 
     };
 
     template<typename Type>
-    void task_factory::add()
+    task_factory::id<Type>::id(): value(task_factory::add<Type>())
+    { }
+
+    template<typename Type>
+    task_factory::creator<Type>::creator()
+    { }
+
+    template<typename Type>
+    task_factory::creator<Type>::~creator()
+    { }
+
+    template<typename Type>
+    task* task_factory::creator<Type>::get_task(std::vector<message*>& data, std::vector<const message*>& c_data)
+    { return new Type(data, c_data); }
+
+    template<typename Type>
+    task_factory::id<Type> task_factory::creator<Type>::my_type;
+
+    template<typename Type>
+    task_type task_factory::creator<Type>::get_type()
+    { return my_type.value; }
+
+    template<typename Type>
+    task_type task_factory::add()
     {
-        if (task_creator<Type>::get_type() != TASK_TYPE_UNDEFINED)
-            return;
-        task_creator<Type>::my_type = static_cast<task_type>(v.size());
-        v.push_back(new task_creator<Type>);
+        task_vec().push_back(new creator<Type>);
+        return task_vec().size() - 1;
     }
+
+    template<typename Type>
+    task_type task_factory::get_type()
+    { return creator<Type>::get_type(); }
 
 }
 

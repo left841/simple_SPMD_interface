@@ -32,25 +32,7 @@ private:
     bool res;
 public:
 
-    struct init_info: public init_info_base
-    {
-        int size;
-
-        init_info(int sz = 0): size(sz)
-        { }
-
-        void send(const sender& se)
-        {
-            se.send(&size, 1);
-        }
-
-        void recv(const receiver& re)
-        {
-            re.recv(&size, 1);
-        }
-    };
-
-    struct part_info: public part_info_base
+    struct part_info: public sendable
     {
         int offset, size;
 
@@ -81,22 +63,32 @@ public:
             res = false;
     }
 
-    m_array(init_info* ii): size(ii->size)
+    m_array(const m_array& mes, const part_info& pi): size(pi.size)
+    {
+        p = mes.p + pi.offset;
+        res = false;
+    }
+
+    m_array(const part_info& pi): size(pi.size)
     {
         p = new int[size];
         res = true;
-    }
-
-    m_array(message* mes, part_info* pi): size(pi->size)
-    {
-        p = dynamic_cast<m_array*>(mes)->p + pi->offset;
-        res = false;
     }
 
     ~m_array()
     {
         if (res)
             delete[] p;
+    }
+
+    void include(const m_array& child, const part_info& pi)
+    {
+        if (child.res)
+        {
+            int* q = p + pi.offset;
+            for (int i = 0; i < child.size; ++i)
+                q[i] = child.p[i];
+        }
     }
 
     void send(const sender& se)
@@ -234,11 +226,11 @@ public:
         else
         {
             size_t half_size = in.get_size() / 2;
-            local_message_id in1 = env.create_message<m_array>(new m_array::init_info(half_size), new m_array::part_info(0, half_size), env.get_c_arg_id(0));
-            local_message_id in2 = env.create_message<m_array>(new m_array::init_info(in.get_size() - half_size), new m_array::part_info(half_size, in.get_size() - half_size), env.get_c_arg_id(0));
+            local_message_id in1 = env.create_message_child<m_array, m_array, m_array::part_info>(env.get_c_arg_id(0), new m_array::part_info(0, half_size));
+            local_message_id in2 = env.create_message_child<m_array, m_array, m_array::part_info>(env.get_c_arg_id(0), new m_array::part_info(half_size, in.get_size() - half_size));
 
-            local_message_id out1 = env.create_message<m_array>(new m_array::init_info(half_size), new m_array::part_info(0, half_size), env.get_c_arg_id(1));
-            local_message_id out2 = env.create_message<m_array>(new m_array::init_info(out.get_size() - half_size), new m_array::part_info(half_size, out.get_size() - half_size), env.get_c_arg_id(1));
+            local_message_id out1 = env.create_message_child<m_array, m_array, m_array::part_info>(env.get_c_arg_id(1), new m_array::part_info(0, half_size));
+            local_message_id out2 = env.create_message_child<m_array, m_array, m_array::part_info>(env.get_c_arg_id(1), new m_array::part_info(half_size, out.get_size() - half_size));
 
             local_task_id org1 = env.create_child_task<merge_organizer>({}, {out1, in1});
             local_task_id org2 = env.create_child_task<merge_organizer>({}, {out2, in2});
@@ -297,22 +289,15 @@ int main(int argc, char** argv)
             merge_organizer::pred = atoll(argv[2]);
     }
 
-    message_factory::add<m_array>();
-    message_factory::add_part<m_array>();
-    task_factory::add<merge_t>();
-    task_factory::add<merge_t_all>();
-    task_factory::add<merge_organizer>();
-
     parallelizer pz;
     task_graph tg;
-    m_array::init_info ii(size);
 
     int comm_size = pz.get_proc_count();
     merge_organizer::pred = size / comm_size;
 
-    message* m1 = new m_array(&ii);
-    message* m2 = new m_array(&ii);
-    message* m3 = new m_array(&ii);
+    message* m1 = new m_array(size);
+    message* m2 = new m_array(size);
+    message* m3 = new m_array(size);
     time_cl* p = new time_cl;
     init_task it({m1, m2, m3, p});
     check_task ct({m3, m2}, {p});

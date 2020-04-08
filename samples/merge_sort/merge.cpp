@@ -128,7 +128,7 @@ int main(int argc, char** argv)
 {
     parallel_engine pe(&argc, &argv);
     int layers = 2;
-    int size = 1000;
+    int size = 100000;
     if (argc > 1)
     {
         size = atoi(argv[1]);
@@ -246,7 +246,7 @@ int main(int argc, char** argv)
         //    cout << "wrong\n";
         //else
         //    cout << "correct\n";
-        cout << dt - true_start_time;//parallel_engine::get_start_time();// << '\n' << pt - dt;
+        cout << dt - true_start_time << endl;//parallel_engine::get_start_time();// << '\n' << pt - dt;
         cout.flush();
     }
 }

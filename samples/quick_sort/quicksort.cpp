@@ -31,30 +31,13 @@ public:
     int* p;
     size_t size;
 
-    struct init_info: public init_info_base
+    struct part_info: public sendable
     {
-        long long size;
+        size_t offset;
+        size_t size;
 
-        init_info()
-        { size = 0; }
-
-        void send(const sender& se)
-        { se.send(&size, 1); }
-
-        void recv(const receiver& re)
-        { re.recv(&size, 1); }
-    };
-
-    struct part_info: public part_info_base
-    {
-        int offset;
-        long long size;
-
-        part_info()
-        { 
-            offset = 0;
-            size = 0;
-        }
+        part_info(): offset(0), size(0)
+        { }
 
         void send(const sender& se)
         {
@@ -69,16 +52,32 @@ public:
         }
     };
 
-    arrray(init_info* ii): size(ii->size)
+    arrray(size_t sz): size(sz)
     {
-        p = new int[ii->size];
+        p = new int[size];
         created = true;
     }
 
-    arrray(message* m, part_info* pi): size(pi->size)
+    arrray(const arrray& m, const part_info& pi): size(pi.size)
     {
-        p = ((arrray*)m)->p + pi->offset;
+        p = m.p + pi.offset;
         created = false;
+    }
+
+    arrray(const part_info& pi) : size(pi.size)
+    {
+        p = new int[size];
+        created = true;
+    }
+
+    void include(const arrray& child, const part_info& pi)
+    {
+        if (child.created)
+        {
+            int* q = p + pi.offset;
+            for (int i = 0; i < child.size; ++i)
+                q[i] = child.p[i];
+        }
     }
 
     ~arrray()
@@ -146,7 +145,6 @@ public:
 
         if (sz < pred)
             simple_quicksort(a, sz);
-            //sort(a, a + sz);
         else
         {
             int bel;
@@ -172,22 +170,18 @@ public:
 
             if (r + 1 > 1)
             {
-                arrray::init_info* ii1 = new arrray::init_info;
-                ii1->size = static_cast<size_t>(r) + 1;
                 arrray::part_info* pi1 = new arrray::part_info;
                 pi1->offset = 0;
                 pi1->size = static_cast<size_t>(r) + 1;
-                env.create_child_task<quick_task>({env.create_message<arrray>(ii1, pi1, env.get_arg_id(0))}, {});
+                env.create_child_task<quick_task>({env.create_message_child<arrray, arrray, arrray::part_info>(env.get_arg_id(0), pi1)}, {});
             }
 
             if (sz - (r + 1) > 1)
             {
-                arrray::init_info* ii2 = new arrray::init_info;
-                ii2->size = static_cast<long long>(sz) - (static_cast<size_t>(r) + 1);
                 arrray::part_info* pi2 = new arrray::part_info;
                 pi2->offset = r + 1;
                 pi2->size = static_cast<size_t>(sz) - (static_cast<size_t>(r) + 1);
-                env.create_child_task<quick_task>({env.create_message<arrray>(ii2, pi2, env.get_arg_id(0))}, {});
+                env.create_child_task<quick_task>({env.create_message_child<arrray, arrray, arrray::part_info>(env.get_arg_id(0), pi2)}, {});
             }
         }
     }
@@ -214,7 +208,6 @@ public:
         for (int i = 0; i < a1.size; ++i)
             a1.p[i] = a2.p[i] = uid(mt);
         t.time = MPI_Wtime();
-        //cout << quick_task::pred << endl;
     }
 };
 
@@ -256,9 +249,6 @@ int main(int argc, char** argv)
         if (argc > 2)
             quick_task::pred = atoi(argv[2]);
     }
-    message_factory::add<arrray>();
-    message_factory::add_part<arrray>();
-    task_factory::add<quick_task>();
 
     parallelizer pz;
 
@@ -266,11 +256,9 @@ int main(int argc, char** argv)
     quick_task::pred = sz / (3 * comm_size / 2);
 
     task_graph tg;
-    arrray::init_info ii;
-    ii.size = sz;
     time_cl* p = new time_cl;
-    arrray* arr1 = new arrray(&ii);
-    arrray* arr2 = new arrray(&ii);
+    arrray* arr1 = new arrray(sz);
+    arrray* arr2 = new arrray(sz);
     quick_task qt({arr1});
     check_task ct({arr1, arr2}, {p});
     init_task it({arr1, arr2, p});

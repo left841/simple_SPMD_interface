@@ -6,6 +6,7 @@
 #include "basic_task.h"
 #include "transfer.h"
 #include <array>
+#include <functional>
 
 namespace auto_parallel
 {
