@@ -8,7 +8,7 @@
 #include <set>
 #include <algorithm>
 
-namespace auto_parallel
+namespace apl
 {
 
     class task_graph

@@ -8,7 +8,7 @@
 #include "task_graph.h"
 #include "it_queue.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     class memory_manager

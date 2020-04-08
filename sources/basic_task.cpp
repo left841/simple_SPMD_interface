@@ -1,6 +1,6 @@
 #include "basic_task.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     task_result::task_result()

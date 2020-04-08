@@ -1,6 +1,6 @@
 #include "buffer_transfer.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     buffer_sender::buffer_sender(MPI_Comm _comm, process _proc, std::queue<MPI_Request>* _q): sender(), comm(_comm), proc(_proc), q(_q)

@@ -4,7 +4,7 @@
 #include "mpi.h"
 #include <limits>
 
-namespace auto_parallel
+namespace apl
 {
 
     typedef size_t task_id;

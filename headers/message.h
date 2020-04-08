@@ -7,7 +7,7 @@
 #include "parallel_defs.h"
 #include "transfer.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     class sendable

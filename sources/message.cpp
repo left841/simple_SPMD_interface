@@ -1,6 +1,6 @@
 #include "message.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     sendable::sendable()

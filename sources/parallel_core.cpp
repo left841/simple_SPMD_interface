@@ -1,6 +1,6 @@
 #include "parallel_core.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     double parallel_engine::start_time;

@@ -1,6 +1,6 @@
 #include "transfer.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     sender::sender(): tag(0)

@@ -8,7 +8,7 @@
 #include <array>
 #include <functional>
 
-namespace auto_parallel
+namespace apl
 {
 
     enum class INSTRUCTION: size_t

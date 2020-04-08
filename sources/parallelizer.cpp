@@ -1,6 +1,6 @@
 #include "parallelizer.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     const int parallelizer::main_proc = 0;

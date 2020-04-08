@@ -1,6 +1,6 @@
 #include "task_graph.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     task_graph::task_graph()

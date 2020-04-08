@@ -1,6 +1,6 @@
 #include "communicator.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     communicator::communicator(MPI_Comm _comm): comm(_comm)

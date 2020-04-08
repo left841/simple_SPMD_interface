@@ -6,7 +6,7 @@
 #include "mpi.h"
 #include "parallel_defs.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     class sender

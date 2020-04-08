@@ -1,6 +1,6 @@
 #include "standard_transfer.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     standard_sender::standard_sender(MPI_Comm _comm, process _proc, std::queue<MPI_Request>* _q): sender(), comm(_comm), proc(_proc), q(_q)

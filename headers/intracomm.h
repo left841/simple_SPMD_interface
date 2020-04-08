@@ -11,7 +11,7 @@
 #include "ready_transfer.h"
 #include "message.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     class intracomm: public communicator

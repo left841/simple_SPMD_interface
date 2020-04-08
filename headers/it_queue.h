@@ -3,7 +3,7 @@
 
 #include <algorithm>
 
-namespace auto_parallel
+namespace apl
 {
 
     template<typename type>

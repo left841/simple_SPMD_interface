@@ -1,6 +1,6 @@
 #include "message_factory.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     // init

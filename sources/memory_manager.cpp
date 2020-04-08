@@ -1,6 +1,6 @@
 #include "memory_manager.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     memory_manager::memory_manager()

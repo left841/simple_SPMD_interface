@@ -7,7 +7,7 @@
 #include <iostream>
 #include "parallel.h"
 using namespace std;
-using namespace auto_parallel;
+using namespace apl;
 
 class time_cl: public message
 {

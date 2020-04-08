@@ -7,7 +7,7 @@
 #include <iostream>
 #include "parallel.h"
 using namespace std;
-using namespace auto_parallel;
+using namespace apl;
 
 int n = 100, m = 50, layers = 8;
 

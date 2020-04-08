@@ -3,7 +3,7 @@
 
 #include "transfer.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     class ready_sender: public sender

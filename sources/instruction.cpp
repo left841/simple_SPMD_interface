@@ -1,6 +1,6 @@
 #include "instruction.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     instruction_block::instruction_block(const size_t* const p): ins(p)

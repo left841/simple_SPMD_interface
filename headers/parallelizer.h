@@ -15,7 +15,7 @@
 #include "intracomm.h"
 #include "it_queue.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     class parallelizer

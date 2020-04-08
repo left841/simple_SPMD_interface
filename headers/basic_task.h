@@ -6,7 +6,7 @@
 #include "message.h"
 #include "message_factory.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     enum class MESSAGE_SOURCE: size_t

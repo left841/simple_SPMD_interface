@@ -3,7 +3,7 @@
 
 #include "message.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     enum class FACTORY_TYPE: size_t

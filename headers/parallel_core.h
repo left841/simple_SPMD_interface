@@ -3,7 +3,7 @@
 
 #include "mpi.h"
 
-namespace auto_parallel
+namespace apl
 {
 
     class parallel_engine

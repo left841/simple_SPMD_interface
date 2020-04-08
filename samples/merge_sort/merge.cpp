@@ -7,7 +7,7 @@
 #include "parallel.h"
 
 using namespace std;
-using namespace auto_parallel;
+using namespace apl;
 
 class m_array: public message
 {
