@@ -114,25 +114,11 @@ namespace auto_parallel
 
     };
 
-    template<class Type>
-    local_task_id task_environment::create_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
-    {
-        created_tasks_v.push_back({ task_factory::get_type<Type>(), data, const_data});
-        return {created_tasks_v.size() - 1, TASK_SOURCE::CREATED};
-    }
-
-    template<class Type>
-    local_task_id task_environment::create_child_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
-    {
-        res.created_tasks().push_back({task_factory::get_type<Type>(), data, const_data});
-        return {res.created_tasks().size() - 1, TASK_SOURCE::CHILD};
-    }
-
     template<class Type, class InfoType>
     local_message_id task_environment::create_message_init(sendable* info)
     {
         res.created_messages().push_back({message_init_factory::get_type<Type, InfoType>(), info});
-        return {created_messages.size() - 1, MESSAGE_SOURCE::CREATED};
+        return {created_messages().size() - 1, MESSAGE_SOURCE::CREATED};
     }
 
     template<class Type, class ParentType, class InfoType>
@@ -257,6 +243,20 @@ namespace auto_parallel
     template<typename Type>
     task_type task_factory::get_type()
     { return creator<Type>::get_type(); }
+
+    template<class Type>
+    local_task_id task_environment::create_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
+    {
+        created_tasks_v.push_back({task_factory::get_type<Type>(), data, const_data});
+        return {created_tasks_v.size() - 1, TASK_SOURCE::CREATED};
+    }
+
+    template<class Type>
+    local_task_id task_environment::create_child_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
+    {
+        res.created_tasks().push_back({task_factory::get_type<Type>(), data, const_data});
+        return {res.created_tasks().size() - 1, TASK_SOURCE::CHILD};
+    }
 
 }
 

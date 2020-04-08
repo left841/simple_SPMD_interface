@@ -377,11 +377,11 @@ namespace auto_parallel
             comm.abort(111);
         const instruction_task_result& result = dynamic_cast<const instruction_task_result&>(ins);
 
-        std::vector<message_type>& mes_created = result.created_messages();
-        std::vector<std::pair<message_type, local_message_id>>& part_created = result.created_parts();
-        std::vector<task_data>& task_child_created = result.created_child_tasks();
-        std::vector<task_data>& task_created = result.created_tasks();
-        std::vector<task_dependence>& dependence_created = result.created_task_dependences();
+        const std::vector<message_type>& mes_created = result.created_messages();
+        const std::vector<std::pair<message_type, local_message_id>>& part_created = result.created_parts();
+        const std::vector<task_data>& task_child_created = result.created_child_tasks();
+        const std::vector<task_data>& task_created = result.created_tasks();
+        const std::vector<task_dependence>& dependence_created = result.created_task_dependences();
         task_id tid = result.id();
 
         for (message_id i: memory.get_task_data(tid))
@@ -438,7 +438,7 @@ namespace auto_parallel
 
         std::vector<task_id> created_child_task_id;
         memory.set_task_created_childs(tid, memory.get_task_created_childs(tid) + task_child_created.size());
-        for (task_data& i: task_child_created)
+        for (const task_data& i: task_child_created)
         {
             std::vector<message_id> data_id;
             data_id.reserve(i.data.size());
@@ -471,7 +471,7 @@ namespace auto_parallel
         }
 
         std::vector<task_id> created_task_id;
-        for (task_data& i: task_created)
+        for (const task_data& i: task_created)
         {
             std::vector<message_id> data_id;
             data_id.reserve(i.data.size());
@@ -502,7 +502,7 @@ namespace auto_parallel
             created_task_id.push_back(id);
         }
 
-        for (task_dependence& i: dependence_created)
+        for (const task_dependence& i: dependence_created)
         {
             task_id parent;
             task_id child;
