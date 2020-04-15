@@ -19,7 +19,7 @@ namespace apl
             message* d;
             sendable* info;
             size_t version;
-            FACTORY_TYPE f_type;
+            MESSAGE_FACTORY_TYPE f_type;
             message_type type;
             message_id parent;
             std::vector<message_id> childs;
@@ -52,7 +52,12 @@ namespace apl
         std::queue<task_id> get_ready_tasks();
 
         message_id add_message(message* ptr);
-        task_id add_task(task* ptr, task_type type = TASK_TYPE_UNDEFINED);
+        task_id add_task(task* ptr);
+
+        message_id add_message(message* ptr, message_type type);
+        message_id add_message_init(message* ptr, message_type type, sendable* info);
+        message_id add_message_child(message* ptr, message_type type, message_id parent, sendable* info);
+        task_id add_task(task* ptr, task_type type, std::vector<message_id> data, std::vector<message_id> const_data);
 
         message_id create_message(message_type type);
         message_id create_message_init(message_type type, sendable* info);
@@ -60,6 +65,11 @@ namespace apl
         task_id create_task(task_type type, std::vector<message_id> data, std::vector<message_id> const_data);
         void include_child_to_parent(message_id child);
         void include_child_to_parent_recursive(message_id child);
+
+        void add_message_with_id(message* ptr, message_id id, message_type type);
+        void add_message_init_with_id(message* ptr, message_id id, message_type type, sendable* info);
+        void add_message_child_with_id(message* ptr, message_id id, message_type type, message_id parent, sendable* info);
+        void add_task_with_id(task* ptr, task_id id, task_type type, std::vector<message_id> data, std::vector<message_id> const_data);
 
         void create_message_with_id(message_id id, message_type type);
         void create_message_init_with_id(message_id id, message_type type, sendable* info);
@@ -88,7 +98,7 @@ namespace apl
 
         size_t message_count();
         message* get_message(message_id id);
-        FACTORY_TYPE get_message_factory_type(message_id id);
+        MESSAGE_FACTORY_TYPE get_message_factory_type(message_id id);
         message_type get_message_type(message_id id);
         sendable* get_message_info(message_id id);
         message_id get_message_parent(message_id id);

@@ -179,7 +179,7 @@ public:
             if (sz - (r + 1) > 1)
             {
                 arrray::part_info* pi2 = new arrray::part_info;
-                pi2->offset = r + 1;
+                pi2->offset = static_cast<size_t>(r) + 1;
                 pi2->size = static_cast<size_t>(sz) - (static_cast<size_t>(r) + 1);
                 env.create_child_task<quick_task>({env.create_message_child<arrray, arrray, arrray::part_info>(env.get_arg_id(0), pi2)}, {});
             }
@@ -223,16 +223,16 @@ public:
         arrray& a1 = dynamic_cast<arrray&>(*data[0]);
         arrray& a2 = dynamic_cast<arrray&>(*data[1]);
         double tm1 = MPI_Wtime();
-        //sort(a2.p, a2.p + a2.size);
-        //double tm2 = MPI_Wtime();
-        //for (int i = 0; i < a1.size; ++i)
-        //    if (a1.p[i] != a2.p[i])
-        //    {
-        //        cout << "wrong\n";
-        //        goto gh;
-        //    }
-        //cout << "correct\n";
-        //gh:
+        sort(a2.p, a2.p + a2.size);
+        double tm2 = MPI_Wtime();
+        for (int i = 0; i < a1.size; ++i)
+            if (a1.p[i] != a2.p[i])
+            {
+                cout << "wrong\n";
+                goto gh;
+            }
+        cout << "correct\n";
+        gh:
         cout << tm1 - t.time << '\n';
         //cout << tm2 - tm1;
         cout.flush();

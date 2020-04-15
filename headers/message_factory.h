@@ -6,9 +6,10 @@
 namespace apl
 {
 
-    enum class FACTORY_TYPE: size_t
+    enum class MESSAGE_FACTORY_TYPE: size_t
     {
-        UNDEFINED, SIMPLE, COPY, INIT, CHILD, PART
+        UNDEFINED,
+        SIMPLE, COPY, INIT, CHILD, PART
     };
 
     // init
@@ -72,7 +73,7 @@ namespace apl
     };
 
     template<typename Type, typename InfoType>
-    message_init_factory::id<Type, InfoType>::id(): id(message_init_factory::add<Type, InfoType>())
+    message_init_factory::id<Type, InfoType>::id(): value(message_init_factory::add<Type, InfoType>())
     { }
 
     template<typename Type, typename InfoType>
@@ -96,7 +97,7 @@ namespace apl
 
     template<typename Type, typename InfoType>
     message_type message_init_factory::creator<Type, InfoType>::get_type()
-    { return my_type.id; }
+    { return my_type.value; }
 
     template<typename Type, typename InfoType>
     message_type message_init_factory::add()

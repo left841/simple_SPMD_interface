@@ -21,6 +21,8 @@ namespace apl
         virtual void send(const void* buf, int size, MPI_Datatype type) const;
         virtual void isend(const void* buf, int size, MPI_Datatype type) const;
 
+        virtual void wait_all() const;
+
     };
 
 }

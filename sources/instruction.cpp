@@ -71,7 +71,10 @@ namespace apl
         { return new instruction_task_create(p); },
 
         [](const size_t* const p)->const instruction_block*
-        { return new instruction_task_result(p); }
+        { return new instruction_task_result(p); },
+
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_add_result_to_memory(p); }
     };
 
     const instruction_block* instruction::block_factory::get(const size_t* const p)
@@ -271,179 +274,88 @@ namespace apl
 
     // TASK_RES
     instruction_task_result::instruction_task_result(const size_t* const p): instruction_block(p)
-    {
-        offsets[0] = 2;
-        offsets[1] = 3 + ins[2];
-        offsets[2] = 4 + ins[2] + ins[3 + ins[2]] * 3;
-        size_t m = offsets[2] + 1;
-        for (size_t i = 0; i < ins[offsets[2]]; ++i)
-        {
-            m += 1;
-            m += ins[m] * 2 + 1;
-            m += ins[m] * 2 + 1;
-        }
-        offsets[3] = m;
-        ++m;
-        for (size_t i = 0; i < ins[offsets[3]]; ++i)
-        {
-            m += 1;
-            m += ins[m] * 2 + 1;
-            m += ins[m] * 2 + 1;
-        }
-        offsets[4] = m;
-        offsets[5] = ins[m] * 4 + m + 1;
-    }
+    { }
 
     size_t instruction_task_result::size() const
-    { return offsets[5]; }
+    { return 2; }
 
     task_id instruction_task_result::id() const
     { return static_cast<task_id>(ins[1]); }
 
-    std::vector<message_type> instruction_task_result::created_messages() const
-    {
-        std::vector<message_type> v(ins[offsets[0]]);
-        for (size_t i = 0; i < v.size(); ++i)
-            v[i] = ins[3 + i];
-        return v;
-    }
-
-    std::vector<std::pair<message_type, local_message_id>> instruction_task_result::created_parts() const
-    {
-        size_t n = offsets[1] + 1;
-        std::vector<std::pair<message_type, local_message_id>> v(ins[offsets[1]]);
-        for (size_t i = 0; i < v.size(); ++i)
-        {
-            v[i] = {static_cast<message_type>(ins[n]), {ins[n + 1], static_cast<MESSAGE_SOURCE>(ins[n + 2])}};
-            n += 3;
-        }
-        return v;
-    }
-
-    std::vector<task_data> instruction_task_result::created_child_tasks() const
-    {
-        size_t n = offsets[2];
-        std::vector<task_data> v = read_vector<task_data>(n, [this](size_t& n)->task_data
-        {
-            task_data td {static_cast<task_type>(this->ins[n++]), {}, {}};
-            td.data = read_vector<local_message_id>(n, [this](size_t& n)->local_message_id
-            {
-                local_message_id id;
-                id.id = this->ins[n++];
-                id.ms = static_cast<MESSAGE_SOURCE>(this->ins[n++]);
-                return id;
-            });
-            td.c_data = read_vector<local_message_id>(n, [this](size_t& n)->local_message_id
-            {
-                local_message_id id;
-                id.id = this->ins[n++];
-                id.ms = static_cast<MESSAGE_SOURCE>(this->ins[n++]);
-                return id;
-            });
-            return td;
-        });
-        return v;
-    }
-
-    std::vector<task_data> instruction_task_result::created_tasks() const
-    {
-        size_t n = offsets[3];
-        std::vector<task_data> v = read_vector<task_data>(n, [this](size_t& n)->task_data
-            {
-                task_data td{static_cast<task_type>(this->ins[n++]), {}, {}};
-                td.data = read_vector<local_message_id>(n, [this](size_t& n)->local_message_id
-                    {
-                        local_message_id id;
-                        id.id = this->ins[n++];
-                        id.ms = static_cast<MESSAGE_SOURCE>(this->ins[n++]);
-                        return id;
-                    });
-                td.c_data = read_vector<local_message_id>(n, [this](size_t& n)->local_message_id
-                    {
-                        local_message_id id;
-                        id.id = this->ins[n++];
-                        id.ms = static_cast<MESSAGE_SOURCE>(this->ins[n++]);
-                        return id;
-                    });
-                return td;
-            });
-        return v;
-    }
-
-    std::vector<task_dependence> instruction_task_result::created_task_dependences() const
-    {
-        size_t n = offsets[4];
-        std::vector<task_dependence> v = read_vector<task_dependence>(n, [this](size_t& n)->task_dependence
-        {
-            task_dependence dp {ins[n], static_cast<TASK_SOURCE>(ins[n + 1]), ins[n + 2], static_cast<TASK_SOURCE>(ins[n + 3])};
-            n += 4;
-            return dp;
-        });
-        return v;
-    }
-
-    void instruction::add_task_result(task_id id, task_environment& env)
+    void instruction::add_task_result(task_id id)
     {
         add_cmd(INSTRUCTION::TASK_RES);
-        std::vector<message_data>& md = env.created_messages();
-        std::vector<message_part_data>& mpd = env.created_parts();
-        std::vector<task_data>& td = env.created_child_tasks();
-        std::vector<task_data>& cre_t = env.created_tasks();
-        std::vector<task_dependence>& dep = env.created_dependences();
-
         v.push_back(id);
-        v.push_back(md.size());
-        for (size_t i = 0; i < md.size(); ++i)
-            v.push_back(md[i].type);
-        v.push_back(mpd.size());
-        for (size_t i = 0; i < mpd.size(); ++i)
+    }
+
+    // ADD_RES_TO_MEMORY
+    instruction_add_result_to_memory::instruction_add_result_to_memory(const size_t* const p): instruction_block(p)
+    {
+        offsets[0] = 1;
+        offsets[1] = offsets[0] + ins[offsets[0]] + 1;
+        offsets[2] = offsets[1] + ins[offsets[1]] + 1;
+        offsets[3] = offsets[2] + ins[offsets[2]] + 1;
+        offsets[4] = offsets[3] + ins[offsets[3]] + 1;
+    }
+
+    size_t instruction_add_result_to_memory::size() const
+    { return offsets[4]; }
+
+    std::vector<message_id> instruction_add_result_to_memory::added_messages_init() const
+    {
+        size_t pos = offsets[0];
+        std::vector<message_id> v = read_vector<message_id>(pos, [this](size_t& p)->message_id
         {
-            v.push_back(mpd[i].type);
-            v.push_back(mpd[i].sourse.id);
-            v.push_back(static_cast<size_t>(mpd[i].sourse.ms));
-        }
-        v.push_back(td.size());
-        for (size_t i = 0; i < td.size(); ++i)
+            return ins[p++];
+        });
+        return v;
+    }
+
+    std::vector<message_id> instruction_add_result_to_memory::added_messages_child() const
+    {
+        size_t pos = offsets[1];
+        std::vector<message_id> v = read_vector<message_id>(pos, [this](size_t& p)->message_id
         {
-            v.push_back(td[i].type);
-            v.push_back(td[i].data.size());
-            for (local_message_id j: td[i].data)
-            {
-                v.push_back(j.id);
-                v.push_back(static_cast<size_t>(j.ms));
-            }
-            v.push_back(td[i].c_data.size());
-            for (local_message_id j: td[i].c_data)
-            {
-                v.push_back(j.id);
-                v.push_back(static_cast<size_t>(j.ms));
-            }
-        }
-        v.push_back(cre_t.size());
-        for (task_data& i: cre_t)
+            return ins[p++];
+        });
+        return v;
+    }
+
+    std::vector<task_id> instruction_add_result_to_memory::added_tasks_simple() const
+    {
+        size_t pos = offsets[2];
+        std::vector<task_id> v = read_vector<task_id>(pos, [this](size_t& p)->task_id
         {
-            v.push_back(i.type);
-            v.push_back(i.data.size());
-            for (local_message_id j: i.data)
-            {
-                v.push_back(j.id);
-                v.push_back(static_cast<size_t>(j.ms));
-            }
-            v.push_back(i.c_data.size());
-            for (local_message_id j: i.c_data)
-            {
-                v.push_back(j.id);
-                v.push_back(static_cast<size_t>(j.ms));
-            }
-        }
-        v.push_back(dep.size());
-        for (task_dependence& i: dep)
+            return ins[p++];
+        });
+        return v;
+    }
+
+    std::vector<task_id> instruction_add_result_to_memory::added_tasks_child() const
+    {
+        size_t pos = offsets[3];
+        std::vector<task_id> v = read_vector<task_id>(pos, [this](size_t& p)->task_id
         {
-            v.push_back(i.parent.id);
-            v.push_back(static_cast<size_t>(i.parent.src));
-            v.push_back(i.child.id);
-            v.push_back(static_cast<size_t>(i.child.src));
-        }
+            return ins[p++];
+        });
+        return v;
+    }
+
+    void instruction::add_add_result_to_memory(const std::vector<message_id>& mes, const std::vector<message_id>& mes_c, const std::vector<task_id>& tasks, const std::vector<task_id>& tasks_c)
+    {
+        add_cmd(INSTRUCTION::ADD_RES_TO_MEMORY);
+        v.push_back(mes.size());
+        for (message_id i: mes)
+            v.push_back(i);
+        v.push_back(mes_c.size());
+        for (message_id i: mes_c)
+            v.push_back(i);
+        v.push_back(tasks.size());
+        for (task_id i: tasks)
+            v.push_back(i);
+        v.push_back(tasks_c.size());
+        for (task_id i: tasks_c)
+            v.push_back(i);
     }
 
 }

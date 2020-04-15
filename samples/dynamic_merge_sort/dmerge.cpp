@@ -24,6 +24,20 @@ public:
     { re.recv(&time, 1); }
 };
 
+struct array_size: public message
+{
+    int size;
+
+    array_size(int sz = 0): size(sz)
+    { }
+
+    void send(const sender& se)
+    { se.send(&size); }
+
+    void recv(const receiver& re)
+    { re.recv(&size); }
+};
+
 class m_array: public message
 {
 private:
@@ -75,6 +89,12 @@ public:
         res = true;
     }
 
+    m_array(const array_size sz): size(sz.size)
+    {
+        p = new int[size];
+        res = true;
+    }
+
     ~m_array()
     {
         if (res)
@@ -102,29 +122,6 @@ public:
 
     int get_size() const
     { return size; }
-};
-
-class init_task: public task
-{
-public:
-    init_task(const vector<message*>& mes_v) : task(mes_v)
-    { }
-
-    init_task(const vector<message*>& mes_v, const vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
-    { }
-
-    void perform(task_environment& env)
-    {
-        mt19937 mt(static_cast<int>(time(0)));
-        uniform_int_distribution<int> uid(0, 10000);
-        m_array& a1 = dynamic_cast<m_array&>(*data[0]);
-        m_array& a2 = dynamic_cast<m_array&>(*data[1]);
-        m_array& a3 = dynamic_cast<m_array&>(*data[2]);
-        time_cl& t = dynamic_cast<time_cl&>(*data[3]);
-        for (int i = 0; i < a1.get_size(); ++i)
-            a1.get_p()[i] = a2.get_p()[i] = a3.get_p()[i] = uid(mt);
-        t.time = MPI_Wtime();
-    }
 };
 
 class merge_t_all: public task
@@ -256,25 +253,59 @@ public:
         m_array& a1 = dynamic_cast<m_array&>(*data[0]);
         m_array& a2 = dynamic_cast<m_array&>(*data[1]);
         double tm1 = MPI_Wtime();
-    //    sort(a2.get_p(), a2.get_p() + a2.get_size());
-    //    double tm2 = MPI_Wtime();
-    //    /*for (int i = 0; i < a1.get_size(); ++i)
-    //        cout << a1.get_p()[i] << ' ';
-    //    cout << endl;
-    //    for (int i = 0; i < a2.get_size(); ++i)
-    //        cout << a2.get_p()[i] << ' ';
-    //    cout << endl;*/
-    //    for (int i = 0; i < a1.get_size(); ++i)
-    //        if (a1.get_p()[i] != a2.get_p()[i])
-    //        {
-    //            cout << "wrong\n";
-    //            goto gh;
-    //        }
-    //    cout << "correct\n";
-    //gh:
+        sort(a2.get_p(), a2.get_p() + a2.get_size());
+        /*double tm2 = MPI_Wtime();
+        for (int i = 0; i < a1.get_size(); ++i)
+            cout << a1.get_p()[i] << ' ';
+        cout << endl;
+        for (int i = 0; i < a2.get_size(); ++i)
+            cout << a2.get_p()[i] << ' ';
+        cout << endl;*/
+        for (int i = 0; i < a1.get_size(); ++i)
+            if (a1.get_p()[i] != a2.get_p()[i])
+            {
+                cout << "wrong\n";
+                goto gh;
+            }
+        cout << "correct\n";
+    gh:
         cout << tm1 - t.time << '\n';
         //cout << tm2 - tm1;
         cout.flush();
+    }
+};
+
+class init_task: public task
+{
+public:
+    init_task(const vector<message*>& mes_v) : task(mes_v)
+    { }
+
+    init_task(const vector<message*>& mes_v, const vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
+    { }
+
+    void perform(task_environment& env)
+    {
+        mt19937 mt(static_cast<int>(time(0)));
+        uniform_int_distribution<int> uid(0, 10000);
+        time_cl& t = dynamic_cast<time_cl&>(get_a(0));
+        const array_size& size = dynamic_cast<const array_size&>(get_c(0));
+        m_array& a1 = *new m_array(size);
+        m_array& a2 = *new m_array(size);
+        m_array& a3 = *new m_array(size);
+
+        for (int i = 0; i < a1.get_size(); ++i)
+            a1.get_p()[i] = a2.get_p()[i] = a3.get_p()[i] = uid(mt);
+        t.time = MPI_Wtime();
+
+        local_message_id m_id1 = env.add_message_init<m_array, array_size>(&a1, new array_size(size));
+        local_message_id m_id2 = env.add_message_init<m_array, array_size>(&a2, new array_size(size));
+        local_message_id m_id3 = env.add_message_init<m_array, array_size>(&a3, new array_size(size));
+
+        local_task_id merge = env.create_task<merge_organizer>({}, {m_id1, m_id3});
+        local_task_id check = env.create_task<check_task>({m_id3, m_id2}, {env.get_arg_id(0)});
+
+        env.add_dependence(merge, check);
     }
 };
 
@@ -290,20 +321,9 @@ int main(int argc, char** argv)
     }
 
     parallelizer pz;
-    task_graph tg;
 
     int comm_size = pz.get_proc_count();
     merge_organizer::pred = size / comm_size;
 
-    message* m1 = new m_array(size);
-    message* m2 = new m_array(size);
-    message* m3 = new m_array(size);
-    time_cl* p = new time_cl;
-    init_task it({m1, m2, m3, p});
-    check_task ct({m3, m2}, {p});
-    merge_organizer* qt = new merge_organizer({}, {m1, m3});
-    tg.add_dependence(&it, qt);
-    tg.add_dependence(qt, &ct);
-    pz.init(tg);
-    pz.execution();
+    pz.execution(new init_task({new time_cl()}, {new array_size(size)}));
 }

@@ -58,7 +58,8 @@ namespace apl
         void init(task_graph& _tg);
 
         void execution();
-
+        void execution(task_graph& _tg);
+        void execution(task* root);
     };
 
 }

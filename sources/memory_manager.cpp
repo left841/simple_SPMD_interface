@@ -72,16 +72,39 @@ namespace apl
     message_id memory_manager::add_message(message* ptr)
     { 
         std::vector<message_id> childs;
-        data_v.push_back({ptr, nullptr, 0, FACTORY_TYPE::UNDEFINED, MESSAGE_TYPE_UNDEFINED, MESSAGE_ID_UNDEFINED, childs, false});
+        data_v.push_back({ptr, nullptr, 0, MESSAGE_FACTORY_TYPE::UNDEFINED, MESSAGE_TYPE_UNDEFINED, MESSAGE_ID_UNDEFINED, childs, false});
         return data_v.size() - 1;
     }
 
-    task_id memory_manager::add_task(task* ptr, task_type type)
+    task_id memory_manager::add_task(task* ptr)
     {
         std::vector<task_id> childs;
         std::vector<message_id> data;
         std::vector<message_id> const_data;
-        task_v.push_back({ptr, type, TASK_ID_UNDEFINED, 0, 0, childs, data, const_data});
+        task_v.push_back({ptr, TASK_TYPE_UNDEFINED, TASK_ID_UNDEFINED, 0, 0, childs, data, const_data, false});
+        return task_v.size() - 1;
+    }
+
+    message_id memory_manager::add_message_init(message* ptr, message_type type, sendable* info)
+    {
+        std::vector<message_id> childs;
+        data_v.push_back({ptr, info, 0, MESSAGE_FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true});
+        return data_v.size() - 1;
+    }
+
+    message_id memory_manager::add_message_child(message* ptr, message_type type, message_id parent, sendable* info)
+    {
+        std::vector<message_id> childs;
+        data_v.push_back({ptr, info, 0, MESSAGE_FACTORY_TYPE::CHILD, type, parent, childs, true});
+        if ((parent < data_v.size()) && (data_v[parent].d != nullptr))
+            data_v[parent].childs.push_back(data_v.size() - 1);
+        return data_v.size() - 1;
+    }
+
+    task_id memory_manager::add_task(task* ptr, task_type type, std::vector<message_id> data, std::vector<message_id> const_data)
+    {
+        std::vector<task_id> childs;
+        task_v.push_back({ptr, type, TASK_ID_UNDEFINED, 0, 0, childs, data, const_data, true});
         return task_v.size() - 1;
     }
 
@@ -89,7 +112,7 @@ namespace apl
     {
         message* mes = message_init_factory::get(type, *info);
         std::vector<message_id> childs;
-        data_v.push_back({mes, info, 0, FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true});
+        data_v.push_back({mes, info, 0, MESSAGE_FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true});
         return data_v.size() - 1;
     }
 
@@ -101,7 +124,7 @@ namespace apl
         else
             mes = message_child_factory::get(type, *info);
         std::vector<message_id> childs;
-        data_v.push_back({mes, info, 0, FACTORY_TYPE::CHILD, type, parent, childs, true});
+        data_v.push_back({mes, info, 0, MESSAGE_FACTORY_TYPE::CHILD, type, parent, childs, true});
         if ((parent < data_v.size()) && (data_v[parent].d != nullptr))
             data_v[parent].childs.push_back(data_v.size() - 1);
         return data_v.size() - 1;
@@ -117,7 +140,7 @@ namespace apl
             const_mes_v.push_back(data_v[i].d);
         task* t = task_factory::get(type, mes_v, const_mes_v);
         std::vector<task_id> childs;
-        task_v.push_back({t, type, TASK_ID_UNDEFINED, 0, 0, childs, data, const_data});
+        task_v.push_back({t, type, TASK_ID_UNDEFINED, 0, 0, childs, data, const_data, true});
         return task_v.size() - 1;
     }
 
@@ -136,13 +159,39 @@ namespace apl
         }
     }
 
+    void memory_manager::add_message_init_with_id(message* ptr, message_id id, message_type type, sendable* info)
+    {
+        if (id >= data_v.size())
+            data_v.resize(id + 1);
+        std::vector<message_id> childs;
+        data_v[id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true};
+    }
+
+    void memory_manager::add_message_child_with_id(message* ptr, message_id id, message_type type, message_id parent, sendable* info)
+    {
+        if (id >= data_v.size())
+            data_v.resize(id + 1);
+        std::vector<message_id> childs;
+        data_v[id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::CHILD, type, parent, childs, true};
+        if ((parent < data_v.size()) && (data_v[parent].d != nullptr))
+            data_v[parent].childs.push_back(data_v.size() - 1);
+    }
+
+    void memory_manager::add_task_with_id(task* ptr, task_id id, task_type type, std::vector<message_id> data, std::vector<message_id> const_data)
+    {
+        if (id >= task_v.size())
+            task_v.resize(id + 1);
+        std::vector<task_id> childs;
+        task_v[id] = {ptr, type, TASK_ID_UNDEFINED, 0, 0, childs, data, const_data, true};
+    }
+
     void memory_manager::create_message_init_with_id(message_id id, message_type type, sendable* info)
     {
         if (id >= data_v.size())
             data_v.resize(id + 1);
         message* mes = message_init_factory::get(type, *info);
         std::vector<message_id> childs;
-        data_v[id] = {mes, info, 0, FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true};
+        data_v[id] = {mes, info, 0, MESSAGE_FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true};
     }
 
     void memory_manager::create_message_child_with_id(message_id id, message_type type, message_id parent, sendable* info)
@@ -155,7 +204,7 @@ namespace apl
             mes = message_child_factory::get(type, *data_v[parent].d, *info);
         else
             mes = message_child_factory::get(type, *info);
-        data_v[id] = {mes, info, 0, FACTORY_TYPE::CHILD, type, parent, childs, true};
+        data_v[id] = {mes, info, 0, MESSAGE_FACTORY_TYPE::CHILD, type, parent, childs, true};
         if ((parent < data_v.size()) && (data_v[parent].d != nullptr))
             data_v[parent].childs.push_back(data_v.size() - 1);
     }
@@ -172,7 +221,7 @@ namespace apl
             const_mes_v.push_back(data_v[i].d);
         task* t = task_factory::get(type, mes_v, const_mes_v);
         std::vector<task_id> childs;
-        task_v[id] = {t, type, TASK_ID_UNDEFINED, 0, 0, childs, data, const_data};
+        task_v[id] = {t, type, TASK_ID_UNDEFINED, 0, 0, childs, data, const_data, true};
     }
 
     void memory_manager::update_message_versions(task_id id)
@@ -269,7 +318,7 @@ namespace apl
     message* memory_manager::get_message(message_id id)
     { return data_v[id].d; }
 
-    FACTORY_TYPE memory_manager::get_message_factory_type(message_id id)
+    MESSAGE_FACTORY_TYPE memory_manager::get_message_factory_type(message_id id)
     { return data_v[id].f_type; }
 
     message_type memory_manager::get_message_type(message_id id)

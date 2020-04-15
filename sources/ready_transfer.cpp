@@ -18,4 +18,13 @@ namespace apl
         q->push(req);
     }
 
+    void ready_sender::wait_all() const
+    {
+        while (!q->empty())
+        {
+            MPI_Wait(&q->front(), MPI_STATUS_IGNORE);
+            q->pop();
+        }
+    }
+
 }

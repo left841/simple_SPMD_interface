@@ -9,15 +9,24 @@
 namespace apl
 {
 
+    class task;
+
     enum class MESSAGE_SOURCE: size_t
     {
-        TASK_ARG, TASK_ARG_C,
-        CREATED, PART
+        TASK_ARG, TASK_ARG_C, REFERENCE,
+        SIMPLE, COPY, INIT, CHILD, PART,
+        SIMPLE_A, COPY_A, INIT_A, CHILD_A, PART_A
     };
 
     enum class TASK_SOURCE: size_t
     {
-        GLOBAL, CREATED, CHILD
+        GLOBAL, SIMPLE, SIMPLE_A, REFERENCE,
+        SIMPLE_C, SIMPLE_AC
+    };
+
+    enum class TASK_FACTORY_TYPE: size_t
+    {
+        UNDEFINED, SIMPLE
     };
 
     struct local_task_id
@@ -29,7 +38,7 @@ namespace apl
     struct local_message_id
     {
         size_t id;
-        MESSAGE_SOURCE ms;
+        MESSAGE_SOURCE src;
     };
 
     struct task_data
@@ -38,17 +47,39 @@ namespace apl
         std::vector<local_message_id> data, c_data;
     };
 
-    struct message_data
+    struct task_add_data
     {
-        message_type type;
-        sendable* iib;
+        task_type type;
+        std::vector<local_message_id> data, c_data;
+        task* t;
     };
 
-    struct message_part_data
+    struct message_init_data
+    {
+        message_type type;
+        sendable* ii;
+    };
+
+    struct message_init_add_data
+    {
+        message_type type;
+        sendable* ii;
+        message* mes;
+    };
+
+    struct message_child_data
     {
         message_type type;
         local_message_id sourse;
-        sendable* pib;
+        sendable* pi;
+    };
+
+    struct message_child_add_data
+    {
+        message_type type;
+        local_message_id sourse;
+        sendable* pi;
+        message* mes;
     };
 
     struct task_dependence
@@ -57,31 +88,25 @@ namespace apl
         local_task_id child;
     };
 
-    class task_result
-    {
-    private:
-
-        std::vector<task_data> created_tasks_v;
-        std::vector<message_data> created_messages_v;
-        std::vector<message_part_data> created_parts_v;
-
-    public:
-
-        task_result();
-
-        std::vector<task_data>& created_tasks();
-        std::vector<message_data>& created_messages();
-        std::vector<message_part_data>& created_parts();
-    };
-
-    class task_environment
+    class task_environment: public sendable
     {
     private:
 
         task_data this_task;
         local_task_id this_task_id;
-        task_result res;
-        std::vector<task_data> created_tasks_v;
+
+        std::vector<local_message_id> created_messages_v;
+        std::vector<message_init_data> messages_init_v;
+        std::vector<message_init_add_data> messages_init_add_v;
+        std::vector<message_child_data> messages_childs_v;
+        std::vector<message_child_add_data> messages_childs_add_v;
+
+        std::vector<local_task_id> created_tasks_v;
+        std::vector<task_data> tasks_v;
+        std::vector<task_add_data> tasks_add_v;
+        std::vector<task_data> tasks_child_v;
+        std::vector<task_add_data> tasks_child_add_v;
+
         std::vector<task_dependence> dependence_v;
 
     public:
@@ -93,18 +118,36 @@ namespace apl
         local_task_id create_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
         template<class Type>
         local_task_id create_child_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
+
+        template<class Type>
+        local_task_id add_task(task* t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
+        template<class Type>
+        local_task_id add_child_task(task* t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
+
         template<class Type, class InfoType>
         local_message_id create_message_init(sendable* info);
         template<class Type, class ParentType, class InfoType>
         local_message_id create_message_child(local_message_id source, sendable* info);
 
+        template<class Type, class InfoType>
+        local_message_id add_message_init(message* m, sendable* info);
+        template<class Type, class ParentType, class InfoType>
+        local_message_id add_message_child(message* m, local_message_id source, sendable* info);
+
         void add_dependence(local_task_id parent, local_task_id child);
 
-        task_result& get_result();
-        std::vector<task_data>& created_tasks();
+        std::vector<local_task_id>& result_task_ids();
+        std::vector<task_data>& created_tasks_simple();
         std::vector<task_data>& created_child_tasks();
-        std::vector<message_data>& created_messages();
-        std::vector<message_part_data>& created_parts();
+        std::vector<task_add_data>& added_tasks();
+        std::vector<task_add_data>& added_child_tasks();
+
+        std::vector<local_message_id>& result_message_ids();
+        std::vector<message_init_data>& created_messages_init();
+        std::vector<message_child_data>& created_messages_child();
+        std::vector<message_init_add_data>& added_messages_init();
+        std::vector<message_child_add_data>& added_messages_child();
+
         std::vector<task_dependence>& created_dependences();
 
         local_message_id get_arg_id(size_t n);
@@ -112,20 +155,40 @@ namespace apl
         task_data get_this_task_data();
         local_task_id get_this_task_id();
 
+        void send(const sender& se);
+        void recv(const receiver& re);
+
     };
 
     template<class Type, class InfoType>
     local_message_id task_environment::create_message_init(sendable* info)
     {
-        res.created_messages().push_back({message_init_factory::get_type<Type, InfoType>(), info});
-        return {created_messages().size() - 1, MESSAGE_SOURCE::CREATED};
+        messages_init_v.push_back({message_init_factory::get_type<Type, InfoType>(), info});
+        created_messages_v.push_back({messages_init_v.size() - 1, MESSAGE_SOURCE::INIT});
+        return created_messages_v.back();
     }
 
     template<class Type, class ParentType, class InfoType>
     local_message_id task_environment::create_message_child(local_message_id source, sendable* info)
     {
-        res.created_parts().push_back({message_child_factory::get_type<Type, ParentType, InfoType>(), source, info});
-        return {res.created_parts().size() - 1, MESSAGE_SOURCE::PART};
+        messages_childs_v.push_back({message_child_factory::get_type<Type, ParentType, InfoType>(), source, info});
+        created_messages_v.push_back({messages_childs_v.size() - 1, MESSAGE_SOURCE::CHILD});
+        return created_messages_v.back();
+    }
+
+    template<class Type, class InfoType>
+    local_message_id task_environment::add_message_init(message* m, sendable* info)
+    {
+        messages_init_add_v.push_back({message_init_factory::get_type<Type, InfoType>(), info, m});
+        created_messages_v.push_back({messages_init_add_v.size() - 1, MESSAGE_SOURCE::INIT_A});
+        return created_messages_v.back();
+    }
+    template<class Type, class ParentType, class InfoType>
+    local_message_id task_environment::add_message_child(message* m, local_message_id source, sendable* info)
+    {
+        messages_childs_add_v.push_back({message_child_factory::get_type<Type, ParentType, InfoType>(), source, info, m});
+        created_messages_v.push_back({messages_childs_add_v.size() - 1, MESSAGE_SOURCE::CHILD_A});
+        return created_messages_v.back();
     }
 
     class task
@@ -247,15 +310,33 @@ namespace apl
     template<class Type>
     local_task_id task_environment::create_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
     {
-        created_tasks_v.push_back({task_factory::get_type<Type>(), data, const_data});
-        return {created_tasks_v.size() - 1, TASK_SOURCE::CREATED};
+        tasks_v.push_back({task_factory::get_type<Type>(), data, const_data});
+        created_tasks_v.push_back({tasks_v.size() - 1, TASK_SOURCE::SIMPLE});
+        return created_tasks_v.back();
     }
 
     template<class Type>
     local_task_id task_environment::create_child_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
     {
-        res.created_tasks().push_back({task_factory::get_type<Type>(), data, const_data});
-        return {res.created_tasks().size() - 1, TASK_SOURCE::CHILD};
+        tasks_child_v.push_back({task_factory::get_type<Type>(), data, const_data});
+        created_tasks_v.push_back({tasks_child_v.size() - 1, TASK_SOURCE::SIMPLE_C});
+        return created_tasks_v.back();
+    }
+
+    template<class Type>
+    local_task_id task_environment::add_task(task* t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
+    {
+        tasks_add_v.push_back({task_factory::get_type<Type>(), data, const_data, t});
+        created_tasks_v.push_back({tasks_add_v.size() - 1, TASK_SOURCE::SIMPLE_A});
+        return created_tasks_v.back();
+    }
+
+    template<class Type>
+    local_task_id task_environment::add_child_task(task* t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
+    {
+        tasks_child_add_v.push_back({task_factory::get_type<Type>(), data, const_data, t});
+        created_tasks_v.push_back({tasks_child_add_v.size() - 1, TASK_SOURCE::SIMPLE_AC});
+        return created_tasks_v.back();
     }
 
 }

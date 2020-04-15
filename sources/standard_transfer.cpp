@@ -16,6 +16,15 @@ namespace apl
         q->push(req);
     }
 
+    void standard_sender::wait_all() const
+    {
+        while (!q->empty())
+        {
+            MPI_Wait(&q->front(), MPI_STATUS_IGNORE);
+            q->pop();
+        }
+    }
+
     standard_receiver::standard_receiver(MPI_Comm _comm, process _proc, std::queue<MPI_Request>* _q): receiver(), comm(_comm), proc(_proc), q(_q)
     { tag = 0; }
 
@@ -36,6 +45,15 @@ namespace apl
         MPI_Probe(proc, tag, comm, &status);
         MPI_Get_count(&status, type, &size);
         return size;
+    }
+
+    void standard_receiver::wait_all() const
+    {
+        while (!q->empty())
+        {
+            MPI_Wait(&q->front(), MPI_STATUS_IGNORE);
+            q->pop();
+        }
     }
 
 }

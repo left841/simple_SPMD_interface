@@ -14,7 +14,7 @@ namespace apl
     enum class INSTRUCTION: size_t
     {
         UNDEFINED, END, MES_SEND, MES_RECV, MES_CREATE,
-        MES_P_CREATE, TASK_EXE, TASK_CREATE, TASK_RES
+        MES_P_CREATE, TASK_EXE, TASK_CREATE, TASK_RES, ADD_RES_TO_MEMORY
     };
 
     class instruction_block
@@ -124,18 +124,25 @@ namespace apl
 
     class instruction_task_result: public instruction_block
     {
-    private:
-        std::array<size_t, 6> offsets;
     public:
         instruction_task_result(const size_t* const p);
 
         size_t size() const;
         task_id id() const;
-        std::vector<message_type> created_messages() const;
-        std::vector<std::pair<message_type, local_message_id>> created_parts() const;
-        std::vector<task_data> created_child_tasks() const;
-        std::vector<task_data> created_tasks() const;
-        std::vector<task_dependence> created_task_dependences() const;
+    };
+
+    class instruction_add_result_to_memory: public instruction_block
+    {
+    private:
+        std::array<size_t, 5> offsets;
+    public:
+        instruction_add_result_to_memory(const size_t* const p);
+
+        size_t size() const;
+        std::vector<message_id> added_messages_init() const;
+        std::vector<message_id> added_messages_child() const;
+        std::vector<task_id> added_tasks_simple() const;
+        std::vector<task_id> added_tasks_child() const;
     };
 
     class instruction: public sendable
@@ -191,7 +198,8 @@ namespace apl
         void add_message_part_creation(message_id id, message_type type, message_id source);
         void add_task_execution(task_id id);
         void add_task_creation(task_id id, task_type type, std::vector<message_id> data, std::vector<message_id> c_data);
-        void add_task_result(task_id id, task_environment& env);
+        void add_task_result(task_id id);
+        void add_add_result_to_memory(const std::vector<message_id>& mes, const std::vector<message_id>& mes_c, const std::vector<task_id>& tasks, const std::vector<task_id>& tasks_c);
 
         const_iterator begin() const;
         const_iterator end() const;

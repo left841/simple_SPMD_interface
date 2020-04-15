@@ -233,19 +233,19 @@ int main(int argc, char** argv)
         for (message* i: fin)
             i->wait_requests();
         double dt = MPI_Wtime();
-        //sort(p3, p3 + size);
-        //double pt = MPI_Wtime();
-        //bool fl = false;
-        //for (int i = 0; i < size; ++i)
-        //    if (p1[i] != p3[i])
-        //        fl = true;
-        ///*for (int i = 0; i < size; ++i)
-        //    cout << p1[i] << ' ';
-        //cout << '\n';*/
-        //if (fl)
-        //    cout << "wrong\n";
-        //else
-        //    cout << "correct\n";
+        sort(p3, p3 + size);
+        double pt = MPI_Wtime();
+        bool fl = false;
+        for (int i = 0; i < size; ++i)
+            if (p1[i] != p3[i])
+                fl = true;
+        /*for (int i = 0; i < size; ++i)
+            cout << p1[i] << ' ';
+        cout << '\n';*/
+        if (fl)
+            cout << "wrong\n";
+        else
+            cout << "correct\n";
         cout << dt - true_start_time << endl;//parallel_engine::get_start_time();// << '\n' << pt - dt;
         cout.flush();
     }

@@ -31,6 +31,8 @@ namespace apl
         template<class T>
         void isend(const T* buf, int size = 1) const;
 
+        virtual void wait_all() const = 0;
+
     };
 
     class receiver
@@ -58,6 +60,8 @@ namespace apl
         void irecv(T* buf, int size = 1) const;
         template<class T>
         int probe() const;
+
+        virtual void wait_all() const = 0;
 
     };
 

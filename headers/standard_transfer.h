@@ -21,6 +21,8 @@ namespace apl
         virtual void send(const void* buf, int size, MPI_Datatype type) const;
         virtual void isend(const void* buf, int size, MPI_Datatype type) const;
 
+        virtual void wait_all() const;
+
     };
 
     class standard_receiver: public receiver
@@ -38,6 +40,8 @@ namespace apl
         virtual void recv(void* buf, int size, MPI_Datatype type) const;
         virtual void irecv(void* buf, int size, MPI_Datatype type) const;
         virtual int probe(MPI_Datatype type) const;
+
+        virtual void wait_all() const;
 
     };
 
