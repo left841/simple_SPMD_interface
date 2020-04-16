@@ -266,6 +266,13 @@ namespace apl
         {
             memory.get_message(i)->wait_requests();
             memory.include_child_to_parent_recursive(i);
+            message_id j = i;
+            while (memory.message_has_parent(j))
+            {
+                for (process k = 1; k < comm.size(); ++k)
+                    ver[k].erase(memory.get_message_parent(j));
+                j = memory.get_message_parent(j);
+            }
         }
 
         for (const local_message_id& i: env.result_message_ids())
@@ -296,7 +303,6 @@ namespace apl
                     {
                         case MESSAGE_SOURCE::TASK_ARG:
                         case MESSAGE_SOURCE::TASK_ARG_C:
-                        case MESSAGE_SOURCE::REFERENCE:
                         {
                             src = d.sourse.id;
                             break;
@@ -322,8 +328,6 @@ namespace apl
                             break;
                         }
                     }
-                    for (process k = 1; k < comm.size(); ++k)
-                        ver[k].erase(src);
                     memory.get_message(src)->wait_requests();
                     messages_childs_id.push_back(memory.create_message_child(d.type, src, d.pi));
                     con[main_proc].insert(messages_childs_id.back());
@@ -338,7 +342,6 @@ namespace apl
                     {
                         case MESSAGE_SOURCE::TASK_ARG:
                         case MESSAGE_SOURCE::TASK_ARG_C:
-                        case MESSAGE_SOURCE::REFERENCE:
                         {
                             src = d.sourse.id;
                             break;
@@ -657,6 +660,13 @@ namespace apl
         {
             memory.get_message(i)->wait_requests();
             memory.include_child_to_parent_recursive(i);
+            message_id j = i;
+            while (memory.message_has_parent(j))
+            {
+                for (process k = 1; k < comm.size(); ++k)
+                    ver[k].erase(memory.get_message_parent(j));
+                j = memory.get_message_parent(j);
+            }
         }
 
         for (const local_message_id& i: env.result_message_ids())
@@ -690,7 +700,6 @@ namespace apl
                     {
                         case MESSAGE_SOURCE::TASK_ARG:
                         case MESSAGE_SOURCE::TASK_ARG_C:
-                        case MESSAGE_SOURCE::REFERENCE:
                         {
                             src = d.sourse.id;
                             break;
@@ -718,8 +727,6 @@ namespace apl
                         default:
                             comm.abort(765);
                     }
-                    for (process k = 1; k < comm.size(); ++k)
-                        ver[k].erase(src);
                     memory.get_message(src)->wait_requests();
                     messages_childs_id.push_back(memory.create_message_child(d.type, src, d.pi));
                     con[main_proc].insert(messages_childs_id.back());
@@ -734,7 +741,6 @@ namespace apl
                     {
                         case MESSAGE_SOURCE::TASK_ARG:
                         case MESSAGE_SOURCE::TASK_ARG_C:
-                        case MESSAGE_SOURCE::REFERENCE:
                         {
                             src = d.sourse.id;
                             break;
