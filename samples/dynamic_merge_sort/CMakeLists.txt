@@ -8,4 +8,4 @@ file(GLOB sample_src RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.cpp")
 add_executable(${sample_name} ${sample_h} ${sample_src})
 
 target_include_directories(${sample_name} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(${sample_name} ${MPI_LIBRARIES} auto_parallel)
+target_link_libraries(${sample_name} ${MPI_LIBRARIES} spmd_interface)
