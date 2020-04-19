@@ -109,6 +109,7 @@ namespace apl
                         c_data.push_back({j, MESSAGE_SOURCE::TASK_ARG_C});
                     task_data td = {memory.get_task_type(i), data, c_data};
                     task_environment te(td, i);
+                    te.set_proc_count(comm.size());
 
                     for (message_id j: memory.get_task_data(i))
                         memory.get_message(j)->wait_requests();
@@ -116,7 +117,8 @@ namespace apl
                     for (message_id j: memory.get_task_const_data(i))
                         memory.get_message(j)->wait_requests();
 
-                    memory.get_task(i)->perform(te);
+                    memory.get_task(i)->set_environment(&te);
+                    memory.get_task(i)->perform();
                     end_main_task(i, te, versions, contained, contained_tasks);
                     assigned[0].pop_back();
                     --all_assigned;
@@ -1141,6 +1143,7 @@ namespace apl
 
         task_data td = {memory.get_task_type(id), data, c_data};
         task_environment env(std::move(td), id);
+        env.set_proc_count(comm.size());
 
         for (message_id i: memory.get_task_data(id))
             memory.get_message(i)->wait_requests();
@@ -1148,7 +1151,8 @@ namespace apl
         for (message_id i : memory.get_task_const_data(id))
             memory.get_message(i)->wait_requests();
 
-        memory.get_task(id)->perform(env);
+        memory.get_task(id)->set_environment(&env);
+        memory.get_task(id)->perform();
 
         instruction res;
         res.add_task_result(id);

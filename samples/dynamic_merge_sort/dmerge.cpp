@@ -14,21 +14,21 @@ class time_cl: public message
 public:
     double time;
 
-    time_cl()
-    { time = 0.0; }
+    time_cl(): time(0.0)
+    { }
 
     void send(const sender& se)
-    { se.send(&time, 1); }
+    { se.send(&time); }
 
     void recv(const receiver& re)
-    { re.recv(&time, 1); }
+    { re.recv(&time); }
 };
 
 struct array_size: public message
 {
-    int size;
+    size_t size;
 
-    array_size(int sz = 0): size(sz)
+    array_size(size_t sz = 0): size(sz)
     { }
 
     void send(const sender& se)
@@ -42,56 +42,56 @@ class m_array: public message
 {
 private:
     int* p;
-    int size;
+    size_t size_;
     bool res;
 public:
 
     struct part_info: public sendable
     {
-        int offset, size;
+        size_t offset, size;
 
-        part_info(int off = 0, int sz = 0): offset(off), size(sz)
+        part_info(size_t off = 0, size_t sz = 0): offset(off), size(sz)
         { }
 
         void send(const sender& se)
         {
-            se.send(&offset, 1);
-            se.send(&size, 1);
+            se.send(&offset);
+            se.send(&size);
         }
 
         void recv(const receiver& re)
         {
-            re.recv(&offset, 1);
-            re.recv(&size, 1);
+            re.recv(&offset);
+            re.recv(&size);
         }
     };
 
-    m_array(int sz, int* pt = nullptr): size(sz), p(pt)
+    m_array(size_t sz, int* pt = nullptr): size_(sz), p(pt)
     {
         if (p == nullptr)
         {
-            p = new int[size];
+            p = new int[size_];
             res = true;
         }
         else
             res = false;
     }
 
-    m_array(const m_array& mes, const part_info& pi): size(pi.size)
+    m_array(const m_array& mes, const part_info& pi): size_(pi.size)
     {
         p = mes.p + pi.offset;
         res = false;
     }
 
-    m_array(const part_info& pi): size(pi.size)
+    m_array(const part_info& pi): size_(pi.size)
     {
-        p = new int[size];
+        p = new int[size_];
         res = true;
     }
 
-    m_array(const array_size sz): size(sz.size)
+    m_array(const array_size sz): size_(sz.size)
     {
-        p = new int[size];
+        p = new int[size_];
         res = true;
     }
 
@@ -106,55 +106,57 @@ public:
         if (child.res)
         {
             int* q = p + pi.offset;
-            for (int i = 0; i < child.size; ++i)
+            for (size_t i = 0; i < child.size_; ++i)
                 q[i] = child.p[i];
         }
     }
 
     void send(const sender& se)
-    { se.isend(p, size); }
+    { se.isend(p, size_); }
 
     void recv(const receiver& re)
-    { re.irecv(p, size); }
+    { re.irecv(p, size_); }
 
-    int* get_p() const
-    { return p; }
+    int& operator[](size_t n)
+    { return p[n]; }
 
-    int get_size() const
-    { return size; }
+    const int& operator[](size_t n) const
+    { return p[n]; }
+
+    size_t size() const
+    { return size_; }
 };
 
 class merge_t_all: public task
 {
 public:
-    merge_t_all(): task()
-    { }
-    merge_t_all(const vector<message*> vm, const vector<const message*> cvm) : task(vm, cvm)
-    { }
-    void perform(task_environment& env)
-    {
-        m_array* s1, *s2;
-        s1 = (m_array*)data[0];
-        s2 = (m_array*)data[1];
 
-        for (int i = 0; i < s1->get_size(); ++i)
-            s2->get_p()[i] = s1->get_p()[i];
-        merge_it(s1->get_p(), s2->get_p(), s1->get_size() / 2, s1->get_size());
+    merge_t_all(const vector<message*> vm, const vector<const message*> cvm): task(vm, cvm)
+    { }
+    void perform()
+    {
+        m_array& s1 = dynamic_cast<m_array&>(arg(0));
+        m_array& s2 = dynamic_cast<m_array&>(arg(1));
+
+        for (size_t i = 0; i < s1.size(); ++i)
+            s2[i] = s1[i];
+        merge_it(&s1[0], &s2[0], s1.size() / 2, s1.size());
     }
-    void merge_it(int* s, int* out, int size1, int size2)
+
+    void merge_it(int* s, int* out, size_t size1, size_t size2)
     {
         if (size2 < 2)
         {
-            for (int i = 0; i < size2; ++i)
+            for (size_t i = 0; i < size2; ++i)
                 out[i] = s[i];
             return;
         }
         merge_it(out, s, size1 / 2, size1);
         merge_it(out + size1, s + size1, (size2 - size1) / 2, size2 - size1);
-        int first = 0;
-        int second = size1;
+        size_t first = 0;
+        size_t second = size1;
 
-        for (int i = 0; i < size2; ++i)
+        for (size_t i = 0; i < size2; ++i)
         {
             if ((first >= size1))
                 out[i] = s[second++];
@@ -170,38 +172,26 @@ class merge_t: public task
 {
 public:
 
-    merge_t(): task()
-    { }
     merge_t(const vector<message*> vm, const vector<const message*> cvm): task(vm, cvm)
     { }
-    void perform(task_environment& env)
-    {
-        const m_array& src = dynamic_cast<const m_array&>(*c_data[0]);
-        m_array& out = dynamic_cast<m_array&>(*data[0]);
-        int* p_out = out.get_p();
-        int h_size = src.get_size() / 2;
-        int first = 0, second = h_size;
 
-        for (int i = 0; i < out.get_size(); ++i)
+    void perform()
+    {
+        const m_array& src = dynamic_cast<const m_array&>(const_arg(0));
+        m_array& out = dynamic_cast<m_array&>(arg(0));
+        size_t h_size = src.size() / 2;
+        size_t first = 0, second = h_size;
+
+        for (size_t i = 0; i < out.size(); ++i)
         {
             if ((first >= h_size))
-                p_out[i] = src.get_p()[second++];
-            else if ((second < src.get_size()) && (src.get_p()[second] < src.get_p()[first]))
-                p_out[i] = src.get_p()[second++];
+                out[i] = src[second++];
+            else if ((second < src.size()) && (src[second] < src[first]))
+                out[i] = src[second++];
             else
-                p_out[i] = src.get_p()[first++];
+                out[i] = src[first++];
         }
     }
-
-    m_array* get_out()
-    { return (m_array*)data[0]; }
-
-    m_array* get_first()
-    { return (m_array*)c_data[0]; }
-
-    m_array* get_second()
-    { return (m_array*)c_data[1]; }
-
 };
 
 class merge_organizer: public task
@@ -213,28 +203,28 @@ public:
     merge_organizer(const vector<message*> vm, const vector<const message*> cvm): task(vm, cvm)
     { }
 
-    void perform(task_environment& env)
+    void perform()
     {
-        const m_array& in = dynamic_cast<const m_array&>(get_c(0));
-        const m_array& out = dynamic_cast<const m_array&>(get_c(1));
+        const m_array& in = dynamic_cast<const m_array&>(const_arg(0));
+        const m_array& out = dynamic_cast<const m_array&>(const_arg(1));
 
-        if (in.get_size() <= pred)
-            env.create_child_task<merge_t_all>({env.get_c_arg_id(0), env.get_c_arg_id(1)}, {});
+        if (in.size() <= pred)
+            create_child_task<merge_t_all>({const_arg_id(0), const_arg_id(1)}, {});
         else
         {
-            size_t half_size = in.get_size() / 2;
-            local_message_id in1 = env.create_message_child<m_array, m_array, m_array::part_info>(env.get_c_arg_id(0), new m_array::part_info(0, half_size));
-            local_message_id in2 = env.create_message_child<m_array, m_array, m_array::part_info>(env.get_c_arg_id(0), new m_array::part_info(half_size, in.get_size() - half_size));
+            size_t half_size = in.size() / 2;
+            local_message_id in1 = create_message_child<m_array>(const_arg_id(0), new m_array::part_info(0, half_size));
+            local_message_id in2 = create_message_child<m_array>(const_arg_id(0), new m_array::part_info(half_size, in.size() - half_size));
 
-            local_message_id out1 = env.create_message_child<m_array, m_array, m_array::part_info>(env.get_c_arg_id(1), new m_array::part_info(0, half_size));
-            local_message_id out2 = env.create_message_child<m_array, m_array, m_array::part_info>(env.get_c_arg_id(1), new m_array::part_info(half_size, out.get_size() - half_size));
+            local_message_id out1 = create_message_child<m_array>(const_arg_id(1), new m_array::part_info(0, half_size));
+            local_message_id out2 = create_message_child<m_array>(const_arg_id(1), new m_array::part_info(half_size, out.size() - half_size));
 
-            local_task_id org1 = env.create_child_task<merge_organizer>({}, {out1, in1});
-            local_task_id org2 = env.create_child_task<merge_organizer>({}, {out2, in2});
-            local_task_id mer = env.create_child_task<merge_t>({env.get_c_arg_id(1)}, {env.get_c_arg_id(0)});
+            local_task_id org1 = create_child_task<merge_organizer>({}, {out1, in1});
+            local_task_id org2 = create_child_task<merge_organizer>({}, {out2, in2});
+            local_task_id mer = create_child_task<merge_t>({const_arg_id(1)}, {const_arg_id(0)});
 
-            env.add_dependence(org1, mer);
-            env.add_dependence(org2, mer);
+            add_dependence(org1, mer);
+            add_dependence(org2, mer);
         }
     }
 };
@@ -247,13 +237,13 @@ public:
     check_task(const vector<message*>& mes_v, const vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
     { }
 
-    void perform(task_environment& env)
+    void perform()
     {
-        const time_cl& t = dynamic_cast<const time_cl&>(*c_data[0]);
-        m_array& a1 = dynamic_cast<m_array&>(*data[0]);
-        m_array& a2 = dynamic_cast<m_array&>(*data[1]);
+        const time_cl& t = dynamic_cast<const time_cl&>(const_arg(0));
+        m_array& a1 = dynamic_cast<m_array&>(arg(0));
+        m_array& a2 = dynamic_cast<m_array&>(arg(1));
         double tm1 = MPI_Wtime();
-        sort(a2.get_p(), a2.get_p() + a2.get_size());
+        sort(&a2[0], &a2[0] + a2.size());
         /*double tm2 = MPI_Wtime();
         for (int i = 0; i < a1.get_size(); ++i)
             cout << a1.get_p()[i] << ' ';
@@ -261,61 +251,58 @@ public:
         for (int i = 0; i < a2.get_size(); ++i)
             cout << a2.get_p()[i] << ' ';
         cout << endl;*/
-        for (int i = 0; i < a1.get_size(); ++i)
-            if (a1.get_p()[i] != a2.get_p()[i])
+        for (size_t i = 0; i < a1.size(); ++i)
+            if (a1[i] != a2[i])
             {
                 cout << "wrong\n";
                 goto gh;
             }
         cout << "correct\n";
-    gh:
-        cout << tm1 - t.time << '\n';
-        //cout << tm2 - tm1;
-        cout.flush();
+        gh:
+        cout << tm1 - t.time << endl;
+        //cout << tm2 - tm1 << endl;
     }
 };
 
 class init_task: public task
 {
 public:
-    init_task(const vector<message*>& mes_v) : task(mes_v)
-    { }
 
     init_task(const vector<message*>& mes_v, const vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
     { }
 
-    void perform(task_environment& env)
+    void perform()
     {
         mt19937 mt(static_cast<int>(time(0)));
         uniform_int_distribution<int> uid(0, 10000);
-        time_cl& t = dynamic_cast<time_cl&>(get_a(0));
-        const array_size& size = dynamic_cast<const array_size&>(get_c(0));
+        time_cl& t = dynamic_cast<time_cl&>(arg(0));
+        const array_size& size = dynamic_cast<const array_size&>(const_arg(0));
         m_array& a1 = *new m_array(size);
         m_array& a2 = *new m_array(size);
         m_array& a3 = *new m_array(size);
 
-        for (int i = 0; i < a1.get_size(); ++i)
-            a1.get_p()[i] = a2.get_p()[i] = a3.get_p()[i] = uid(mt);
+        for (size_t i = 0; i < a1.size(); ++i)
+            a1[i] = a2[i] = a3[i] = uid(mt);
         t.time = MPI_Wtime();
 
-        local_message_id m_id1 = env.add_message_init<m_array, array_size>(&a1, new array_size(size));
-        local_message_id m_id2 = env.add_message_init<m_array, array_size>(&a2, new array_size(size));
-        local_message_id m_id3 = env.add_message_init<m_array, array_size>(&a3, new array_size(size));
+        local_message_id m_id1 = add_message_init(&a1, new array_size(size));
+        local_message_id m_id2 = add_message_init(&a2, new array_size(size));
+        local_message_id m_id3 = add_message_init(&a3, new array_size(size));
 
-        local_task_id merge = env.create_task<merge_organizer>({}, {m_id1, m_id3});
-        local_task_id check = env.create_task<check_task>({m_id3, m_id2}, {env.get_arg_id(0)});
+        local_task_id merge = create_task<merge_organizer>({}, {m_id1, m_id3});
+        local_task_id check = create_task<check_task>({m_id3, m_id2}, {arg_id(0)});
 
-        env.add_dependence(merge, check);
+        add_dependence(merge, check);
     }
 };
 
 int main(int argc, char** argv)
 {
     parallel_engine pe(&argc, &argv);
-    int size = 100000;
+    size_t size = 100000;
     if (argc > 1)
     {
-        size = atoi(argv[1]);
+        size = atoll(argv[1]);
         if (argc > 2)
             merge_organizer::pred = atoll(argv[2]);
     }

@@ -104,28 +104,28 @@ public:
     vector_sum(std::vector<message*> mes_v, std::vector<const message*> const_mes_v): task(mes_v, const_mes_v)
     { }
 
-    void perform(task_environment& env)
+    void perform()
     {
-        const my_vector& first = dynamic_cast<const my_vector&>(get_c(0));
-        const my_vector& second = dynamic_cast<const my_vector&>(get_c(1));
-        my_vector& output = dynamic_cast<my_vector&>(get_a(0));
+        const my_vector& first = dynamic_cast<const my_vector&>(const_arg(0));
+        const my_vector& second = dynamic_cast<const my_vector&>(const_arg(1));
+        my_vector& output = dynamic_cast<my_vector&>(arg(0));
 
         for (size_t i = 0; i < output.size(); ++i)
             output[i] = first[i] + second[i];
     }
 };
 
-class end_task : public task
+class end_task: public task
 {
 public:
     end_task(std::vector<message*> mes_v, std::vector<const message*> const_mes_v): task(mes_v, const_mes_v)
     { }
 
-    void perform(task_environment& env)
+    void perform()
     {
-        const my_vector& first = dynamic_cast<const my_vector&>(get_c(0));
-        const my_vector& second = dynamic_cast<const my_vector&>(get_c(1));
-        const my_vector& output = dynamic_cast<const my_vector&>(get_c(2));
+        const my_vector& first = dynamic_cast<const my_vector&>(const_arg(0));
+        const my_vector& second = dynamic_cast<const my_vector&>(const_arg(1));
+        const my_vector& output = dynamic_cast<const my_vector&>(const_arg(2));
 
         my_vector check(size_info(output.size()));
 
@@ -144,17 +144,13 @@ public:
 
 class vector_sum_init: public task
 {
-private:
-    int part_count;
 public:
     vector_sum_init(std::vector<message*> mes_v, std::vector<const message*> const_mes_v): task(mes_v, const_mes_v)
-    {
-        part_count = 4;
-    }
+    { }
 
-    void perform(task_environment& env)
+    void perform()
     {
-        const size_info& size = dynamic_cast<const size_info&>(get_c(0));
+        const size_info& size = dynamic_cast<const size_info&>(const_arg(0));
 
         my_vector& first = *new my_vector(size);
         my_vector& second = *new my_vector(size);
@@ -166,25 +162,25 @@ public:
         for (size_t i = 0; i < second.size(); ++i)
             second[i] = uid(mt);
 
-        local_message_id first_id = env.add_message_init<my_vector, size_info>(&first, new size_info(size));
-        local_message_id second_id = env.add_message_init<my_vector, size_info>(&second, new size_info(size));
-        local_message_id output_id = env.create_message_init<my_vector, size_info>(new size_info(size));
+        local_message_id first_id = add_message_init(&first, new size_info(size));
+        local_message_id second_id = add_message_init(&second, new size_info(size));
+        local_message_id output_id = create_message_init<my_vector>(new size_info(size));
 
         int offset = 0;
-        for (int i = 0; i < part_count; ++i)
+        for (int i = 0; i < working_processes(); ++i)
         {
-            int new_size = size.new_size / part_count + ((size.new_size % part_count > i) ? 1 : 0);
+            int new_size = size.new_size / working_processes() + ((size.new_size % working_processes() > i) ? 1 : 0);
 
-            local_message_id first_child = env.create_message_child<my_vector, my_vector, part_info>(first_id, new part_info(new_size, offset));
-            local_message_id second_child = env.create_message_child<my_vector, my_vector, part_info>(second_id, new part_info(new_size, offset));
-            local_message_id output_child = env.create_message_child<my_vector, my_vector, part_info>(output_id, new part_info(new_size, offset));
+            local_message_id first_child = create_message_child<my_vector>(first_id, new part_info(new_size, offset));
+            local_message_id second_child = create_message_child<my_vector>(second_id, new part_info(new_size, offset));
+            local_message_id output_child = create_message_child<my_vector>(output_id, new part_info(new_size, offset));
 
-            env.create_child_task<vector_sum>({output_child}, {first_child, second_child});
+            create_child_task<vector_sum>({output_child}, {first_child, second_child});
 
             offset += new_size;
         }
 
-        env.add_dependence(env.get_this_task_id(), env.create_task<end_task>({}, {first_id, second_id, output_id}));
+        add_dependence(this_task_id(), create_task<end_task>({}, {first_id, second_id, output_id}));
     }
 };
 

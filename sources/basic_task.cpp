@@ -3,10 +3,10 @@
 namespace apl
 {
 
-    task_environment::task_environment(task_data& td, task_id id): this_task_id({id, TASK_SOURCE::GLOBAL})
+    task_environment::task_environment(task_data& td, task_id id): this_task_id({id, TASK_SOURCE::GLOBAL}), proc_count(0)
     { this_task = td; }
 
-    task_environment::task_environment(task_data&& td, task_id id): this_task(std::move(td)), this_task_id({id, TASK_SOURCE::GLOBAL})
+    task_environment::task_environment(task_data&& td, task_id id): this_task(std::move(td)), this_task_id({id, TASK_SOURCE::GLOBAL}), proc_count(0)
     { }
 
     std::vector<local_task_id>& task_environment::result_task_ids()
@@ -42,20 +42,82 @@ namespace apl
     std::vector<task_dependence>& task_environment::created_dependences()
     { return dependence_v; }
 
-    local_message_id task_environment::get_arg_id(size_t n)
+    local_message_id task_environment::arg_id(size_t n)
     { return this_task.data[n]; }
 
-    local_message_id task_environment::get_c_arg_id(size_t n)
+    local_message_id task_environment::const_arg_id(size_t n)
     { return this_task.c_data[n]; }
 
     task_data task_environment::get_this_task_data()
     { return this_task; }
+
+    local_message_id task_environment::create_message_init(message_type type, sendable* info)
+    {
+        messages_init_v.push_back({type, info});
+        created_messages_v.push_back({messages_init_v.size() - 1, MESSAGE_SOURCE::INIT});
+        return created_messages_v.back();
+    }
+
+    local_message_id task_environment::create_message_child(message_type type, local_message_id source, sendable* info)
+    {
+        messages_childs_v.push_back({type, source, info});
+        created_messages_v.push_back({messages_childs_v.size() - 1, MESSAGE_SOURCE::CHILD});
+        return created_messages_v.back();
+    }
+
+    local_message_id task_environment::add_message_init(message_type type, message* m, sendable* info)
+    {
+        messages_init_add_v.push_back({type, info, m});
+        created_messages_v.push_back({messages_init_add_v.size() - 1, MESSAGE_SOURCE::INIT_A});
+        return created_messages_v.back();
+    }
+
+    local_message_id task_environment::add_message_child(message_type type, message* m, local_message_id source, sendable* info)
+    {
+        messages_childs_add_v.push_back({type, source, info, m});
+        created_messages_v.push_back({messages_childs_add_v.size() - 1, MESSAGE_SOURCE::CHILD_A});
+        return created_messages_v.back();
+    }
+
+    local_task_id task_environment::create_task(task_type type, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
+    {
+        tasks_v.push_back({type, data, const_data});
+        created_tasks_v.push_back({tasks_v.size() - 1, TASK_SOURCE::SIMPLE});
+        return created_tasks_v.back();
+    }
+
+    local_task_id task_environment::create_child_task(task_type type, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
+    {
+        tasks_child_v.push_back({type, data, const_data});
+        created_tasks_v.push_back({tasks_child_v.size() - 1, TASK_SOURCE::SIMPLE_C});
+        return created_tasks_v.back();
+    }
+
+    local_task_id task_environment::add_task(task_type type, task* t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
+    {
+        tasks_add_v.push_back({type, data, const_data, t});
+        created_tasks_v.push_back({tasks_add_v.size() - 1, TASK_SOURCE::SIMPLE_A});
+        return created_tasks_v.back();
+    }
+
+    local_task_id task_environment::add_child_task(task_type type, task* t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
+    {
+        tasks_child_add_v.push_back({type, data, const_data, t});
+        created_tasks_v.push_back({tasks_child_add_v.size() - 1, TASK_SOURCE::SIMPLE_AC});
+        return created_tasks_v.back();
+    }
 
     void task_environment::add_dependence(local_task_id parent, local_task_id child)
     { dependence_v.push_back({parent, child}); }
 
     local_task_id task_environment::get_this_task_id()
     { return this_task_id; }
+
+    void task_environment::set_proc_count(size_t sz)
+    { proc_count = sz; }
+
+    size_t task_environment::working_processes()
+    { return proc_count; }
 
     void task_environment::send(const sender& se)
     {
@@ -272,28 +334,49 @@ namespace apl
         re.irecv(reinterpret_cast<size_t*>(dependence_v.data()), static_cast<int>(sz * 4));
     }
 
-    task::task()
+    task::task(): env(nullptr)
     { }
 
-    task::task(const std::vector<message*>& mes_v): data(mes_v)
+    task::task(const std::vector<message*>& mes_v): data(mes_v), env(nullptr)
     { }
 
-    task::task(const std::vector<message*>& mes_v, const std::vector<const message*>& c_mes_v): data(mes_v), c_data(c_mes_v)
+    task::task(const std::vector<message*>& mes_v, const std::vector<const message*>& c_mes_v): data(mes_v), c_data(c_mes_v), env(nullptr)
     { }
 
     task::~task()
     { }
 
-    void task::put_a(message* mes)
+    void task::set_environment(task_environment* e)
+    { env = e; }
+
+    void task::add_dependence(local_task_id parent, local_task_id child)
+    { env->add_dependence(parent, child); }
+
+    local_message_id task::arg_id(size_t n)
+    { return env->arg_id(n); }
+
+    local_message_id task::const_arg_id(size_t n)
+    { return env->const_arg_id(n); }
+
+    task_data task::this_task_data()
+    { return env->get_this_task_data(); }
+
+    local_task_id task::this_task_id()
+    { return env->get_this_task_id(); }
+
+    size_t task::working_processes()
+    { return env->working_processes(); }
+
+    void task::put_arg(message* mes)
     { data.push_back(mes); }
 
-    void task::put_c(const message* mes)
+    void task::put_const_arg(const message* mes)
     { c_data.push_back(mes); }
 
-    message& task::get_a(size_t id)
+    message& task::arg(size_t id)
     { return *data[id]; }
 
-    const message& task::get_c(size_t id)
+    const message& task::const_arg(size_t id)
     { return *c_data[id]; }
 
     task_factory::creator_base::creator_base()

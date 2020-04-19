@@ -13,15 +13,15 @@ class m_array: public message
 {
 private:
     int* p;
-    int size;
+    int size_;
     bool res;
 public:
 
-    m_array(int sz, int* pt = nullptr): size(sz), p(pt)
+    m_array(int sz, int* pt = nullptr): size_(sz), p(pt)
     {
         if (p == nullptr)
         {
-            p = new int[size];
+            p = new int[size_];
             res = true;
         }
         else
@@ -33,16 +33,22 @@ public:
             delete[] p;
     }
     void send(const sender& se)
-    { se.isend(p, size); }
+    { se.isend(p, size_); }
 
     void recv(const receiver& re)
-    { re.irecv(p, size); }
+    { re.irecv(p, size_); }
 
-    int* get_p() const
+    int& operator[](size_t n)
+    { return p[n]; }
+
+    const int& operator[](size_t n) const
+    { return p[n]; }
+
+    int size() const
+    { return size_; }
+
+    int* data()
     { return p; }
-
-    int get_size() const
-    { return size; }
 };
 
 class merge_t: public task
@@ -52,35 +58,32 @@ public:
     { }
     merge_t(const vector<message*> vm, const vector<const message*> cvm): task(vm, cvm)
     { }
-    void perform(task_environment& env)
+    void perform()
     {
-        const m_array* s1, *s2;
-        m_array* out;
-        s1 = (const m_array*)c_data[0];
-        s2 = (const m_array*)c_data[1];
-        out = (m_array*)data[0];
+        const m_array& s1 = dynamic_cast<const m_array&>(const_arg(0));
+        const m_array& s2 = dynamic_cast<const m_array&>(const_arg(1));
+        m_array& out = dynamic_cast<m_array&>(arg(0));
 
         int first = 0, second = 0;
-        int* p_out = out->get_p();
-        for (int i = 0; i < out->get_size(); ++i)
+        for (int i = 0; i < out.size(); ++i)
         {
-            if ((first >= s1->get_size()))
-                p_out[i] = s2->get_p()[second++];
-            else if ((second < s2->get_size()) && (s2->get_p()[second] < s1->get_p()[first]))
-                p_out[i] = s2->get_p()[second++];
+            if ((first >= s1.size()))
+                out[i] = s2[second++];
+            else if ((second < s2.size()) && (s2[second] < s1[first]))
+                out[i] = s2[second++];
             else
-                p_out[i] = s1->get_p()[first++];
+                out[i] = s1[first++];
         }
     }
 
     m_array* get_out()
-    { return (m_array*)data[0]; }
+    { return (m_array*)&arg(0); }
 
     m_array* get_first()
-    { return (m_array*)c_data[0]; }
+    { return (m_array*)&const_arg(0); }
 
     m_array* get_second()
-    { return (m_array*)c_data[1]; }
+    { return (m_array*)&const_arg(1); }
 
 };
 
@@ -91,14 +94,13 @@ public:
     { }
     merge_t_all(const vector<message*> vm): task(vm)
     { }
-    void perform(task_environment& env)
+    void perform()
     {
-        m_array* s1, *s2;
-        s1 = (m_array*)data[0];
-        s2 = (m_array*)data[1];
-        for (int i = 0; i < s1->get_size(); ++i)
-            s2->get_p()[i] = s1->get_p()[i];
-        merge_it(s1->get_p(), s2->get_p(), s1->get_size()/2, s1->get_size());
+        m_array& s1 = dynamic_cast<m_array&>(arg(0));
+        m_array& s2 = dynamic_cast<m_array&>(arg(1));
+        for (int i = 0; i < s1.size(); ++i)
+            s2[i] = s1[i];
+        merge_it(&s1[0], &s2[0], s1.size()/2, s1.size());
     }
     void merge_it(int* s, int* out, int size1, int size2)
     {
@@ -182,18 +184,18 @@ int main(int argc, char** argv)
                 int* ptr;
                 if (j%2)
                 {
-                    me = ((merge_t*)v2[j/2])->get_second();
-                    ptr = ((merge_t*)v2[j/2])->get_out()->get_p() + ((merge_t*)v2[j/2])->get_first()->get_size();
+                    me = &((m_array&)((merge_t*)v2[j/2])->const_arg(1));
+                    ptr = ((merge_t*)v2[j/2])->get_out()->data() + ((merge_t*)v2[j/2])->get_first()->size();
                 }
                 else
                 {
                     me = ((merge_t*)v2[j/2])->get_first();
-                    ptr = ((merge_t*)v2[j/2])->get_out()->get_p();
+                    ptr = ((merge_t*)v2[j/2])->get_out()->data();
                 }
 
-                arr1 = new m_array(me->get_size() / 2, ptr);
+                arr1 = new m_array(me->size() / 2, ptr);
 
-                arr2 = new m_array(me->get_size() - me->get_size() / 2, ptr + me->get_size() / 2);
+                arr2 = new m_array(me->size() - me->size() / 2, ptr + me->size() / 2);
                 arr_p1 = me;
 
                 v1[j] = new merge_t({arr_p1}, {arr1, arr2});
@@ -205,11 +207,11 @@ int main(int argc, char** argv)
 
         for (int i = 0; i < v2.size(); ++i)
         {
-            arr1 = new m_array(((merge_t*)v2[i])->get_first()->get_size(), ((merge_t*)v2[i])->get_out()->get_p());
+            arr1 = new m_array(((merge_t*)v2[i])->get_first()->size(), ((merge_t*)v2[i])->get_out()->data());
             arr2 = ((merge_t*)v2[i])->get_first();
             tg.add_dependence(new merge_t_all({arr1, arr2}), v2[i]);
-            arr1 = new m_array(((merge_t*)v2[i])->get_second()->get_size(), ((merge_t*)v2[i])->get_out()->get_p()
-                + ((merge_t*)v2[i])->get_first()->get_size());
+            arr1 = new m_array(((merge_t*)v2[i])->get_second()->size(), ((merge_t*)v2[i])->get_out()->data()
+                + ((merge_t*)v2[i])->get_first()->size());
             arr2 = ((merge_t*)v2[i])->get_second();
             tg.add_dependence(new merge_t_all({arr1, arr2}), v2[i]);
         }

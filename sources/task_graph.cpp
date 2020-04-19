@@ -14,7 +14,7 @@ namespace apl
         d_map = _tg.d_map;
     }
 
-    task_graph& task_graph::operator =(const task_graph& _tg)
+    task_graph& task_graph::operator=(const task_graph& _tg)
     {
         if (&_tg == this)
             return *this;
@@ -27,10 +27,6 @@ namespace apl
 
     void task_graph::add_task(task* t)
     {
-        if (t == nullptr)
-            throw -3;
-        if (t_map.find(t) != t_map.end())
-            throw -1;
         for (message* i:t->data)
         {
             if (d_map.find(i) == d_map.end())
@@ -48,13 +44,7 @@ namespace apl
     }
 
     void task_graph::add_data(message* m)
-    {
-        if (m == nullptr)
-            throw -3;
-        if (d_map.find(m) != d_map.end())
-            throw -2;
-        d_map.insert(std::make_pair(m, d_id(base_data_id++)));
-    }
+    { d_map.insert(std::make_pair(m, d_id(base_data_id++))); }
 
     void task_graph::add_dependence(task* parent, task* child)
     {
@@ -78,8 +68,6 @@ namespace apl
             t_map[(*it)].childs.erase(t);
         for (message* i:t->data)
         {
-            if (d_map.find(i) == d_map.end())
-                throw -4;
             --d_map[i].ref_count;
             if (d_map[i].ref_count < 1)
                 d_map.erase(i);
@@ -87,8 +75,6 @@ namespace apl
         for (const message* j : t->c_data)
         {
             message* i = const_cast<message*>(j);
-            if (d_map.find(i) == d_map.end())
-                throw - 4;
             --d_map[i].ref_count;
             if (d_map[i].ref_count < 1)
                 d_map.erase(i);
@@ -100,8 +86,6 @@ namespace apl
     {
         if (d_map.find(m) == d_map.end())
             return;
-        if (d_map[m].ref_count != 0)
-            throw -5;
         d_map.erase(m);
     }
 
@@ -115,12 +99,6 @@ namespace apl
 
     void task_graph::change_task(task* old_t, task* new_t)
     {
-        if (new_t == nullptr)
-            throw -3;
-        if (t_map.find(old_t) == t_map.end())
-            throw -6;
-        if (t_map.find(new_t) != t_map.end())
-            throw -7;
         t_id tmp(t_map[old_t].id);
         tmp.childs = t_map[old_t].childs;
         tmp.parents = t_map[old_t].parents;
@@ -138,8 +116,6 @@ namespace apl
         }
         for (message* i:old_t->data)
         {
-            if (d_map.find(i) == d_map.end())
-                throw -4;
             --d_map[i].ref_count;
             if (d_map[i].ref_count < 1)
                 d_map.erase(i);
@@ -153,8 +129,6 @@ namespace apl
         for (const message* j : old_t->c_data)
         {
             message* i = const_cast<message*>(j);
-            if (d_map.find(i) == d_map.end())
-                throw - 4;
             --d_map[i].ref_count;
             if (d_map[i].ref_count < 1)
                 d_map.erase(i);
