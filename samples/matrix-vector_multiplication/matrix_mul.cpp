@@ -1,87 +1,228 @@
-#include <vector>
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
+#include <vector>
 #include <random>
 #include <algorithm>
-#include <iostream>
 #include "parallel.h"
-using namespace std;
 using namespace apl;
 
-size_t n = 100, m = 50, layers = 8;
-
-class mymessage: public message
+class time_cl: public message
 {
 public:
+    double time;
+
+    time_cl(): time(0.0)
+    { }
+
+    void send(const sender& se)
+    { se.send(&time); }
+
+    void recv(const receiver& re)
+    { re.recv(&time); }
+};
+
+struct size_type: public message
+{
     size_t size;
-    int* arr;
-    mymessage(int _size, int* _arr): message(), size(_size), arr(_arr)
+
+    size_type(size_t s = 0): size(s)
     { }
+
+    operator size_t()
+    { return size; }
+
+    operator const size_t() const
+    { return size; }
+
     void send(const sender& se)
-    { se.isend(arr, size); }
+    { se.send(&size); }
+
+    void recv(const receiver& re)
+    { re.recv(&size); }
+};
+
+struct vector_part: public message
+{
+    size_t size;
+    size_t offset;
+
+    vector_part(size_t s = 0, size_t off = 0): size(s), offset(off)
+    { }
+
+    void send(const sender& se)
+    {
+        se.send(&size);
+        se.send(&offset);
+    }
+
     void recv(const receiver& re)
     {
-        if (arr == nullptr)
-            arr = new int[size];
-        re.irecv(arr, size);
+        re.recv(&size);
+        re.recv(&offset);
     }
 };
 
-class matrix_part: public message
+struct matrix_size: public message
 {
-public:
-    int** arr;
-    size_t size, length;
-    matrix_part(int _l, int _s): message(), length(_l), size(_s)
+    size_t sizes[2];
+
+    matrix_size(): sizes()
+    { }
+
+    matrix_size(size_t sizes_[2])
     {
-        arr = new int*[size];
-        arr[0] = nullptr;
+        sizes[0] = sizes_[0];
+        sizes[1] = sizes_[1];
     }
+
     void send(const sender& se)
-    { se.isend(arr[0], size * length); }
+    { se.send(sizes, 2); }
 
     void recv(const receiver& re)
+    { re.recv(sizes, 2); }
+};
+
+struct matrix_part: public message
+{
+    size_t info[4];
+
+    matrix_part(): info()
+    { }
+
+    matrix_part(size_t sizes[2], size_t offsets[2])
     {
-        if (arr[0] == nullptr)
+        info[0] = sizes[0];
+        info[1] = sizes[1];
+        info[2] = offsets[0];
+        info[3] = offsets[1];
+    }
+
+    void send(const sender& se)
+    { se.send(info, 4); }
+
+    void recv(const receiver& re)
+    { re.recv(info, 4); }
+};
+
+template<typename Type>
+class vector: public message
+{
+private:
+    size_t size_;
+    Type* arr;
+    bool created;
+public:
+    vector(size_t _size): message(), size_(_size), created(true)
+    { arr = new Type[size_]; }
+
+    vector(const vector<Type>& parent, const vector_part& info): size_(info.size), created(false)
+    { arr = parent.arr + info.offset; }
+
+    vector(const vector_part& info): size_(info.size), created(true)
+    { arr = new Type[size_]; }
+
+    ~vector()
+    {
+        if (created)
+            delete[] arr;
+    }
+
+    void include(const vector<Type>& child, const vector_part& info)
+    {
+        if (child.created)
         {
-            arr[0] = new int[size * length];
-            for (int i = 0; i < size; ++i)
-                arr[i] = arr[0] + length * i;
+            for (size_t i = 0; i < child.size(); ++i)
+                arr[i + info.offset] = child[i];
         }
-        re.irecv(arr[0], size * length);
     }
-};
 
-
-class onemessage: public message
-{
-public:
-    int a;
-    onemessage(int _a): message(), a(_a)
-    { }
     void send(const sender& se)
-    { se.isend(&a); }
+    { se.isend(arr, size_); }
+
     void recv(const receiver& re)
-    { re.irecv(&a); }
+    { re.irecv(arr, size_); }
+
+    Type& operator[](size_t n)
+    { return arr[n]; }
+
+    const Type& operator[](size_t n) const
+    { return arr[n]; }
+
+    size_t size() const
+    { return size_; }
 };
 
+template<typename Type>
+class matrix: public message
+{
+private:
+    Type* arr;
+    size_t size_, length_;
+    bool created;
 
-class mytask: public task
+public:
+    matrix(size_t _s, size_t _l): message(), length_(_l), size_(_s), created(true)
+    { arr = new int[size_ * length_]; }
+
+    matrix(const matrix_size& info): size_(info.sizes[0]), length_(info.sizes[1]), created(true)
+    { arr = new int[size_ * length_]; }
+
+    matrix(const matrix<Type>& m, const matrix_part& p): size_(p.info[0]), length_(p.info[1]), created(false)
+    { arr = m.arr + p.info[2] * length_ + p.info[3]; }
+    
+    matrix(const matrix_part& p): size_(p.info[0]), length_(p.info[1]), created(true)
+    { arr = new Type[size_ * length_]; }
+
+    void include(const matrix<Type>& m, const matrix_part& p)
+    {
+        if (m.created)
+            for (size_t i = 0; i < m.size(); ++i)
+                for (size_t j = 0; j < m.length(); ++j)
+                    arr[(p.info[2] + i) * length_ + p.info[3] + j] = m[i][j];
+    }
+
+    ~matrix()
+    {
+        if (created)
+            delete[] arr;
+    }
+
+    void send(const sender& se)
+    { se.isend(arr, size_ * length_); }
+
+    void recv(const receiver& re)
+    { re.irecv(arr, size_ * length_); }
+
+    Type* operator[](size_t n)
+    { return arr + length_ * n; }
+
+    const Type* operator[](size_t n) const
+    { return arr + length_ * n; }
+
+    size_t size() const
+    { return size_; }
+
+    size_t length() const
+    { return length_; }
+};
+
+template<typename Type>
+class multiply_task: public task
 {
 public:
-    mytask(const std::vector<message*>& mes_v, const std::vector<const message*>& cmes_v): task(mes_v, cmes_v)
+    multiply_task(const std::vector<message*>& mes_v, const std::vector<const message*>& cmes_v): task(mes_v, cmes_v)
     { }
     void perform()
     {
-        const matrix_part& mp = (const matrix_part&)const_arg(0);
-        const mymessage& vb = (const mymessage&)const_arg(1);
-        mymessage& c = (mymessage&)arg(0);
-        for (int i = 0; i < mp.size; ++i)
+        const matrix<Type>& m = dynamic_cast<const matrix<int>&>(const_arg(0));
+        const vector<Type>& b = dynamic_cast<const vector<int>&>(const_arg(1));
+        vector<Type>& c = dynamic_cast<vector<int>&>(arg(0));
+        for (size_t i = 0; i < m.size(); ++i)
         {
-            c.arr[i] = 0;
-            for (int j = 0; j < mp.length; ++j)
-                c.arr[i] += mp.arr[i][j] * vb.arr[j];
+            c[i] = 0;
+            for (size_t j = 0; j < m.length(); ++j)
+                c[i] += m[i][j] * b[j];
         }
     }
 };
@@ -93,96 +234,87 @@ public:
     { }
     void perform()
     {
-        int* a = ((mymessage&)arg(0)).arr;
-        int size = ((mymessage&)arg(0)).size;
-        for(int i = 0; i < layers; i++)
+        const matrix<int>& a = dynamic_cast<const matrix<int>&>(const_arg(0));
+        const vector<int>& b = dynamic_cast<const vector<int>&>(const_arg(1));
+        const vector<int>& c = dynamic_cast<const vector<int>&>(const_arg(2));
+        vector<int> d(c.size());
+
+        for (size_t i = 0; i < a.size(); i++)
         {
-            const mymessage& me = ((const mymessage&)const_arg(i));
-            for (int j = 0; j < me.size; ++j)
-                a[j] = me.arr[j];
-            a += me.size;
+            d[i] = 0;
+            for (size_t j = 0; j < a.length(); ++j)
+                d[i] += a[i][j] * b[j];
         }
+        for (size_t i = 0; i < d.size(); i++)
+            if (c[i] != d[i])
+            {
+                std::cout << "wrong" << std::endl;
+                goto gh;
+            }
+        std::cout << "correct" << std::endl;
+        gh:
+        std::cout << dynamic_cast<const time_cl&>(const_arg(3)).time - parallel_engine::get_start_time() << std::endl;
     }
 };
 
-class init_task : public task
+class init_task: public task
 {
     public:
     init_task(const std::vector<message*>& mes_v, const std::vector<const message*>& cmes_v): task(mes_v, cmes_v)
     { }
     void perform()
     {
-        int**& a = ((matrix_part&)arg(0)).arr;
-        a[0] = new int[size_t(n) * m];
-        int* b = a[0];
-        int tn = 0;
-        for (size_t i = 0; i < layers; i++)
+        size_t n = dynamic_cast<const size_type&>(const_arg(0));
+        size_t m = dynamic_cast<const size_type&>(const_arg(1));
+        size_t sizes[2] = {n, m};
+        matrix<int>& a = *new matrix<int>(n, m);
+        local_message_id a_id = add_message_init(&a, new matrix_size(sizes));
+
+        vector<int>& b = *new vector<int>(m);
+        local_message_id b_id = add_message_init(&b, new size_type(m));
+
+        local_message_id c_id = create_message_init<vector<int>>(new size_type(n));
+
+        std::mt19937 mt(static_cast<unsigned>(time(0)));
+        std::uniform_int_distribution<int> uid(-500, 500);
+        for (size_t i = 0; i < a.size(); i++)
+            for (size_t j = 0; j < a.length(); ++j)
+                a[i][j] = uid(mt);
+
+        for (size_t i = 0; i < b.size(); i++)
+            b[i] = uid(mt);
+
+        time_cl& t = dynamic_cast<time_cl&>(arg(0));
+        t.time = MPI_Wtime();
+
+        size_t offsets[2] = {0, 0};
+        for (size_t i = 0; i < working_processes(); i++)
         {
-            size_t& s = ((matrix_part&)arg(i)).size;
-            size_t& l = ((matrix_part&)arg(i)).length;
-            for (size_t j = 0; j < s; ++j)
-            {
-                ((matrix_part&)arg(i)).arr[j] = b + j * l;
-                for (size_t k = 0; k < l; ++k)
-                   b[j * l + k] = tn++;
-            }
-            b += s * l;
+            sizes[0] = n / working_processes() + ((i < n % working_processes()) ? 1: 0);
+            local_message_id a_child = create_message_child<matrix<int>>(a_id, new matrix_part(sizes, offsets));
+            local_message_id c_child = create_message_child<vector<int>>(c_id, new vector_part(sizes[0], offsets[0]));
+            create_child_task<multiply_task<int>>({c_child}, {a_child, b_id});
+            offsets[0] += sizes[0];
         }
+        add_dependence(this_task_id(), create_task<out_task>({}, {a_id, b_id, c_id, arg_id(0)}));
     }
 };
 
 int main(int argc, char** argv)
 {
     parallel_engine pe(&argc, &argv);
+
+    size_type n(100), m(50);
     if (argc > 1)
     {
         n = atoll(argv[1]);
         if (argc > 2)
-        {
             m = atoll(argv[2]);
-            if (argc > 3)
-                layers = atoll(argv[3]);
-        }
     }
-    int* b, *c;
-    b = new int[m];
-    c = new int[n];
-    int tn = 0;
-    tn = m;
-    for(int i = 0; i < m; i++)
-        b[i] = tn--;
     parallelizer pz;
-    task_graph gr;
-    mymessage* w = new mymessage(m, b);
-    mymessage* cw = new mymessage(n, c);
-    mytask** t = new mytask*[layers];
-    vector<const message*> cve;
-    vector<message*> vi;
-    int div = n / layers;
-    int mod = n % layers;
-    for (int i = 0; i < layers; ++i)
-    {
-        int g = div;
-        if (i == layers - 1)
-            g += mod;
-        matrix_part* p = new matrix_part(m, g);
-        mymessage* q = new mymessage(div, new int[g]);
-        cve.push_back(q);
-        t[i] = new mytask({q}, {p, w});
-        vi.push_back(p);
-    }
-    out_task* te = new out_task({cw}, cve);
-    init_task * ti = new init_task(vi, {});
-    for (int i = 0; i < layers; ++i)
-    {
-        gr.add_dependence(t[i], te);
-        gr.add_dependence(ti, t[i]);
-    }
-    pz.init(gr);
-    pz.execution();
-    if (pz.get_current_proc() == 0)
-    {
-        double time = MPI_Wtime();
-        cout << time - parallel_engine::get_start_time();
-    }
+
+    time_cl t;
+    init_task ti({&t}, {&n, &m});
+
+    pz.execution(&ti);
 }

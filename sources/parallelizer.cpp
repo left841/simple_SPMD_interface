@@ -426,7 +426,6 @@ namespace apl
                 {
                     case MESSAGE_SOURCE::TASK_ARG:
                     case MESSAGE_SOURCE::TASK_ARG_C:
-                    case MESSAGE_SOURCE::REFERENCE:
                     {
                         data_id.push_back(k.id);
                         break;
@@ -462,7 +461,6 @@ namespace apl
                 {
                     case MESSAGE_SOURCE::TASK_ARG:
                     case MESSAGE_SOURCE::TASK_ARG_C:
-                    case MESSAGE_SOURCE::REFERENCE:
                     {
                         const_data_id.push_back(k.id);
                         break;

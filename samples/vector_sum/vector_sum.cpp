@@ -1,12 +1,10 @@
-#include <vector>
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
+#include <vector>
 #include <random>
 #include <algorithm>
-#include <iostream>
 #include "parallel.h"
-using namespace std;
 using namespace apl;
 
 struct size_info: public message

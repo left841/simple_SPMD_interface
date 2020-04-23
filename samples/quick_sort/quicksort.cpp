@@ -1,12 +1,10 @@
-#include <vector>
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
+#include <vector>
 #include <random>
 #include <algorithm>
-#include <iostream>
 #include "parallel.h"
-using namespace std;
 using namespace apl;
 
 class time_cl: public message
@@ -62,32 +60,32 @@ struct part_info: public sendable
     }
 };
 
-class arrray: public message
+class array: public message
 {
 public:
     bool created;
     int* p;
     size_t size;
 
-    arrray(const init_size& sz): size(sz.size)
+    array(const init_size& sz): size(sz.size)
     {
         p = new int[size];
         created = true;
     }
 
-    arrray(const arrray& m, const part_info& pi): size(pi.size)
+    array(const array& m, const part_info& pi): size(pi.size)
     {
         p = m.p + pi.offset;
         created = false;
     }
 
-    arrray(const part_info& pi): size(pi.size)
+    array(const part_info& pi): size(pi.size)
     {
         p = new int[size];
         created = true;
     }
 
-    void include(const arrray& child, const part_info& pi)
+    void include(const array& child, const part_info& pi)
     {
         if (child.created)
         {
@@ -97,7 +95,7 @@ public:
         }
     }
 
-    ~arrray()
+    ~array()
     {
         if (created)
             delete[] p;
@@ -123,8 +121,8 @@ private:
     void simple_quicksort(int* a, size_t size)
     {
         int bel;
-        int mi = min(min(a[0], a[size - 1]), a[size / 2]);
-        int ma = max(max(a[0], a[size - 1]), a[size / 2]);
+        int mi = std::min(std::min(a[0], a[size - 1]), a[size / 2]);
+        int ma = std::max(std::max(a[0], a[size - 1]), a[size / 2]);
 
         if (size < 2)
             return;
@@ -144,7 +142,7 @@ private:
             while (a[r] > bel)
                 --r;
             if (l <= r)
-                swap(a[l++], a[r--]);
+                std::swap(a[l++], a[r--]);
         }
 
         simple_quicksort(a, r + 1);
@@ -154,12 +152,12 @@ private:
 public:
     static int pred;
 
-    quick_task(const vector<message*>& mes_v, const vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
+    quick_task(const std::vector<message*>& mes_v, const std::vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
     { }
 
     void perform()
     {
-        arrray& a = dynamic_cast<arrray&>(arg(0));
+        array& a = dynamic_cast<array&>(arg(0));
         size_t sz = static_cast<int>(a.size);
 
         if (sz < pred)
@@ -167,8 +165,8 @@ public:
         else
         {
             int bel;
-            int mi = min(min(a[0], a[sz - 1]), a[sz / 2]);
-            int ma = max(max(a[0], a[sz - 1]), a[sz / 2]);
+            int mi = std::min(std::min(a[0], a[sz - 1]), a[sz / 2]);
+            int ma = std::max(std::max(a[0], a[sz - 1]), a[sz / 2]);
             if ((a[0] > mi) && (a[0] < ma))
                 bel = a[0];
             else if ((a[sz - 1] > mi) && (a[sz - 1] < ma))
@@ -184,18 +182,18 @@ public:
                 while (a[r] > bel)
                     --r;
                 if (l <= r)
-                    swap(a[l++], a[r--]);
+                    std::swap(a[l++], a[r--]);
             }
 
             if (r + 1 > 1)
             {
-                local_message_id p1 = create_message_child<arrray>(arg_id(0), new part_info(0, r + 1));
+                local_message_id p1 = create_message_child<array>(arg_id(0), new part_info(0, r + 1));
                 create_child_task<quick_task>({p1}, {});
             }
 
             if (sz - (r + 1) > 1)
             {
-                local_message_id p2 = create_message_child<arrray>(arg_id(0), new part_info(r + 1, sz - r - 1));
+                local_message_id p2 = create_message_child<array>(arg_id(0), new part_info(r + 1, sz - r - 1));
                 create_child_task<quick_task>({p2}, {});
             }
         }
@@ -210,16 +208,16 @@ class init_task: public task
 {
 public:
 
-    init_task(const vector<message*>& mes_v, const vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
+    init_task(const std::vector<message*>& mes_v, const std::vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
     { }
 
     void perform()
     {
-        mt19937 mt(static_cast<unsigned>(time(0)));
-        uniform_int_distribution<int> uid(0, 10000);
+        std::mt19937 mt(static_cast<unsigned>(time(0)));
+        std::uniform_int_distribution<int> uid(0, 10000);
         const init_size& size = dynamic_cast<const init_size &>(const_arg(0));
-        arrray& a1 = *new arrray(size);
-        arrray& a2 = *new arrray(size);
+        array& a1 = *new array(size);
+        array& a2 = *new array(size);
         time_cl& t = dynamic_cast<time_cl&>(arg(0));
         for (int i = 0; i < a1.size; ++i)
             a1[i] = a2[i] = uid(mt);
@@ -236,27 +234,26 @@ public:
 class check_task: public task
 {
 public:
-    check_task(const vector<message*>& mes_v, const vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
+    check_task(const std::vector<message*>& mes_v, const std::vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
     { }
 
     void perform()
     {
         const time_cl& t = dynamic_cast<const time_cl&>(const_arg(1));
-        const arrray& a1 = dynamic_cast<const arrray&>(const_arg(0));
-        arrray& a2 = dynamic_cast<arrray&>(arg(0));
+        const array& a1 = dynamic_cast<const array&>(const_arg(0));
+        array& a2 = dynamic_cast<array&>(arg(0));
         double tm1 = MPI_Wtime();
-        sort(a2.p, a2.p + a2.size);
+        std::sort(a2.p, a2.p + a2.size);
         double tm2 = MPI_Wtime();
         for (size_t i = 0; i < a1.size; ++i)
             if (a1.p[i] != a2.p[i])
             {
-                cout << "wrong\n";
+                std::cout << "wrong\n";
                 goto gh;
             }
-        cout << "correct\n";
+        std::cout << "correct\n";
         gh:
-        cout << tm1 - t.time << endl;
-        //cout << tm2 - tm1;
+        std::cout << tm1 - t.time << std::endl;
     }
 };
 

@@ -1,23 +1,21 @@
-#include <vector>
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
+#include <vector>
 #include <random>
 #include <algorithm>
 #include "parallel.h"
-
-using namespace std;
 using namespace apl;
 
-class m_array: public message
+class array: public message
 {
 private:
     int* p;
-    int size_;
+    size_t size_;
     bool res;
 public:
 
-    m_array(int sz, int* pt = nullptr): size_(sz), p(pt)
+    array(size_t sz, int* pt = nullptr): size_(sz), p(pt)
     {
         if (p == nullptr)
         {
@@ -27,7 +25,7 @@ public:
         else
             res = false;
     }
-    ~m_array()
+    ~array()
     {
         if (res)
             delete[] p;
@@ -44,28 +42,28 @@ public:
     const int& operator[](size_t n) const
     { return p[n]; }
 
-    int size() const
+    size_t size() const
     { return size_; }
 
     int* data()
     { return p; }
 };
 
-class merge_t: public task
+class merge_task: public task
 {
 public:
-    merge_t(): task()
+    merge_task(): task()
     { }
-    merge_t(const vector<message*> vm, const vector<const message*> cvm): task(vm, cvm)
+    merge_task(const std::vector<message*> vm, const std::vector<const message*> cvm): task(vm, cvm)
     { }
     void perform()
     {
-        const m_array& s1 = dynamic_cast<const m_array&>(const_arg(0));
-        const m_array& s2 = dynamic_cast<const m_array&>(const_arg(1));
-        m_array& out = dynamic_cast<m_array&>(arg(0));
+        const array& s1 = dynamic_cast<const array&>(const_arg(0));
+        const array& s2 = dynamic_cast<const array&>(const_arg(1));
+        array& out = dynamic_cast<array&>(arg(0));
 
-        int first = 0, second = 0;
-        for (int i = 0; i < out.size(); ++i)
+        size_t first = 0, second = 0;
+        for (size_t i = 0; i < out.size(); ++i)
         {
             if ((first >= s1.size()))
                 out[i] = s2[second++];
@@ -76,45 +74,45 @@ public:
         }
     }
 
-    m_array* get_out()
-    { return (m_array*)&arg(0); }
+    array* get_out()
+    { return (array*)&arg(0); }
 
-    m_array* get_first()
-    { return (m_array*)&const_arg(0); }
+    array* get_first()
+    { return (array*)&const_arg(0); }
 
-    m_array* get_second()
-    { return (m_array*)&const_arg(1); }
+    array* get_second()
+    { return (array*)&const_arg(1); }
 
 };
 
-class merge_t_all: public task
+class merge_all_task: public task
 {
 public:
-    merge_t_all(): task()
+    merge_all_task(): task()
     { }
-    merge_t_all(const vector<message*> vm): task(vm)
+    merge_all_task(const std::vector<message*> vm): task(vm)
     { }
     void perform()
     {
-        m_array& s1 = dynamic_cast<m_array&>(arg(0));
-        m_array& s2 = dynamic_cast<m_array&>(arg(1));
+        array& s1 = dynamic_cast<array&>(arg(0));
+        array& s2 = dynamic_cast<array&>(arg(1));
         for (int i = 0; i < s1.size(); ++i)
             s2[i] = s1[i];
         merge_it(&s1[0], &s2[0], s1.size()/2, s1.size());
     }
-    void merge_it(int* s, int* out, int size1, int size2)
+    void merge_it(int* s, int* out, size_t size1, size_t size2)
     {
         if (size2 < 2)
         {
-            for (int i = 0; i < size2; ++i)
+            for (size_t i = 0; i < size2; ++i)
                 out[i] = s[i];
             return;
         }
         merge_it(out, s, size1 / 2, size1);
         merge_it(out + size1, s + size1, (size2 - size1) / 2, size2 - size1);
-        int first = 0;
-        int second = size1;
-        for (int i = 0; i < size2; ++i)
+        size_t first = 0;
+        size_t second = size1;
+        for (size_t i = 0; i < size2; ++i)
         {
             if ((first == size1))
                 out[i] = s[second++];
@@ -129,8 +127,8 @@ public:
 int main(int argc, char** argv)
 {
     parallel_engine pe(&argc, &argv);
-    int layers = 2;
-    int size = 100000;
+    size_t layers = 2;
+    size_t size = 100000;
     if (argc > 1)
     {
         size = atoi(argv[1]);
@@ -141,9 +139,9 @@ int main(int argc, char** argv)
     int* p1 = new int[size];
     int* p2 = new int[size];
     int* p3 = new int[size];
-    mt19937 mt(static_cast<unsigned>(time(0)));
-    uniform_int_distribution<int> uid(0, 10000);
-    for (int i = 0; i < size; ++i)
+    std::mt19937 mt(static_cast<unsigned>(time(0)));
+    std::uniform_int_distribution<int> uid(0, 10000);
+    for (size_t i = 0; i < size; ++i)
         p1[i] = p3[i] = uid(mt);
     
     double true_start_time = MPI_Wtime();
@@ -153,7 +151,7 @@ int main(int argc, char** argv)
     int comm_size = pz.get_proc_count();
     {
         int j = 1;
-        int i = 0;
+        size_t i = 0;
         while (j < comm_size)
         {
             j <<= 1;
@@ -162,66 +160,65 @@ int main(int argc, char** argv)
         layers = i;
     }
 
-    vector<message*> fin;
-    vector<task*> v1, v2;
-    int g = 1 << layers;
+    std::vector<message*> fin;
+    std::vector<task*> v1, v2;
     if (layers != 0)
     {
         if (layers % 2 == 0)
-            swap(p1,p2);
-        m_array* arr1 = new m_array(size / 2, p2);
-        m_array* arr2 = new m_array(size - size / 2, p2 + size / 2);
-        m_array* arr_p1 = new m_array(size, p1);
-        v2.push_back(new merge_t({arr_p1}, {arr1, arr2}));
+            std::swap(p1,p2);
+        array* arr1 = new array(size / 2, p2);
+        array* arr2 = new array(size - size / 2, p2 + size / 2);
+        array* arr_p1 = new array(size, p1);
+        v2.push_back(new merge_task({arr_p1}, {arr1, arr2}));
         fin.push_back(arr_p1);
-        for (int i = 1; i < layers; ++i)
+        for (size_t i = 1; i < layers; ++i)
         {
-            int q = 1 << i;
+            size_t q = 1ull << i;
             v1.resize(q);
-            for (int j = 0; j < q; ++j)
+            for (size_t j = 0; j < q; ++j)
             {
-                m_array* me;
+                array* me;
                 int* ptr;
                 if (j%2)
                 {
-                    me = &((m_array&)((merge_t*)v2[j/2])->const_arg(1));
-                    ptr = ((merge_t*)v2[j/2])->get_out()->data() + ((merge_t*)v2[j/2])->get_first()->size();
+                    me = &((array&)((merge_task*)v2[j/2])->const_arg(1));
+                    ptr = ((merge_task*)v2[j/2])->get_out()->data() + ((merge_task*)v2[j/2])->get_first()->size();
                 }
                 else
                 {
-                    me = ((merge_t*)v2[j/2])->get_first();
-                    ptr = ((merge_t*)v2[j/2])->get_out()->data();
+                    me = ((merge_task*)v2[j/2])->get_first();
+                    ptr = ((merge_task*)v2[j/2])->get_out()->data();
                 }
 
-                arr1 = new m_array(me->size() / 2, ptr);
+                arr1 = new array(me->size() / 2, ptr);
 
-                arr2 = new m_array(me->size() - me->size() / 2, ptr + me->size() / 2);
+                arr2 = new array(me->size() - me->size() / 2, ptr + me->size() / 2);
                 arr_p1 = me;
 
-                v1[j] = new merge_t({arr_p1}, {arr1, arr2});
+                v1[j] = new merge_task({arr_p1}, {arr1, arr2});
 
                 tg.add_dependence(v1[j], v2[j/2]);
             }
             swap(v1, v2);
         }
 
-        for (int i = 0; i < v2.size(); ++i)
+        for (size_t i = 0; i < v2.size(); ++i)
         {
-            arr1 = new m_array(((merge_t*)v2[i])->get_first()->size(), ((merge_t*)v2[i])->get_out()->data());
-            arr2 = ((merge_t*)v2[i])->get_first();
-            tg.add_dependence(new merge_t_all({arr1, arr2}), v2[i]);
-            arr1 = new m_array(((merge_t*)v2[i])->get_second()->size(), ((merge_t*)v2[i])->get_out()->data()
-                + ((merge_t*)v2[i])->get_first()->size());
-            arr2 = ((merge_t*)v2[i])->get_second();
-            tg.add_dependence(new merge_t_all({arr1, arr2}), v2[i]);
+            arr1 = new array(((merge_task*)v2[i])->get_first()->size(), ((merge_task*)v2[i])->get_out()->data());
+            arr2 = ((merge_task*)v2[i])->get_first();
+            tg.add_dependence(new merge_all_task({arr1, arr2}), v2[i]);
+            arr1 = new array(((merge_task*)v2[i])->get_second()->size(), ((merge_task*)v2[i])->get_out()->data()
+                + ((merge_task*)v2[i])->get_first()->size());
+            arr2 = ((merge_task*)v2[i])->get_second();
+            tg.add_dependence(new merge_all_task({arr1, arr2}), v2[i]);
         }
     }
     else
     {
-        m_array* arr1 = new m_array(size, p1);
-        m_array* arr2 = new m_array(size, p2);
-        tg.add_task(new merge_t_all({arr1, arr2}));
-        swap(p1, p2);
+        array* arr1 = new array(size, p1);
+        array* arr2 = new array(size, p2);
+        tg.add_task(new merge_all_task({arr1, arr2}));
+        std::swap(p1, p2);
         fin.push_back(arr1);
         fin.push_back(arr2);
     }
@@ -235,20 +232,16 @@ int main(int argc, char** argv)
         for (message* i: fin)
             i->wait_requests();
         double dt = MPI_Wtime();
-        sort(p3, p3 + size);
+        std::sort(p3, p3 + size);
         double pt = MPI_Wtime();
         bool fl = false;
-        for (int i = 0; i < size; ++i)
+        for (size_t i = 0; i < size; ++i)
             if (p1[i] != p3[i])
                 fl = true;
-        /*for (int i = 0; i < size; ++i)
-            cout << p1[i] << ' ';
-        cout << '\n';*/
         if (fl)
-            cout << "wrong\n";
+            std::cout << "wrong\n";
         else
-            cout << "correct\n";
-        cout << dt - true_start_time << endl;//parallel_engine::get_start_time();// << '\n' << pt - dt;
-        cout.flush();
+            std::cout << "correct\n";
+        std::cout << dt - true_start_time << std::endl;
     }
 }

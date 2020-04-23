@@ -1,12 +1,10 @@
-#include <vector>
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
+#include <vector>
 #include <random>
 #include <algorithm>
 #include "parallel.h"
-
-using namespace std;
 using namespace apl;
 
 class time_cl: public message
@@ -38,7 +36,7 @@ struct array_size: public message
     { re.recv(&size); }
 };
 
-class m_array: public message
+class array: public message
 {
 private:
     int* p;
@@ -66,7 +64,7 @@ public:
         }
     };
 
-    m_array(size_t sz, int* pt = nullptr): size_(sz), p(pt)
+    array(size_t sz, int* pt = nullptr): size_(sz), p(pt)
     {
         if (p == nullptr)
         {
@@ -77,31 +75,31 @@ public:
             res = false;
     }
 
-    m_array(const m_array& mes, const part_info& pi): size_(pi.size)
+    array(const array& mes, const part_info& pi): size_(pi.size)
     {
         p = mes.p + pi.offset;
         res = false;
     }
 
-    m_array(const part_info& pi): size_(pi.size)
+    array(const part_info& pi): size_(pi.size)
     {
         p = new int[size_];
         res = true;
     }
 
-    m_array(const array_size sz): size_(sz.size)
+    array(const array_size sz): size_(sz.size)
     {
         p = new int[size_];
         res = true;
     }
 
-    ~m_array()
+    ~array()
     {
         if (res)
             delete[] p;
     }
 
-    void include(const m_array& child, const part_info& pi)
+    void include(const array& child, const part_info& pi)
     {
         if (child.res)
         {
@@ -127,16 +125,16 @@ public:
     { return size_; }
 };
 
-class merge_t_all: public task
+class merge_all_task: public task
 {
 public:
 
-    merge_t_all(const vector<message*> vm, const vector<const message*> cvm): task(vm, cvm)
+    merge_all_task(const std::vector<message*> vm, const std::vector<const message*> cvm): task(vm, cvm)
     { }
     void perform()
     {
-        m_array& s1 = dynamic_cast<m_array&>(arg(0));
-        m_array& s2 = dynamic_cast<m_array&>(arg(1));
+        array& s1 = dynamic_cast<array&>(arg(0));
+        array& s2 = dynamic_cast<array&>(arg(1));
 
         for (size_t i = 0; i < s1.size(); ++i)
             s2[i] = s1[i];
@@ -168,17 +166,17 @@ public:
     }
 };
 
-class merge_t: public task
+class merge_task: public task
 {
 public:
 
-    merge_t(const vector<message*> vm, const vector<const message*> cvm): task(vm, cvm)
+    merge_task(const std::vector<message*> vm, const std::vector<const message*> cvm): task(vm, cvm)
     { }
 
     void perform()
     {
-        const m_array& src = dynamic_cast<const m_array&>(const_arg(0));
-        m_array& out = dynamic_cast<m_array&>(arg(0));
+        const array& src = dynamic_cast<const array&>(const_arg(0));
+        array& out = dynamic_cast<array&>(arg(0));
         size_t h_size = src.size() / 2;
         size_t first = 0, second = h_size;
 
@@ -200,28 +198,28 @@ public:
 
     static size_t pred;
 
-    merge_organizer(const vector<message*> vm, const vector<const message*> cvm): task(vm, cvm)
+    merge_organizer(const std::vector<message*> vm, const std::vector<const message*> cvm): task(vm, cvm)
     { }
 
     void perform()
     {
-        const m_array& in = dynamic_cast<const m_array&>(const_arg(0));
-        const m_array& out = dynamic_cast<const m_array&>(const_arg(1));
+        const array& in = dynamic_cast<const array&>(const_arg(0));
+        const array& out = dynamic_cast<const array&>(const_arg(1));
 
         if (in.size() <= pred)
-            create_child_task<merge_t_all>({const_arg_id(0), const_arg_id(1)}, {});
+            create_child_task<merge_all_task>({const_arg_id(0), const_arg_id(1)}, {});
         else
         {
             size_t half_size = in.size() / 2;
-            local_message_id in1 = create_message_child<m_array>(const_arg_id(0), new m_array::part_info(0, half_size));
-            local_message_id in2 = create_message_child<m_array>(const_arg_id(0), new m_array::part_info(half_size, in.size() - half_size));
+            local_message_id in1 = create_message_child<array>(const_arg_id(0), new array::part_info(0, half_size));
+            local_message_id in2 = create_message_child<array>(const_arg_id(0), new array::part_info(half_size, in.size() - half_size));
 
-            local_message_id out1 = create_message_child<m_array>(const_arg_id(1), new m_array::part_info(0, half_size));
-            local_message_id out2 = create_message_child<m_array>(const_arg_id(1), new m_array::part_info(half_size, out.size() - half_size));
+            local_message_id out1 = create_message_child<array>(const_arg_id(1), new array::part_info(0, half_size));
+            local_message_id out2 = create_message_child<array>(const_arg_id(1), new array::part_info(half_size, out.size() - half_size));
 
             local_task_id org1 = create_child_task<merge_organizer>({}, {out1, in1});
             local_task_id org2 = create_child_task<merge_organizer>({}, {out2, in2});
-            local_task_id mer = create_child_task<merge_t>({const_arg_id(1)}, {const_arg_id(0)});
+            local_task_id mer = create_child_task<merge_task>({const_arg_id(1)}, {const_arg_id(0)});
 
             add_dependence(org1, mer);
             add_dependence(org2, mer);
@@ -234,32 +232,25 @@ size_t merge_organizer::pred = 1000;
 class check_task: public task
 {
 public:
-    check_task(const vector<message*>& mes_v, const vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
+    check_task(const std::vector<message*>& mes_v, const std::vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
     { }
 
     void perform()
     {
         const time_cl& t = dynamic_cast<const time_cl&>(const_arg(0));
-        m_array& a1 = dynamic_cast<m_array&>(arg(0));
-        m_array& a2 = dynamic_cast<m_array&>(arg(1));
+        array& a1 = dynamic_cast<array&>(arg(0));
+        array& a2 = dynamic_cast<array&>(arg(1));
         double tm1 = MPI_Wtime();
-        sort(&a2[0], &a2[0] + a2.size());
-        /*double tm2 = MPI_Wtime();
-        for (int i = 0; i < a1.get_size(); ++i)
-            cout << a1.get_p()[i] << ' ';
-        cout << endl;
-        for (int i = 0; i < a2.get_size(); ++i)
-            cout << a2.get_p()[i] << ' ';
-        cout << endl;*/
+        std::sort(&a2[0], &a2[0] + a2.size());
         for (size_t i = 0; i < a1.size(); ++i)
             if (a1[i] != a2[i])
             {
-                cout << "wrong\n";
+                std::cout << "wrong\n";
                 goto gh;
             }
-        cout << "correct\n";
+        std::cout << "correct\n";
         gh:
-        cout << tm1 - t.time << endl;
+        std::cout << tm1 - t.time << std::endl;
         //cout << tm2 - tm1 << endl;
     }
 };
@@ -268,18 +259,18 @@ class init_task: public task
 {
 public:
 
-    init_task(const vector<message*>& mes_v, const vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
+    init_task(const std::vector<message*>& mes_v, const std::vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
     { }
 
     void perform()
     {
-        mt19937 mt(static_cast<int>(time(0)));
-        uniform_int_distribution<int> uid(0, 10000);
+        std::mt19937 mt(static_cast<int>(time(0)));
+        std::uniform_int_distribution<int> uid(0, 10000);
         time_cl& t = dynamic_cast<time_cl&>(arg(0));
         const array_size& size = dynamic_cast<const array_size&>(const_arg(0));
-        m_array& a1 = *new m_array(size);
-        m_array& a2 = *new m_array(size);
-        m_array& a3 = *new m_array(size);
+        array& a1 = *new array(size);
+        array& a2 = *new array(size);
+        array& a3 = *new array(size);
 
         for (size_t i = 0; i < a1.size(); ++i)
             a1[i] = a2[i] = a3[i] = uid(mt);
