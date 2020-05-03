@@ -251,7 +251,6 @@ public:
         std::cout << "correct\n";
         gh:
         std::cout << tm1 - t.time << std::endl;
-        //cout << tm2 - tm1 << endl;
     }
 };
 
