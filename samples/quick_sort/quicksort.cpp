@@ -234,6 +234,8 @@ public:
 class check_task: public task
 {
 public:
+    static bool checking;
+
     check_task(const std::vector<message*>& mes_v, const std::vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
     { }
 
@@ -243,29 +245,42 @@ public:
         const array& a1 = dynamic_cast<const array&>(const_arg(0));
         array& a2 = dynamic_cast<array&>(arg(0));
         double tm1 = MPI_Wtime();
-        std::sort(a2.p, a2.p + a2.size);
-        double tm2 = MPI_Wtime();
-        for (size_t i = 0; i < a1.size; ++i)
-            if (a1.p[i] != a2.p[i])
-            {
-                std::cout << "wrong\n";
-                goto gh;
-            }
-        std::cout << "correct\n";
+        if (checking)
+        {
+            std::sort(a2.p, a2.p + a2.size);
+            for (size_t i = 0; i < a1.size; ++i)
+                if (a1.p[i] != a2.p[i])
+                {
+                    std::cout << "wrong\n";
+                    goto gh;
+                }
+            std::cout << "correct\n";
+        }
         gh:
         std::cout << tm1 - t.time << std::endl;
     }
 };
 
+bool check_task::checking = false;
+
 int main(int argc, char** argv)
 {
     parallel_engine pe(&argc, &argv);
     size_t sz = 100000;
-    if (argc > 1)
+    for (int i = 1; i < argc; ++i)
     {
-        sz = atoll(argv[1]);
-        if (argc > 2)
-            quick_task::pred = atoll(argv[2]);
+        if ((strcmp(argv[i], "-s") == 0) || (strcmp(argv[i], "-size") == 0))
+        {
+            sz = atoll(argv[++i]);
+        }
+        else if ((strcmp(argv[i], "-l") == 0) || (strcmp(argv[i], "-limit") == 0))
+        {
+            quick_task::pred = atoll(argv[++i]);
+        }
+        else if (strcmp(argv[i], "-check") == 0)
+        {
+            check_task::checking = true;
+        }
     }
 
     parallelizer pz;

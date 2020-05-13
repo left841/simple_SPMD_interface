@@ -129,11 +129,21 @@ int main(int argc, char** argv)
     parallel_engine pe(&argc, &argv);
     size_t layers = 2;
     size_t size = 100000;
-    if (argc > 1)
+    bool checks = false;
+    for (int i = 1; i < argc; ++i)
     {
-        size = atoi(argv[1]);
-        if (argc > 2)
-            layers = atoi(argv[2]);
+        if ((strcmp(argv[i], "-s") == 0) || (strcmp(argv[i], "-size") == 0))
+        {
+            size = atoll(argv[++i]);
+        }
+        else if ((strcmp(argv[i], "-l") == 0) || (strcmp(argv[i], "-layers") == 0))
+        {
+            layers = atoll(argv[++i]);
+        }
+        else if (strcmp(argv[i], "-check") == 0)
+        {
+            checks = true;
+        }
     }
 
     int* p1 = new int[size];
@@ -232,16 +242,18 @@ int main(int argc, char** argv)
         for (message* i: fin)
             i->wait_requests();
         double dt = MPI_Wtime();
-        std::sort(p3, p3 + size);
-        double pt = MPI_Wtime();
-        bool fl = false;
-        for (size_t i = 0; i < size; ++i)
-            if (p1[i] != p3[i])
-                fl = true;
-        if (fl)
-            std::cout << "wrong\n";
-        else
-            std::cout << "correct\n";
+        if (checks)
+        {
+            std::sort(p3, p3 + size);
+            bool fl = false;
+            for (size_t i = 0; i < size; ++i)
+                if (p1[i] != p3[i])
+                    fl = true;
+            if (fl)
+                std::cout << "wrong\n";
+            else
+                std::cout << "correct\n";
+        }
         std::cout << dt - true_start_time << std::endl;
     }
 }

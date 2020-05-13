@@ -232,6 +232,8 @@ size_t merge_organizer::pred = 1000;
 class check_task: public task
 {
 public:
+    static bool checking;
+
     check_task(const std::vector<message*>& mes_v, const std::vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
     { }
 
@@ -241,18 +243,23 @@ public:
         array& a1 = dynamic_cast<array&>(arg(0));
         array& a2 = dynamic_cast<array&>(arg(1));
         double tm1 = MPI_Wtime();
-        std::sort(&a2[0], &a2[0] + a2.size());
-        for (size_t i = 0; i < a1.size(); ++i)
-            if (a1[i] != a2[i])
-            {
-                std::cout << "wrong\n";
-                goto gh;
-            }
-        std::cout << "correct\n";
+        if (checking)
+        {
+            std::sort(&a2[0], &a2[0] + a2.size());
+            for (size_t i = 0; i < a1.size(); ++i)
+                if (a1[i] != a2[i])
+                {
+                    std::cout << "wrong\n";
+                    goto gh;
+                }
+            std::cout << "correct\n";
+        }
         gh:
         std::cout << tm1 - t.time << std::endl;
     }
 };
+
+bool check_task::checking = false;
 
 class init_task: public task
 {
@@ -290,11 +297,20 @@ int main(int argc, char** argv)
 {
     parallel_engine pe(&argc, &argv);
     size_t size = 100000;
-    if (argc > 1)
+    for (int i = 1; i < argc; ++i)
     {
-        size = atoll(argv[1]);
-        if (argc > 2)
-            merge_organizer::pred = atoll(argv[2]);
+        if ((strcmp(argv[i], "-s") == 0) || (strcmp(argv[i], "-size") == 0))
+        {
+            size = atoll(argv[++i]);
+        }
+        else if ((strcmp(argv[i], "-l") == 0) || (strcmp(argv[i], "-limit") == 0))
+        {
+            merge_organizer::pred = atoll(argv[++i]);
+        }
+        else if (strcmp(argv[i], "-check") == 0)
+        {
+            check_task::checking = true;
+        }
     }
 
     parallelizer pz;

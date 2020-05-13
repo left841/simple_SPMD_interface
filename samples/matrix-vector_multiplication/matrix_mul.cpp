@@ -230,6 +230,8 @@ public:
 class out_task: public task
 {
 public:
+    static bool checking;
+
     out_task(const std::vector<message*>& mes_v, const std::vector<const message*>& cmes_v): task(mes_v, cmes_v)
     { }
     void perform()
@@ -240,23 +242,28 @@ public:
         vector<int> d(c.size());
 
         double t = MPI_Wtime();
-        for (size_t i = 0; i < a.size(); i++)
+        if (checking)
         {
-            d[i] = 0;
-            for (size_t j = 0; j < a.length(); ++j)
-                d[i] += a[i][j] * b[j];
-        }
-        for (size_t i = 0; i < d.size(); i++)
-            if (c[i] != d[i])
+            for (size_t i = 0; i < a.size(); i++)
             {
-                std::cout << "wrong" << std::endl;
-                goto gh;
+                d[i] = 0;
+                for (size_t j = 0; j < a.length(); ++j)
+                    d[i] += a[i][j] * b[j];
             }
-        std::cout << "correct" << std::endl;
+            for (size_t i = 0; i < d.size(); i++)
+                if (c[i] != d[i])
+                {
+                    std::cout << "wrong" << std::endl;
+                    goto gh;
+                }
+            std::cout << "correct" << std::endl;
+        }
         gh:
         std::cout <<  t - dynamic_cast<const time_cl&>(const_arg(3)).time << std::endl;
     }
 };
+
+bool out_task::checking = false;
 
 class init_task: public task
 {
@@ -306,11 +313,17 @@ int main(int argc, char** argv)
     parallel_engine pe(&argc, &argv);
 
     size_type n(100), m(50);
-    if (argc > 1)
+    for (int i = 1; i < argc; ++i)
     {
-        n = atoll(argv[1]);
-        if (argc > 2)
-            m = atoll(argv[2]);
+        if ((strcmp(argv[i], "-s") == 0) || (strcmp(argv[i], "-size") == 0))
+        {
+            n = atoll(argv[++i]);
+            m = atoll(argv[++i]);
+        }
+        else if (strcmp(argv[i], "-check") == 0)
+        {
+            out_task::checking = true;
+        }
     }
     parallelizer pz;
 

@@ -169,6 +169,8 @@ public:
 class out_task: public task
 {
 public:
+    static bool checking;
+
     out_task(const std::vector<message*>& mes_v, const std::vector<const message*>& cmes_v): task(mes_v, cmes_v)
     { }
     void perform()
@@ -179,25 +181,30 @@ public:
         matrix<int> d(c.size(), c.length());
 
         double t = MPI_Wtime();
-        for (size_t i = 0; i < d.size(); i++)
-            for (size_t j = 0; j < d.length(); j++)
-            {
-                d[i][j] = 0;
-                for (size_t k = 0; k < a.length(); ++k)
-                    d[i][j] += a[i][k] * b[k][j];
-            }
-        for (size_t i = 0; i < d.size(); i++)
-            for (size_t j = 0; j < d.length(); j++)
-                if (c[i][j] != d[i][j])
+        if (checking)
+        {
+            for (size_t i = 0; i < d.size(); i++)
+                for (size_t j = 0; j < d.length(); j++)
                 {
-                    std::cout << "wrong" << std::endl;
-                    goto gh;
+                    d[i][j] = 0;
+                    for (size_t k = 0; k < a.length(); ++k)
+                        d[i][j] += a[i][k] * b[k][j];
                 }
-        std::cout << "correct" << std::endl;
+            for (size_t i = 0; i < d.size(); i++)
+                for (size_t j = 0; j < d.length(); j++)
+                    if (c[i][j] != d[i][j])
+                    {
+                        std::cout << "wrong" << std::endl;
+                        goto gh;
+                    }
+            std::cout << "correct" << std::endl;
+        }
         gh:
         std::cout << t - dynamic_cast<const time_cl&>(const_arg(3)).time << std::endl;
     }
 };
+
+bool out_task::checking = false;
 
 class init_task: public task
 {
@@ -251,14 +258,17 @@ int main(int argc, char** argv)
     parallel_engine pe(&argc, &argv);
 
     size_type n(100), m(50), l(75);
-    if (argc > 1)
+    for (int i = 1; i < argc; ++i)
     {
-        n = atoll(argv[1]);
-        if (argc > 2)
+        if ((strcmp(argv[i], "-s") == 0) || (strcmp(argv[i], "-size") == 0))
         {
-            m = atoll(argv[2]);
-            if (argc > 3)
-                l = atoll(argv[3]);
+            n = atoll(argv[++i]);
+            m = atoll(argv[++i]);
+            l = atoll(argv[++i]);
+        }
+        else if (strcmp(argv[i], "-check") == 0)
+        {
+            out_task::checking = true;
         }
     }
     parallelizer pz;
