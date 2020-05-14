@@ -29,8 +29,7 @@ push @processes, $ARGV[0];
 $check_try = 5;
 
 # matrix-matrix multiplication
-#@matrix_mul_array = (1000, 2000, 5000, 10000);
-@matrix_mul_array = (1000, 2000);
+@matrix_mul_array = (1000, 2000, 5000, 10000);
 
 print $output_file "matrix-matrix_multiplication ";
 print "matrix-matrix multiplication\n";
