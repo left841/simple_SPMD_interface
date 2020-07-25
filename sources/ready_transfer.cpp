@@ -8,13 +8,13 @@ namespace apl
 
     void ready_sender::send(const void* buf, int size, MPI_Datatype type) const
     {
-        MPI_Rsend(buf, size, type, proc, tag++, comm);
+        MPI_Rsend(const_cast<void*>(buf), size, type, proc, tag++, comm);
     }
 
     void ready_sender::isend(const void* buf, int size, MPI_Datatype type) const
     {
         MPI_Request req;
-        MPI_Irsend(buf, size, type, proc, tag++, comm, &req);
+        MPI_Irsend(const_cast<void*>(buf), size, type, proc, tag++, comm, &req);
         q->push(req);
     }
 

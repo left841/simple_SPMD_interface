@@ -7,12 +7,12 @@ namespace apl
     { }
 
     void standard_sender::send(const void* buf, int size, MPI_Datatype type) const
-    { MPI_Send(buf, size, type, proc, tag++, comm); }
+    { MPI_Send(const_cast<void*>(buf), size, type, proc, tag++, comm); }
 
     void standard_sender::isend(const void* buf, int size, MPI_Datatype type) const
     {
         MPI_Request req;
-        MPI_Isend(buf, size, type, proc, tag++, comm, &req);
+        MPI_Isend(const_cast<void*>(buf), size, type, proc, tag++, comm, &req);
         q->push(req);
     }
 
