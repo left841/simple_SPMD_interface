@@ -57,13 +57,13 @@ namespace apl
     struct message_init_data
     {
         message_type type;
-        sendable* ii;
+        std::vector<sendable*> ii;
     };
 
     struct message_init_add_data
     {
         message_type type;
-        sendable* ii;
+        std::vector<sendable*> ii;
         message* mes;
     };
 
@@ -71,14 +71,14 @@ namespace apl
     {
         message_type type;
         local_message_id sourse;
-        sendable* pi;
+        std::vector<sendable*> pi;
     };
 
     struct message_child_add_data
     {
         message_type type;
         local_message_id sourse;
-        sendable* pi;
+        std::vector<sendable*> pi;
         message* mes;
     };
 
@@ -115,11 +115,11 @@ namespace apl
         task_environment(task_data& td, task_id id);
         task_environment(task_data&& td, task_id id);
 
-        local_message_id create_message_init(message_type type, sendable* info);
-        local_message_id create_message_child(message_type type, local_message_id source, sendable* info);
+        local_message_id create_message_init(message_type type, const std::vector<sendable*>& info);
+        local_message_id create_message_child(message_type type, local_message_id source, const std::vector<sendable*>& info);
 
-        local_message_id add_message_init(message_type type, message* m, sendable* info);
-        local_message_id add_message_child(message_type type, message* m, local_message_id source, sendable* info);
+        local_message_id add_message_init(message_type type, message* m, const std::vector<sendable*>& info);
+        local_message_id add_message_child(message_type type, message* m, local_message_id source, const std::vector<sendable*>& info);
 
         local_task_id create_task(task_type type, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
         local_task_id create_child_task(task_type type, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
@@ -151,7 +151,7 @@ namespace apl
         void set_proc_count(size_t sz);
         size_t working_processes();
 
-        void send(const sender& se);
+        void send(const sender& se) const;
         void recv(const receiver& re);
 
     };
@@ -168,15 +168,15 @@ namespace apl
 
     protected:
 
-        template<class Type, class InfoType>
-        local_message_id create_message_init(InfoType* info);
-        template<class Type, class ParentType = Type, class InfoType>
-        local_message_id create_message_child(local_message_id source, InfoType* info);
+        template<class Type, class... InfoTypes>
+        local_message_id create_message_init(InfoTypes*... info);
+        template<class Type, class ParentType = Type, class... InfoTypes>
+        local_message_id create_message_child(local_message_id source, InfoTypes*... info);
 
-        template<class Type, class InfoType>
-        local_message_id add_message_init(Type* m, InfoType* info);
-        template<class Type, class ParentType = Type, class InfoType>
-        local_message_id add_message_child(Type* m, local_message_id source, InfoType* info);
+        template<class Type, class... InfoTypes>
+        local_message_id add_message_init(Type* m, InfoTypes*... info);
+        template<class Type, class ParentType = Type, class... InfoTypes>
+        local_message_id add_message_child(Type* m, local_message_id source, InfoTypes*... info);
 
         template<class Type>
         local_task_id create_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
@@ -217,21 +217,37 @@ namespace apl
         friend class memory_manager;
     };
 
-    template<class Type, class InfoType>
-    local_message_id task::create_message_init(InfoType* info)
-    { return env->create_message_init(message_init_factory::get_type<Type, InfoType>(), info); }
+    template<class Type, class... InfoTypes>
+    local_message_id task::create_message_init(InfoTypes*... info)
+    {
+        std::vector<sendable*> v;
+        tuple_processers<sizeof...(InfoTypes), InfoTypes...>::create_vector_from_pointers(v, std::make_tuple(info...));
+        return env->create_message_init(message_init_factory::get_type<Type, InfoTypes...>(), v);
+    }
 
-    template<class Type, class ParentType, class InfoType>
-    local_message_id task::create_message_child(local_message_id source, InfoType* info)
-    { return env->create_message_child(message_child_factory::get_type<Type, ParentType, InfoType>(), source, info); }
+    template<class Type, class ParentType, class... InfoTypes>
+    local_message_id task::create_message_child(local_message_id source, InfoTypes*... info)
+    {
+        std::vector<sendable*> v;
+        tuple_processers<sizeof...(InfoTypes), InfoTypes...>::create_vector_from_pointers(v, std::make_tuple(info...));
+        return env->create_message_child(message_child_factory::get_type<Type, ParentType, InfoTypes...>(), source, v);
+    }
 
-    template<class Type, class InfoType>
-    local_message_id task::add_message_init(Type* m, InfoType* info)
-    { return env->add_message_init(message_init_factory::get_type<Type, InfoType>(), m, info); }
+    template<class Type, class... InfoTypes>
+    local_message_id task::add_message_init(Type* m, InfoTypes*... info)
+    {
+        std::vector<sendable*> v;
+        tuple_processers<sizeof...(InfoTypes), InfoTypes...>::create_vector_from_pointers(v, std::make_tuple(info...));
+        return env->add_message_init(message_init_factory::get_type<Type, InfoTypes...>(), m, v);
+    }
 
-    template<class Type, class ParentType, class InfoType>
-    local_message_id task::add_message_child(Type* m, local_message_id source, InfoType* info)
-    { return env->add_message_child(message_child_factory::get_type<Type, ParentType, InfoType>(), source, info); }
+    template<class Type, class ParentType, class... InfoTypes>
+    local_message_id task::add_message_child(Type* m, local_message_id source, InfoTypes*... info)
+    {
+        std::vector<sendable*> v;
+        tuple_processers<sizeof...(InfoTypes), InfoTypes...>::create_vector_from_pointers(v, std::make_tuple(info...));
+        return env->add_message_child(message_child_factory::get_type<Type, ParentType, InfoTypes...>(), source, v);
+    }
 
     class task_factory
     {

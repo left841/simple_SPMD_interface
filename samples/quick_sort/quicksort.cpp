@@ -7,59 +7,6 @@
 #include "parallel.h"
 using namespace apl;
 
-class time_cl: public message
-{
-public:
-    double time;
-
-    time_cl(): time(0.0)
-    { }
-
-    void send(const sender& se)
-    { se.send(&time); }
-
-    void recv(const receiver& re)
-    { re.recv(&time); }
-};
-
-struct init_size: public message
-{
-    size_t size;
-
-    init_size(size_t sz = 0): size(sz)
-    { }
-
-    operator size_t()
-    { return size; }
-
-    void send(const sender& se)
-    { se.send(&size); }
-
-    void recv(const receiver& re)
-    { re.recv(&size); }
-};
-
-struct part_info: public sendable
-{
-    size_t offset;
-    size_t size;
-
-    part_info(size_t off = 0, size_t sz = 0): offset(off), size(sz)
-    { }
-
-    void send(const sender& se)
-    {
-        se.send(&offset);
-        se.send(&size);
-    }
-
-    void recv(const receiver& re)
-    {
-        re.recv(&offset);
-        re.recv(&size);
-    }
-};
-
 class array: public message
 {
 public:
@@ -67,29 +14,29 @@ public:
     int* p;
     size_t size;
 
-    array(const init_size& sz): size(sz.size)
+    array(size_t sz): size(sz)
     {
         p = new int[size];
         created = true;
     }
 
-    array(const array& m, const part_info& pi): size(pi.size)
+    array(const array& m, size_t sz, size_t offset): size(sz)
     {
-        p = m.p + pi.offset;
+        p = m.p + offset;
         created = false;
     }
 
-    array(const part_info& pi): size(pi.size)
+    array(size_t sz, size_t offset): size(sz)
     {
         p = new int[size];
         created = true;
     }
 
-    void include(const array& child, const part_info& pi)
+    void include(const array& child, size_t sz, size_t offset)
     {
         if (child.created)
         {
-            int* q = p + pi.offset;
+            int* q = p + offset;
             for (size_t i = 0; i < child.size; ++i)
                 q[i] = child.p[i];
         }
@@ -107,7 +54,7 @@ public:
     const int& operator[](size_t n) const
     { return p[n]; }
 
-    void send(const sender& se)
+    void send(const sender& se) const
     { se.isend(p, static_cast<int>(size)); }
 
     void recv(const receiver& re)
@@ -187,13 +134,13 @@ public:
 
             if (r + 1 > 1)
             {
-                local_message_id p1 = create_message_child<array>(arg_id(0), new part_info(0, r + 1));
+                local_message_id p1 = create_message_child<array>(arg_id(0), new size_t(r + 1), new size_t(0));
                 create_child_task<quick_task>({p1}, {});
             }
 
             if (sz - (r + 1) > 1)
             {
-                local_message_id p2 = create_message_child<array>(arg_id(0), new part_info(r + 1, sz - r - 1));
+                local_message_id p2 = create_message_child<array>(arg_id(0), new size_t(sz - r - 1), new size_t(r + 1));
                 create_child_task<quick_task>({p2}, {});
             }
         }
@@ -215,16 +162,16 @@ public:
     {
         std::mt19937 mt(static_cast<unsigned>(time(0)));
         std::uniform_int_distribution<int> uid(0, 10000);
-        const init_size& size = dynamic_cast<const init_size &>(const_arg(0));
+        size_t size = dynamic_cast<const message_wrapper<size_t>&>(const_arg(0));
         array& a1 = *new array(size);
         array& a2 = *new array(size);
-        time_cl& t = dynamic_cast<time_cl&>(arg(0));
+        double& t = dynamic_cast<message_wrapper<double>&>(arg(0));
         for (int i = 0; i < a1.size; ++i)
             a1[i] = a2[i] = uid(mt);
-        t.time = MPI_Wtime();
+        t = MPI_Wtime();
 
-        local_message_id a1_id = add_message_init(&a1, new init_size(size));
-        local_message_id a2_id = add_message_init(&a2, new init_size(size));
+        local_message_id a1_id = add_message_init(&a1, new size_t(size));
+        local_message_id a2_id = add_message_init(&a2, new size_t(size));
 
         create_child_task<quick_task>({a1_id}, {});
         add_dependence(this_task_id(), create_task<check_task>({a2_id}, {a1_id, arg_id(0)}));
@@ -241,7 +188,7 @@ public:
 
     void perform()
     {
-        const time_cl& t = dynamic_cast<const time_cl&>(const_arg(1));
+        const double& t = dynamic_cast<const message_wrapper<double>&>(const_arg(1));
         const array& a1 = dynamic_cast<const array&>(const_arg(0));
         array& a2 = dynamic_cast<array&>(arg(0));
         double tm1 = MPI_Wtime();
@@ -257,11 +204,12 @@ public:
             std::cout << "correct\n";
         }
         gh:
-        std::cout << tm1 - t.time << std::endl;
+        std::cout << tm1 - t << std::endl;
     }
 };
 
 bool check_task::checking = false;
+bool pred_initialized = false;
 
 int main(int argc, char** argv)
 {
@@ -276,6 +224,7 @@ int main(int argc, char** argv)
         else if ((strcmp(argv[i], "-l") == 0) || (strcmp(argv[i], "-limit") == 0))
         {
             quick_task::pred = atoll(argv[++i]);
+            pred_initialized = true;
         }
         else if (strcmp(argv[i], "-check") == 0)
         {
@@ -286,10 +235,9 @@ int main(int argc, char** argv)
     parallelizer pz;
 
     int comm_size = pz.get_proc_count();
-    quick_task::pred = sz / (3 * comm_size / 2);
+    if (!pred_initialized)
+        quick_task::pred = sz / (3 * comm_size / 2);
 
-    time_cl p;
-    init_size is(sz);
-    init_task it({&p}, {&is});
+    init_task it({new message_wrapper<double>(new double(0))}, {new message_wrapper<size_t>(new size_t(sz))});
     pz.execution(&it);
 }

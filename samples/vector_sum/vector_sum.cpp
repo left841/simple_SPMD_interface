@@ -7,42 +7,6 @@
 #include "parallel.h"
 using namespace apl;
 
-struct size_info: public message
-{
-public:
-    size_t new_size;
-
-    size_info(size_t sz = 0): message(), new_size(sz)
-    { }
-
-    void send(const sender& se)
-    { se.send(&new_size); }
-
-    void recv(const receiver& re)
-    { re.recv(&new_size); }
-};
-
-struct part_info: public sendable
-{
-public:
-    size_t new_size;
-    size_t offset;
-
-    part_info(size_t sz = 0, size_t off = 0): sendable(), new_size(sz), offset(off)
-    { }
-
-    void send(const sender& se)
-    {
-        se.send(&new_size);
-        se.send(&offset);
-    }
-    void recv(const receiver& re)
-    {
-        re.recv(&new_size);
-        re.recv(&offset);
-    }
-};
-
 class my_vector: public message
 {
 private:
@@ -51,20 +15,20 @@ private:
     bool is_created;
 public:
 
-    my_vector(const part_info& pi): message(), ptr(nullptr), count(pi.new_size), is_created(true)
+    my_vector(const size_t& new_size, const size_t& offset): message(), ptr(nullptr), count(new_size), is_created(true)
     {
         if (count > 0)
             ptr = new int[count];
     }
 
-    my_vector(const size_info& si): message(), ptr(nullptr), count(si.new_size), is_created(true)
+    my_vector(const size_t& new_size): message(), ptr(nullptr), count(new_size), is_created(true)
     {
         if (count > 0)
             ptr = new int[count];
     }
 
-    my_vector(const my_vector& src, const part_info& pi): message(), ptr(nullptr), count(pi.new_size), is_created(false)
-    { ptr = src.ptr + pi.offset; }
+    my_vector(const my_vector& src, const size_t& new_size, const size_t& offset): message(), ptr(nullptr), count(new_size), is_created(false)
+    { ptr = src.ptr + offset; }
 
     ~my_vector()
     {
@@ -72,11 +36,11 @@ public:
             delete[] ptr;
     }
 
-    void include(const my_vector& child, const part_info& pi)
+    void include(const my_vector& child, const size_t& new_size, const size_t& offset)
     {
         if (is_created)
             for (size_t i = 0; i < child.size(); ++i)
-                ptr[pi.offset + i] = child[i];
+                ptr[offset + i] = child[i];
     }
 
     int& operator[](size_t pos)
@@ -88,7 +52,7 @@ public:
     size_t size() const
     { return count; }
 
-    void send(const sender& se)
+    void send(const sender& se) const
     { se.send(ptr, count); }
 
     void recv(const receiver& re)
@@ -125,7 +89,7 @@ public:
         const my_vector& second = dynamic_cast<const my_vector&>(const_arg(1));
         const my_vector& output = dynamic_cast<const my_vector&>(const_arg(2));
 
-        my_vector check(size_info(output.size()));
+        my_vector check(output.size());
 
         for (size_t i = 0; i < check.size(); ++i)
             check[i] = first[i] + second[i];
@@ -148,7 +112,7 @@ public:
 
     void perform()
     {
-        const size_info& size = dynamic_cast<const size_info&>(const_arg(0));
+        size_t size = dynamic_cast<const message_wrapper<size_t>&>(const_arg(0));
 
         my_vector& first = *new my_vector(size);
         my_vector& second = *new my_vector(size);
@@ -160,18 +124,18 @@ public:
         for (size_t i = 0; i < second.size(); ++i)
             second[i] = uid(mt);
 
-        local_message_id first_id = add_message_init(&first, new size_info(size));
-        local_message_id second_id = add_message_init(&second, new size_info(size));
-        local_message_id output_id = create_message_init<my_vector>(new size_info(size));
+        local_message_id first_id = add_message_init(&first, new size_t(size));
+        local_message_id second_id = add_message_init(&second, new size_t(size));
+        local_message_id output_id = create_message_init<my_vector>(new size_t(size));
 
         int offset = 0;
         for (int i = 0; i < working_processes(); ++i)
         {
-            int new_size = size.new_size / working_processes() + ((size.new_size % working_processes() > i) ? 1 : 0);
+            int new_size = size / working_processes() + ((size % working_processes() > i) ? 1 : 0);
 
-            local_message_id first_child = create_message_child<my_vector>(first_id, new part_info(new_size, offset));
-            local_message_id second_child = create_message_child<my_vector>(second_id, new part_info(new_size, offset));
-            local_message_id output_child = create_message_child<my_vector>(output_id, new part_info(new_size, offset));
+            local_message_id first_child = create_message_child<my_vector>(first_id, new size_t(new_size), new size_t(offset));
+            local_message_id second_child = create_message_child<my_vector>(second_id, new size_t(new_size), new size_t(offset));
+            local_message_id output_child = create_message_child<my_vector>(output_id, new size_t(new_size), new size_t(offset));
 
             create_child_task<vector_sum>({output_child}, {first_child, second_child});
 
@@ -188,8 +152,7 @@ int main(int argc, char** argv)
 
     parallelizer pz;
 
-    size_info size(10000000);
-    vector_sum_init vsi_task({}, {&size});
+    vector_sum_init vsi_task({}, {new message_wrapper<size_t>(new size_t(10000000))});
 
     pz.execution(&vsi_task);
 }

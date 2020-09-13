@@ -221,13 +221,15 @@ namespace apl
             case INSTRUCTION::MES_CREATE:
             {
                 const instruction_message_create& j = dynamic_cast<const instruction_message_create&>(i);
-                instr_comm.send(memory.get_message_info(j.id()), proc);
+                for (sendable* p: memory.get_message_info(j.id()))
+                    instr_comm.send(p, proc);
                 break;
             }
             case INSTRUCTION::MES_P_CREATE:
             {
                 const instruction_message_part_create& j = dynamic_cast<const instruction_message_part_create&>(i);
-                instr_comm.send(memory.get_message_info(j.id()), proc);
+                for (sendable* p: memory.get_message_info(j.id()))
+                    instr_comm.send(p, proc);
                 break;
             }
             case INSTRUCTION::TASK_CREATE:
@@ -676,6 +678,8 @@ namespace apl
                 case MESSAGE_SOURCE::INIT:
                 {
                     message_init_data& d = env.created_messages_init()[i.id];
+                    for (sendable* p: d.ii)
+                        p->wait_requests();
                     messages_init_id.push_back(memory.create_message_init(d.type, d.ii));
                     con[main_proc].insert(messages_init_id.back());
                     ver[main_proc].insert(messages_init_id.back());
@@ -684,6 +688,8 @@ namespace apl
                 case MESSAGE_SOURCE::INIT_A:
                 {
                     message_init_add_data& d = env.added_messages_init()[i.id];
+                    for (sendable* p: d.ii)
+                        p->wait_requests();
                     messages_init_add_id.push_back(memory.create_message_init(d.type, d.ii));
                     comm.recv(memory.get_message(messages_init_add_id.back()), proc);
                     con[main_proc].insert(messages_init_add_id.back());
@@ -728,6 +734,8 @@ namespace apl
                             comm.abort(765);
                     }
                     memory.get_message(src)->wait_requests();
+                    for (sendable* p: d.pi)
+                        p->wait_requests();
                     messages_childs_id.push_back(memory.create_message_child(d.type, src, d.pi));
                     con[main_proc].insert(messages_childs_id.back());
                     ver[main_proc].insert(messages_childs_id.back());
@@ -771,6 +779,8 @@ namespace apl
                     for (process k = 1; k < comm.size(); ++k)
                         ver[k].erase(src);
                     memory.get_message(src)->wait_requests();
+                    for (sendable* p: d.pi)
+                        p->wait_requests();
                     messages_childs_add_id.push_back(memory.create_message_child(d.type, src, d.pi));
                     comm.recv(memory.get_message(messages_childs_add_id.back()), proc);
                     con[main_proc].insert(messages_childs_add_id.back());
@@ -1090,16 +1100,22 @@ namespace apl
                 case INSTRUCTION::MES_CREATE:
                 {
                     const instruction_message_create& j = dynamic_cast<const instruction_message_create&>(i);
-                    sendable* iib = message_init_factory::get_info(j.type());
-                    instr_comm.recv(iib, main_proc);
+                    std::vector<sendable*> iib = message_init_factory::get_info(j.type());
+                    for (sendable* p: iib)
+                        instr_comm.recv(p, main_proc);
+                    for (sendable* p: iib)
+                        p->wait_requests();
                     memory.create_message_init_with_id(j.id(), j.type(), iib);
                     break;
                 }
                 case INSTRUCTION::MES_P_CREATE:
                 {
                     const instruction_message_part_create& j = dynamic_cast<const instruction_message_part_create&>(i);
-                    sendable* pib = message_child_factory::get_info(j.type());
-                    instr_comm.recv(pib, main_proc);
+                    std::vector<sendable*> pib = message_child_factory::get_info(j.type());
+                    for (sendable* p: pib)
+                        instr_comm.recv(p, main_proc);
+                    for (sendable* p: pib)
+                        p->wait_requests();
                     if (memory.message_contained(j.source()))
                         memory.get_message(j.source())->wait_requests();
                     memory.create_message_child_with_id(j.id(), j.type(), j.source(), pib);
@@ -1146,7 +1162,7 @@ namespace apl
         for (message_id i: memory.get_task_data(id))
             memory.get_message(i)->wait_requests();
 
-        for (message_id i : memory.get_task_const_data(id))
+        for (message_id i: memory.get_task_const_data(id))
             memory.get_message(i)->wait_requests();
 
         memory.get_task(id)->set_environment(&env);
@@ -1197,7 +1213,11 @@ namespace apl
                 case MESSAGE_SOURCE::INIT:
                 {
                     message_init_data& d = env.created_messages_init()[i.id];
-                    delete d.ii;
+                    for (sendable* p: d.ii)
+                    {
+                        p->wait_requests();
+                        delete p;
+                    }
                     break;
                 }
                 case MESSAGE_SOURCE::INIT_A:
@@ -1210,7 +1230,11 @@ namespace apl
                 case MESSAGE_SOURCE::CHILD:
                 {
                     message_child_data& d = env.created_messages_child()[i.id];
-                    delete d.pi;
+                    for (sendable* p: d.pi)
+                    {
+                        p->wait_requests();
+                        delete p;
+                    }
                     break;
                 }
                 case MESSAGE_SOURCE::CHILD_A:

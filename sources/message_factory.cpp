@@ -16,10 +16,10 @@ namespace apl
         return v;
     }
 
-    message* message_init_factory::get(message_type id, const sendable& info)
+    message* message_init_factory::get(message_type id, const std::vector<sendable*>& info)
     { return message_vec().at(id)->get_message(info); }
 
-    sendable* message_init_factory::get_info(message_type id)
+    std::vector<sendable*> message_init_factory::get_info(message_type id)
     { return message_vec().at(id)->get_info(); }
 
     // child
@@ -35,16 +35,16 @@ namespace apl
         return v;
     }
 
-    message* message_child_factory::get(message_type id, const message& parent, const sendable& info)
+    message* message_child_factory::get(message_type id, const message& parent, const std::vector<sendable*>& info)
     { return message_vec().at(id)->get_message(parent, info); }
 
-    message* message_child_factory::get(message_type id, const sendable& info)
+    message* message_child_factory::get(message_type id, const std::vector<sendable*>& info)
     { return message_vec().at(id)->get_message(info); }
 
-    sendable* message_child_factory::get_info(message_type id)
+    std::vector<sendable*> message_child_factory::get_info(message_type id)
     { return message_vec().at(id)->get_info(); }
 
-    void message_child_factory::include(message_type id, message& parent, const message& child, const sendable& info)
+    void message_child_factory::include(message_type id, message& parent, const message& child, const std::vector<sendable*>& info)
     { message_vec().at(id)->include(parent, child, info); }
 
 }

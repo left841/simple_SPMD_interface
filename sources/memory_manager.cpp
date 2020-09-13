@@ -72,7 +72,8 @@ namespace apl
     message_id memory_manager::add_message(message* ptr)
     { 
         std::vector<message_id> childs;
-        data_v.push_back({ptr, nullptr, 0, MESSAGE_FACTORY_TYPE::UNDEFINED, MESSAGE_TYPE_UNDEFINED, MESSAGE_ID_UNDEFINED, childs, false});
+        std::vector<sendable*> info;
+        data_v.push_back({ptr, info, 0, MESSAGE_FACTORY_TYPE::UNDEFINED, MESSAGE_TYPE_UNDEFINED, MESSAGE_ID_UNDEFINED, childs, false});
         return data_v.size() - 1;
     }
 
@@ -85,14 +86,14 @@ namespace apl
         return task_v.size() - 1;
     }
 
-    message_id memory_manager::add_message_init(message* ptr, message_type type, sendable* info)
+    message_id memory_manager::add_message_init(message* ptr, message_type type, std::vector<sendable*>& info)
     {
         std::vector<message_id> childs;
         data_v.push_back({ptr, info, 0, MESSAGE_FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true});
         return data_v.size() - 1;
     }
 
-    message_id memory_manager::add_message_child(message* ptr, message_type type, message_id parent, sendable* info)
+    message_id memory_manager::add_message_child(message* ptr, message_type type, message_id parent, std::vector<sendable*>& info)
     {
         std::vector<message_id> childs;
         data_v.push_back({ptr, info, 0, MESSAGE_FACTORY_TYPE::CHILD, type, parent, childs, true});
@@ -108,21 +109,21 @@ namespace apl
         return task_v.size() - 1;
     }
 
-    message_id memory_manager::create_message_init(message_type type, sendable* info)
+    message_id memory_manager::create_message_init(message_type type, std::vector<sendable*>& info)
     {
-        message* mes = message_init_factory::get(type, *info);
+        message* mes = message_init_factory::get(type, info);
         std::vector<message_id> childs;
         data_v.push_back({mes, info, 0, MESSAGE_FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true});
         return data_v.size() - 1;
     }
 
-    message_id memory_manager::create_message_child(message_type type, message_id parent, sendable* info)
+    message_id memory_manager::create_message_child(message_type type, message_id parent, std::vector<sendable*>& info)
     {
         message* mes;
         if ((parent < data_v.size()) && (data_v[parent].d != nullptr))
-            mes = message_child_factory::get(type, *data_v[parent].d, *info);
+            mes = message_child_factory::get(type, *data_v[parent].d, info);
         else
-            mes = message_child_factory::get(type, *info);
+            mes = message_child_factory::get(type, info);
         std::vector<message_id> childs;
         data_v.push_back({mes, info, 0, MESSAGE_FACTORY_TYPE::CHILD, type, parent, childs, true});
         if ((parent < data_v.size()) && (data_v[parent].d != nullptr))
@@ -146,7 +147,7 @@ namespace apl
 
     void memory_manager::include_child_to_parent(message_id child)
     {
-        message_child_factory::include(data_v[child].type, *data_v[data_v[child].parent].d, *data_v[child].d, *data_v[child].info);
+        message_child_factory::include(data_v[child].type, *data_v[data_v[child].parent].d, *data_v[child].d, data_v[child].info);
     }
 
     void memory_manager::include_child_to_parent_recursive(message_id child)
@@ -154,12 +155,13 @@ namespace apl
         message_id id = child;
         while (data_v[child].parent != MESSAGE_ID_UNDEFINED)
         {
+            data_v[data_v[child].parent].d->wait_requests();
             include_child_to_parent(child);
             child = data_v[child].parent;
         }
     }
 
-    void memory_manager::add_message_init_with_id(message* ptr, message_id id, message_type type, sendable* info)
+    void memory_manager::add_message_init_with_id(message* ptr, message_id id, message_type type, std::vector<sendable*>& info)
     {
         if (id >= data_v.size())
             data_v.resize(id + 1);
@@ -167,7 +169,7 @@ namespace apl
         data_v[id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true};
     }
 
-    void memory_manager::add_message_child_with_id(message* ptr, message_id id, message_type type, message_id parent, sendable* info)
+    void memory_manager::add_message_child_with_id(message* ptr, message_id id, message_type type, message_id parent, std::vector<sendable*>& info)
     {
         if (id >= data_v.size())
             data_v.resize(id + 1);
@@ -185,25 +187,25 @@ namespace apl
         task_v[id] = {ptr, type, TASK_ID_UNDEFINED, 0, 0, childs, data, const_data, true};
     }
 
-    void memory_manager::create_message_init_with_id(message_id id, message_type type, sendable* info)
+    void memory_manager::create_message_init_with_id(message_id id, message_type type, std::vector<sendable*>& info)
     {
         if (id >= data_v.size())
             data_v.resize(id + 1);
-        message* mes = message_init_factory::get(type, *info);
+        message* mes = message_init_factory::get(type, info);
         std::vector<message_id> childs;
         data_v[id] = {mes, info, 0, MESSAGE_FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true};
     }
 
-    void memory_manager::create_message_child_with_id(message_id id, message_type type, message_id parent, sendable* info)
+    void memory_manager::create_message_child_with_id(message_id id, message_type type, message_id parent, std::vector<sendable*>& info)
     {
         if (id >= data_v.size())
             data_v.resize(id + 1);
         std::vector<message_id> childs;
         message* mes;
         if ((parent < data_v.size()) && (data_v[parent].d != nullptr))
-            mes = message_child_factory::get(type, *data_v[parent].d, *info);
+            mes = message_child_factory::get(type, *data_v[parent].d, info);
         else
-            mes = message_child_factory::get(type, *info);
+            mes = message_child_factory::get(type, info);
         data_v[id] = {mes, info, 0, MESSAGE_FACTORY_TYPE::CHILD, type, parent, childs, true};
         if ((parent < data_v.size()) && (data_v[parent].d != nullptr))
             data_v[parent].childs.push_back(data_v.size() - 1);
@@ -244,13 +246,14 @@ namespace apl
         if (data_v[id].created)
         {
             delete data_v[id].d;
-            if (data_v[id].info != nullptr)
-                delete data_v[id].info;
+            for (sendable* i: data_v[id].info)
+                if (i != nullptr)
+                    delete i;
             data_v[id].childs.clear();
             data_v[id].created = false;
         }
         data_v[id].d = nullptr;
-        data_v[id].info = nullptr;
+        data_v[id].info.clear();
     }
 
     void memory_manager::delete_task(task_id id)
@@ -279,7 +282,7 @@ namespace apl
     void memory_manager::set_message_type(message_id id, message_type new_type)
     { data_v[id].type = new_type; }
 
-    void memory_manager::set_message_info(message_id id, sendable* info)
+    void memory_manager::set_message_info(message_id id, std::vector<sendable*>& info)
     { data_v[id].info = info; }
 
     void memory_manager::set_message_parent(message_id id, message_id new_parent)
@@ -324,7 +327,7 @@ namespace apl
     message_type memory_manager::get_message_type(message_id id)
     { return data_v[id].type; }
 
-    sendable* memory_manager::get_message_info(message_id id)
+    std::vector<sendable*>& memory_manager::get_message_info(message_id id)
     { return data_v[id].info; }
 
     message_id memory_manager::get_message_parent(message_id id)

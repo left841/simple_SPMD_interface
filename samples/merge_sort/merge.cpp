@@ -30,7 +30,7 @@ public:
         if (res)
             delete[] p;
     }
-    void send(const sender& se)
+    void send(const sender& se) const
     { se.isend(p, size_); }
 
     void recv(const receiver& re)

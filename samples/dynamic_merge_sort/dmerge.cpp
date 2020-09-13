@@ -7,35 +7,6 @@
 #include "parallel.h"
 using namespace apl;
 
-class time_cl: public message
-{
-public:
-    double time;
-
-    time_cl(): time(0.0)
-    { }
-
-    void send(const sender& se)
-    { se.send(&time); }
-
-    void recv(const receiver& re)
-    { re.recv(&time); }
-};
-
-struct array_size: public message
-{
-    size_t size;
-
-    array_size(size_t sz = 0): size(sz)
-    { }
-
-    void send(const sender& se)
-    { se.send(&size); }
-
-    void recv(const receiver& re)
-    { re.recv(&size); }
-};
-
 class array: public message
 {
 private:
@@ -44,50 +15,19 @@ private:
     bool res;
 public:
 
-    struct part_info: public sendable
+    array(const array& mes, const size_t& sz, const size_t& offset): size_(sz)
     {
-        size_t offset, size;
-
-        part_info(size_t off = 0, size_t sz = 0): offset(off), size(sz)
-        { }
-
-        void send(const sender& se)
-        {
-            se.send(&offset);
-            se.send(&size);
-        }
-
-        void recv(const receiver& re)
-        {
-            re.recv(&offset);
-            re.recv(&size);
-        }
-    };
-
-    array(size_t sz, int* pt = nullptr): size_(sz), p(pt)
-    {
-        if (p == nullptr)
-        {
-            p = new int[size_];
-            res = true;
-        }
-        else
-            res = false;
-    }
-
-    array(const array& mes, const part_info& pi): size_(pi.size)
-    {
-        p = mes.p + pi.offset;
+        p = mes.p + offset;
         res = false;
     }
 
-    array(const part_info& pi): size_(pi.size)
+    array(const size_t& sz, const size_t& offset): size_(sz)
     {
         p = new int[size_];
         res = true;
     }
 
-    array(const array_size sz): size_(sz.size)
+    array(const size_t sz): size_(sz)
     {
         p = new int[size_];
         res = true;
@@ -99,17 +39,17 @@ public:
             delete[] p;
     }
 
-    void include(const array& child, const part_info& pi)
+    void include(const array& child, const size_t& sz, const size_t& offset)
     {
         if (child.res)
         {
-            int* q = p + pi.offset;
+            int* q = p + offset;
             for (size_t i = 0; i < child.size_; ++i)
                 q[i] = child.p[i];
         }
     }
 
-    void send(const sender& se)
+    void send(const sender& se) const
     { se.isend(p, size_); }
 
     void recv(const receiver& re)
@@ -211,11 +151,11 @@ public:
         else
         {
             size_t half_size = in.size() / 2;
-            local_message_id in1 = create_message_child<array>(const_arg_id(0), new array::part_info(0, half_size));
-            local_message_id in2 = create_message_child<array>(const_arg_id(0), new array::part_info(half_size, in.size() - half_size));
+            local_message_id in1 = create_message_child<array>(const_arg_id(0), new size_t(half_size), new size_t(0));
+            local_message_id in2 = create_message_child<array>(const_arg_id(0), new size_t(in.size() - half_size), new size_t(half_size));
 
-            local_message_id out1 = create_message_child<array>(const_arg_id(1), new array::part_info(0, half_size));
-            local_message_id out2 = create_message_child<array>(const_arg_id(1), new array::part_info(half_size, out.size() - half_size));
+            local_message_id out1 = create_message_child<array>(const_arg_id(1), new size_t(half_size), new size_t(0));
+            local_message_id out2 = create_message_child<array>(const_arg_id(1), new size_t(out.size() - half_size), new size_t(half_size));
 
             local_task_id org1 = create_child_task<merge_organizer>({}, {out1, in1});
             local_task_id org2 = create_child_task<merge_organizer>({}, {out2, in2});
@@ -239,7 +179,7 @@ public:
 
     void perform()
     {
-        const time_cl& t = dynamic_cast<const time_cl&>(const_arg(0));
+        double t = dynamic_cast<const message_wrapper<double>&>(const_arg(0));
         array& a1 = dynamic_cast<array&>(arg(0));
         array& a2 = dynamic_cast<array&>(arg(1));
         double tm1 = MPI_Wtime();
@@ -255,7 +195,7 @@ public:
             std::cout << "correct\n";
         }
         gh:
-        std::cout << tm1 - t.time << std::endl;
+        std::cout << tm1 - t << std::endl;
     }
 };
 
@@ -272,19 +212,19 @@ public:
     {
         std::mt19937 mt(static_cast<int>(time(0)));
         std::uniform_int_distribution<int> uid(0, 10000);
-        time_cl& t = dynamic_cast<time_cl&>(arg(0));
-        const array_size& size = dynamic_cast<const array_size&>(const_arg(0));
+        double& t = dynamic_cast<message_wrapper<double>&>(arg(0));
+        size_t size = dynamic_cast<const message_wrapper<size_t>&>(const_arg(0));
         array& a1 = *new array(size);
         array& a2 = *new array(size);
         array& a3 = *new array(size);
 
         for (size_t i = 0; i < a1.size(); ++i)
             a1[i] = a2[i] = a3[i] = uid(mt);
-        t.time = MPI_Wtime();
+        t = MPI_Wtime();
 
-        local_message_id m_id1 = add_message_init(&a1, new array_size(size));
-        local_message_id m_id2 = add_message_init(&a2, new array_size(size));
-        local_message_id m_id3 = add_message_init(&a3, new array_size(size));
+        local_message_id m_id1 = add_message_init(&a1, new size_t(size));
+        local_message_id m_id2 = add_message_init(&a2, new size_t(size));
+        local_message_id m_id3 = add_message_init(&a3, new size_t(size));
 
         local_task_id merge = create_task<merge_organizer>({}, {m_id1, m_id3});
         local_task_id check = create_task<check_task>({m_id3, m_id2}, {arg_id(0)});
@@ -318,5 +258,5 @@ int main(int argc, char** argv)
     int comm_size = pz.get_proc_count();
     merge_organizer::pred = size / comm_size;
 
-    pz.execution(new init_task({new time_cl()}, {new array_size(size)}));
+    pz.execution(new init_task({new message_wrapper<double>(new double)}, {new message_wrapper<size_t>(new size_t(size))}));
 }

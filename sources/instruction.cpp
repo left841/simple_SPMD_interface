@@ -18,7 +18,7 @@ namespace apl
     instruction::~instruction()
     { }
 
-    void instruction::send(const sender& se)
+    void instruction::send(const sender& se) const
     {
         se.send(v.data(), static_cast<int>(v.size()));
     }

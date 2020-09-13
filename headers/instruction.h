@@ -181,7 +181,7 @@ namespace apl
         instruction();
         ~instruction();
 
-        void send(const sender& se);
+        void send(const sender& se) const;
         void recv(const receiver& re);
 
         size_t& operator[](size_t n);
