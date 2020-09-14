@@ -12,7 +12,7 @@ namespace apl
     INSTRUCTION instruction_block::command() const
     { return static_cast<INSTRUCTION>(ins[0]); }
 
-    instruction::instruction(): sendable()
+    instruction::instruction(): message()
     { }
 
     instruction::~instruction()

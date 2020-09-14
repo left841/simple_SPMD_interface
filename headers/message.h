@@ -10,7 +10,7 @@
 namespace apl
 {
 
-    class sendable
+    class message
     {
     private:
 
@@ -18,8 +18,8 @@ namespace apl
 
     public:
 
-        sendable();
-        virtual ~sendable();
+        message();
+        virtual ~message();
 
         virtual void send(const sender& se) const = 0;
         virtual void recv(const receiver& re) = 0;
@@ -30,24 +30,16 @@ namespace apl
     };
 
     template<>
-    void sender::send<sendable>(const sendable* buf, int size) const;
+    void sender::send<message>(const message* buf, int size) const;
 
     template<>
-    void sender::isend<sendable>(const sendable* buf, int size) const;
+    void sender::isend<message>(const message* buf, int size) const;
 
     template<>
-    void receiver::recv<sendable>(sendable* buf, int size) const;
+    void receiver::recv<message>(message* buf, int size) const;
 
     template<>
-    void receiver::irecv<sendable>(sendable* buf, int size) const;
-
-    class message: public sendable
-    {
-    public:
-
-        message();
-        virtual ~message();
-    };
+    void receiver::irecv<message>(message* buf, int size) const;
 
     template<typename Type>
     class message_wrapper: public message
@@ -65,6 +57,7 @@ namespace apl
         operator const Type&() const;
 
         Type* get();
+        const Type* get() const;
 
         void send(const sender& se) const;
         void recv(const receiver& re);
@@ -88,6 +81,10 @@ namespace apl
 
     template<typename Type>
     Type* message_wrapper<Type>::get()
+    { return value; }
+
+    template<typename Type>
+    const Type* message_wrapper<Type>::get() const
     { return value; }
 
     template<typename Type>

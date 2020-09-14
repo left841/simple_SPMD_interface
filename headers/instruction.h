@@ -145,7 +145,7 @@ namespace apl
         std::vector<task_id> added_tasks_child() const;
     };
 
-    class instruction: public sendable
+    class instruction: public message
     {
     private:
 

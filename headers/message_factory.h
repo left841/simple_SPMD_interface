@@ -78,20 +78,28 @@ namespace apl
 
 
     template<typename Type>
-    std::enable_if_t<std::is_base_of<sendable, Type>::value, sendable*> transform_to_sendable(Type* p)
+    std::enable_if_t<std::is_base_of<message, Type>::value, message*> transform_to_message(Type* p)
     { return p; }
 
     template<typename Type>
-    std::enable_if_t<!std::is_base_of<sendable, Type>::value, sendable*> transform_to_sendable(Type* p)
+    std::enable_if_t<!std::is_base_of<message, Type>::value, message*> transform_to_message(Type* p)
     { return new message_wrapper<Type>(p); }
 
     template<typename Type>
-    std::enable_if_t<std::is_base_of<sendable, Type>::value, Type*> transform_from_sendable(sendable* p)
+    std::enable_if_t<std::is_base_of<message, Type>::value, Type*> transform_from_message(message* p)
     { return dynamic_cast<Type*>(p); }
 
     template<typename Type>
-    std::enable_if_t<!std::is_base_of<sendable, Type>::value, Type*> transform_from_sendable(sendable* p)
+    std::enable_if_t<!std::is_base_of<message, Type>::value, Type*> transform_from_message(message* p)
     { return dynamic_cast<message_wrapper<Type>*>(p)->get(); }
+
+    template<typename Type>
+    std::enable_if_t<std::is_base_of<message, Type>::value, const Type*> transform_from_message(const message* p)
+    { return dynamic_cast<const Type*>(p); }
+
+    template<typename Type>
+    std::enable_if_t<!std::is_base_of<message, Type>::value, const Type*> transform_from_message(const message* p)
+    { return dynamic_cast<const message_wrapper<Type>*>(p)->get(); }
 
     template<size_t Pos, typename... Args>
     class tuple_processers
@@ -100,22 +108,22 @@ namespace apl
         typedef std::tuple_element_t<sizeof...(Args) - Pos, std::tuple<Args...>> arg_type;
 
     public:
-        static void create_vector_of_args(std::vector<sendable*>& v)
+        static void create_vector_of_args(std::vector<message*>& v)
         {
             arg_type* t = new arg_type();
-            v.push_back(transform_to_sendable(t));
+            v.push_back(transform_to_message(t));
             tuple_processers<Pos - 1, Args...>::create_vector_of_args(v);
         }
 
-        static void vector_to_ref_tuple(const std::vector<sendable*>& v, std::tuple<empty_ref_wrapper<Args>...>& t)
+        static void vector_to_ref_tuple(const std::vector<message*>& v, std::tuple<empty_ref_wrapper<Args>...>& t)
         {
-            std::get<sizeof...(Args) - Pos>(t).set(*transform_from_sendable<arg_type>(v.at(sizeof...(Args) - Pos)));
+            std::get<sizeof...(Args) - Pos>(t).set(*transform_from_message<arg_type>(v.at(sizeof...(Args) - Pos)));
             tuple_processers<Pos - 1, Args...>::vector_to_ref_tuple(v, t);
         }
 
-        static void create_vector_from_pointers(std::vector<sendable*>& v, const std::tuple<Args*...>& t)
+        static void create_vector_from_pointers(std::vector<message*>& v, const std::tuple<Args*...>& t)
         {
-            v.push_back(transform_to_sendable(std::get<sizeof...(Args) - Pos>(t)));
+            v.push_back(transform_to_message(std::get<sizeof...(Args) - Pos>(t)));
             tuple_processers<Pos - 1, Args...>::create_vector_from_pointers(v, t);
         }
     };
@@ -124,21 +132,20 @@ namespace apl
     class tuple_processers<0, Args...>
     {
     public:
-        static void create_vector_of_args(std::vector<sendable*>& v)
+        static void create_vector_of_args(std::vector<message*>& v)
         { }
 
-        static void vector_to_ref_tuple(const std::vector<sendable*>& v, std::tuple<empty_ref_wrapper<Args>...>& t)
+        static void vector_to_ref_tuple(const std::vector<message*>& v, std::tuple<empty_ref_wrapper<Args>...>& t)
         { }
 
-        static void create_vector_from_pointers(std::vector<sendable*>& v, const std::tuple<Args*...>& tp)
+        static void create_vector_from_pointers(std::vector<message*>& v, const std::tuple<Args*...>& tp)
         { }
     };
 
 
     enum class MESSAGE_FACTORY_TYPE: size_t
     {
-        UNDEFINED,
-        SIMPLE, COPY, INIT, CHILD, PART
+        UNDEFINED, INIT, CHILD
     };
 
     // init
@@ -153,8 +160,8 @@ namespace apl
             creator_base();
             virtual ~creator_base();
 
-            virtual message* get_message(const std::vector<sendable*>& info) = 0;
-            virtual std::vector<sendable*> get_info() = 0;
+            virtual message* get_message(const std::vector<message*>& info) = 0;
+            virtual std::vector<message*> get_info() = 0;
 
         };
 
@@ -177,8 +184,8 @@ namespace apl
             creator();
             ~creator();
 
-            message* get_message(const std::vector<sendable*>& info);
-            std::vector<sendable*> get_info();
+            message* get_message(const std::vector<message*>& info);
+            std::vector<message*> get_info();
 
             static message_type get_type();
 
@@ -193,8 +200,8 @@ namespace apl
 
     public:
 
-        static message* get(message_type id, const std::vector<sendable*>& info);
-        static std::vector<sendable*> get_info(message_type id);
+        static message* get(message_type id, const std::vector<message*>& info);
+        static std::vector<message*> get_info(message_type id);
 
         template<typename Type, typename... InfoTypes>
         static message_type get_type();
@@ -213,22 +220,22 @@ namespace apl
     { }
 
     template<typename Type, typename... InfoTypes>
-    message* message_init_factory::creator<Type, InfoTypes...>::get_message(const std::vector<sendable*>& info)
+    message* message_init_factory::creator<Type, InfoTypes...>::get_message(const std::vector<message*>& info)
     {
         message* p;
         std::tuple<empty_ref_wrapper<InfoTypes>...> tp;
         tuple_processers<sizeof...(InfoTypes), InfoTypes...>::vector_to_ref_tuple(info, tp);
         apply([&p](empty_ref_wrapper<InfoTypes>... args)->void
         {
-            p = new Type(static_cast<InfoTypes>(args)...);
+            p = transform_to_message(new Type(static_cast<InfoTypes>(args)...));
         }, tp);
         return p;
     }
 
     template<typename Type, typename... InfoTypes>
-    std::vector<sendable*> message_init_factory::creator<Type, InfoTypes...>::get_info()
+    std::vector<message*> message_init_factory::creator<Type, InfoTypes...>::get_info()
     {
-        std::vector<sendable*> v;
+        std::vector<message*> v;
         tuple_processers<sizeof...(InfoTypes), InfoTypes...>::create_vector_of_args(v);
         return v;
     }
@@ -263,10 +270,10 @@ namespace apl
             creator_base();
             virtual ~creator_base();
 
-            virtual message* get_message(const message& parent, const std::vector<sendable*>& info) = 0;
-            virtual message* get_message(const std::vector<sendable*>& info) = 0;
-            virtual std::vector<sendable*> get_info() = 0;
-            virtual void include(message& parent, const message& child, const std::vector<sendable*>& info) = 0;
+            virtual message* get_message(const message* parent, const std::vector<message*>& info) = 0;
+            virtual message* get_message(const std::vector<message*>& info) = 0;
+            virtual std::vector<message*> get_info() = 0;
+            virtual void include(message* parent, const message* child, const std::vector<message*>& info) = 0;
 
         };
 
@@ -289,10 +296,10 @@ namespace apl
             creator();
             ~creator();
 
-            message* get_message(const message& parent, const std::vector<sendable*>& info);
-            message* get_message(const std::vector<sendable*>& info);
-            std::vector<sendable*> get_info();
-            void include(message& parent, const message& child, const std::vector<sendable*>& info);
+            message* get_message(const message* parent, const std::vector<message*>& info);
+            message* get_message(const std::vector<message*>& info);
+            std::vector<message*> get_info();
+            void include(message* parent, const message* child, const std::vector<message*>& info);
 
             static message_type get_type();
 
@@ -307,10 +314,10 @@ namespace apl
 
     public:
 
-        static message* get(message_type id, const message& parent, const std::vector<sendable*>& info);
-        static message* get(message_type id, const std::vector<sendable*>& info);
-        static std::vector<sendable*> get_info(message_type id);
-        static void include(message_type id, message& parent, const message& child, const std::vector<sendable*>& info);
+        static message* get(message_type id, const message* parent, const std::vector<message*>& info);
+        static message* get(message_type id, const std::vector<message*>& info);
+        static std::vector<message*> get_info(message_type id);
+        static void include(message_type id, message* parent, const message* child, const std::vector<message*>& info);
 
         template<typename Type, typename ParentType, typename... InfoTypes>
         static message_type get_type();
@@ -330,47 +337,47 @@ namespace apl
     { }
 
     template<typename Type, typename ParentType, typename... InfoTypes>
-    message* message_child_factory::creator<Type, ParentType, InfoTypes...>::get_message(const message& parent, const std::vector<sendable*>& info)
+    message* message_child_factory::creator<Type, ParentType, InfoTypes...>::get_message(const message* parent, const std::vector<message*>& info)
     {
         message* p;
         std::tuple<empty_ref_wrapper<InfoTypes>...> tp;
         tuple_processers<sizeof...(InfoTypes), InfoTypes...>::vector_to_ref_tuple(info, tp);
         apply([&p, &parent](empty_ref_wrapper<InfoTypes>... args)->void
         {
-            p = new Type(reinterpret_cast<const ParentType&>(parent), static_cast<InfoTypes>(args)...);
+            p = transform_to_message(new Type(*transform_from_message<ParentType>(parent), static_cast<InfoTypes>(args)...));
         }, tp);
         return p;
     }
 
     template<typename Type, typename ParentType, typename... InfoTypes>
-    message* message_child_factory::creator<Type, ParentType, InfoTypes...>::get_message(const std::vector<sendable*>& info)
+    message* message_child_factory::creator<Type, ParentType, InfoTypes...>::get_message(const std::vector<message*>& info)
     {
         message* p;
         std::tuple<empty_ref_wrapper<InfoTypes>...> tp;
         tuple_processers<sizeof...(InfoTypes), InfoTypes...>::vector_to_ref_tuple(info, tp);
         apply([&p](empty_ref_wrapper<InfoTypes>... args)->void
         {
-            p = new Type(static_cast<InfoTypes>(args)...);
+            p = transform_to_message(new Type(static_cast<InfoTypes>(args)...));
         }, tp);
         return p;
     }
 
     template<typename Type, typename ParentType, typename... InfoTypes>
-    std::vector<sendable*> message_child_factory::creator<Type, ParentType, InfoTypes...>::get_info()
+    std::vector<message*> message_child_factory::creator<Type, ParentType, InfoTypes...>::get_info()
     {
-        std::vector<sendable*> v;
+        std::vector<message*> v;
         tuple_processers<sizeof...(InfoTypes), InfoTypes...>::create_vector_of_args(v);
         return v;
     }
 
     template<typename Type, typename ParentType, typename... InfoTypes>
-    void message_child_factory::creator<Type, ParentType, InfoTypes...>::include(message& parent, const message& child, const std::vector<sendable*>& info)
+    void message_child_factory::creator<Type, ParentType, InfoTypes...>::include(message* parent, const message* child, const std::vector<message*>& info)
     {
         std::tuple<empty_ref_wrapper<InfoTypes>...> tp;
         tuple_processers<sizeof...(InfoTypes), InfoTypes...>::vector_to_ref_tuple(info, tp);
         apply([&parent, &child](empty_ref_wrapper<InfoTypes>... args)->void
         {
-            reinterpret_cast<ParentType&>(parent).include(reinterpret_cast<const Type&>(child), static_cast<InfoTypes>(args)...);
+                (*transform_from_message<ParentType>(parent)).include(*transform_from_message<Type>(child), static_cast<InfoTypes>(args)...);
         }, tp);
     }
 

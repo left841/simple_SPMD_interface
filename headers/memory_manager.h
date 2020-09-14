@@ -17,7 +17,7 @@ namespace apl
         struct d_info
         {
             message* d;
-            std::vector<sendable*> info;
+            std::vector<message*> info;
             size_t version;
             MESSAGE_FACTORY_TYPE f_type;
             message_type type;
@@ -54,22 +54,22 @@ namespace apl
         message_id add_message(message* ptr);
         task_id add_task(task* ptr);
 
-        message_id add_message_init(message* ptr, message_type type, std::vector<sendable*>& info);
-        message_id add_message_child(message* ptr, message_type type, message_id parent, std::vector<sendable*>& info);
+        message_id add_message_init(message* ptr, message_type type, std::vector<message*>& info);
+        message_id add_message_child(message* ptr, message_type type, message_id parent, std::vector<message*>& info);
         task_id add_task(task* ptr, task_type type, std::vector<message_id> data, std::vector<message_id> const_data);
 
-        message_id create_message_init(message_type type, std::vector<sendable*>& info);
-        message_id create_message_child(message_type type, message_id parent, std::vector<sendable*>& info);
+        message_id create_message_init(message_type type, std::vector<message*>& info);
+        message_id create_message_child(message_type type, message_id parent, std::vector<message*>& info);
         task_id create_task(task_type type, std::vector<message_id> data, std::vector<message_id> const_data);
         void include_child_to_parent(message_id child);
         void include_child_to_parent_recursive(message_id child);
 
-        void add_message_init_with_id(message* ptr, message_id id, message_type type, std::vector<sendable*>& info);
-        void add_message_child_with_id(message* ptr, message_id id, message_type type, message_id parent, std::vector<sendable*>& info);
+        void add_message_init_with_id(message* ptr, message_id id, message_type type, std::vector<message*>& info);
+        void add_message_child_with_id(message* ptr, message_id id, message_type type, message_id parent, std::vector<message*>& info);
         void add_task_with_id(task* ptr, task_id id, task_type type, std::vector<message_id> data, std::vector<message_id> const_data);
 
-        void create_message_init_with_id(message_id id, message_type type, std::vector<sendable*>& info);
-        void create_message_child_with_id(message_id id, message_type type, message_id parent, std::vector<sendable*>& info);
+        void create_message_init_with_id(message_id id, message_type type, std::vector<message*>& info);
+        void create_message_child_with_id(message_id id, message_type type, message_id parent, std::vector<message*>& info);
         void create_task_with_id(task_id id, task_type type, std::vector<message_id> data, std::vector<message_id> const_data);
 
         void update_message_versions(task_id id);
@@ -79,7 +79,7 @@ namespace apl
 
         void set_message(message_id id, message* new_message);
         void set_message_type(message_id id, message_type new_type);
-        void set_message_info(message_id id, std::vector<sendable*>& info);
+        void set_message_info(message_id id, std::vector<message*>& info);
         void set_message_parent(message_id id, message_id new_parent);
         void set_message_version(message_id id, size_t new_version);
 
@@ -96,7 +96,7 @@ namespace apl
         message* get_message(message_id id);
         MESSAGE_FACTORY_TYPE get_message_factory_type(message_id id);
         message_type get_message_type(message_id id);
-        std::vector<sendable*>& get_message_info(message_id id);
+        std::vector<message*>& get_message_info(message_id id);
         message_id get_message_parent(message_id id);
         size_t get_message_version(message_id id);
 

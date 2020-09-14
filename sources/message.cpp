@@ -3,13 +3,13 @@
 namespace apl
 {
 
-    sendable::sendable()
+    message::message()
     { }
 
-    sendable::~sendable()
+    message::~message()
     { /*wait_requests();*/ }
 
-    void sendable::wait_requests()
+    void message::wait_requests()
     {
         while (req_q.size())
         {
@@ -19,37 +19,31 @@ namespace apl
     }
 
     template<>
-    void sender::send<sendable>(const sendable* buf, int size) const
+    void sender::send<message>(const message* buf, int size) const
     {
         for (size_t i = 0; i < size; ++i)
             (buf + i)->send(*this);
     }
 
     template<>
-    void sender::isend<sendable>(const sendable* buf, int size) const
+    void sender::isend<message>(const message* buf, int size) const
     {
         for (size_t i = 0; i < size; ++i)
             (buf + i)->send(*this);
     }
 
     template<>
-    void receiver::recv<sendable>(sendable* buf, int size) const
+    void receiver::recv<message>(message* buf, int size) const
     {
         for (size_t i = 0; i < size; ++i)
             (buf + i)->recv(*this);
     }
 
     template<>
-    void receiver::irecv<sendable>(sendable* buf, int size) const
+    void receiver::irecv<message>(message* buf, int size) const
     {
         for (size_t i = 0; i < size; ++i)
             (buf + i)->recv(*this);
     }
-
-    message::message(): sendable()
-    { }
-
-    message::~message()
-    { /*wait_requests();*/ }
 
 }

@@ -24,12 +24,12 @@ namespace apl
         intracomm(const intracomm& c, int color, int key);
         ~intracomm();
 
-        void send(sendable* mes, process proc);
-        void bsend(sendable* mes, process proc);
-        void ssend(sendable* mes, process proc);
-        void rsend(sendable* mes, process proc);
-        void recv(sendable* mes, process proc);
-        void bcast(sendable* mes, process proc);
+        void send(message* mes, process proc);
+        void bsend(message* mes, process proc);
+        void ssend(message* mes, process proc);
+        void rsend(message* mes, process proc);
+        void recv(message* mes, process proc);
+        void bcast(message* mes, process proc);
 
         void barrier();
         void abort(int err);
