@@ -3,6 +3,7 @@
 
 #include "message.h"
 #include <tuple>
+#include <memory>
 
 namespace apl
 {
@@ -12,7 +13,8 @@ namespace apl
     { };
 
     template<size_t Pos, size_t... Indexes>
-    struct make_index_sequence: make_index_sequence<Pos - 1, Pos - 1, Indexes...> {};
+    struct make_index_sequence: make_index_sequence<Pos - 1, Pos - 1, Indexes...>
+    { };
 
     template<size_t... Indexes>
     struct make_index_sequence<0, Indexes...>
@@ -20,21 +22,21 @@ namespace apl
         typedef index_sequence<Indexes...> type;
     };
 
-    template<size_t... Indexes, typename F, typename... Args>
-    auto apply_impl(index_sequence<Indexes...>, F&& f, const std::tuple<Args...>& args)
+    template<size_t... Indexes, typename Func, typename... Args>
+    auto apply_impl(index_sequence<Indexes...>, Func&& f, const std::tuple<Args...>& args)
     { return f(std::get<Indexes>(args)...); }
 
-    template<size_t... Indexes, typename F, typename... Args>
-    auto apply_impl(index_sequence<Indexes...>, F&& f, std::tuple<Args...>& args)
+    template<size_t... Indexes, typename Func, typename... Args>
+    auto apply_impl(index_sequence<Indexes...>, Func&& f, std::tuple<Args...>& args)
     { return f(std::get<Indexes>(args)...); }
 
-    template<typename F, typename... Args>
-    auto apply(F&& f, const std::tuple<Args...>& args)->typename std::result_of<F(Args...)>::type
-    { return apply_impl(typename make_index_sequence<sizeof...(Args)>::type(), std::forward<F>(f), args); }
+    template<typename Func, typename... Args>
+    auto apply(Func&& f, const std::tuple<Args...>& args)
+    { return apply_impl(typename make_index_sequence<sizeof...(Args)>::type(), std::forward<Func>(f), args); }
 
-    template<typename F, typename... Args>
-    auto apply(F&& f, std::tuple<Args...>& args)->typename std::result_of<F(Args...)>::type
-    { return apply_impl(typename make_index_sequence<sizeof...(Args)>::type(), std::forward<F>(f), args); }
+    template<typename Func, typename... Args>
+    auto apply(Func&& f, std::tuple<Args...>& args)
+    { return apply_impl(typename make_index_sequence<sizeof...(Args)>::type(), std::forward<Func>(f), args); }
 
     template<typename Type>
     class empty_ref_wrapper
@@ -48,6 +50,7 @@ namespace apl
         empty_ref_wrapper<Type>& operator=(const empty_ref_wrapper<Type>& src);
 
         operator Type&();
+        operator const Type&() const;
 
         void set(const Type& src);
 
@@ -70,6 +73,10 @@ namespace apl
 
     template<typename Type>
     empty_ref_wrapper<Type>::operator Type&()
+    { return *p; }
+
+    template<typename Type>
+    empty_ref_wrapper<Type>::operator const Type&() const
     { return *p; }
 
     template<typename Type>
@@ -101,6 +108,44 @@ namespace apl
     std::enable_if_t<!std::is_base_of<message, Type>::value, const Type*> transform_from_message(const message* p)
     { return dynamic_cast<const message_wrapper<Type>*>(p)->get(); }
 
+    template<typename Type>
+    std::enable_if_t<std::is_const<Type>::value, Type*> choose_vector(const std::vector<message*>& v, const std::vector<const message*>& cv, size_t& v_pos, size_t& cv_pos)
+    { 
+        cv_pos += 1;
+        return transform_from_message<std::remove_const<Type>::type>(cv.at(cv_pos - 1));
+    }
+
+    template<typename Type>
+    std::enable_if_t<!std::is_const<Type>::value, Type*> choose_vector(const std::vector<message*>& v, const std::vector<const message*>& cv, size_t& v_pos, size_t& cv_pos)
+    {
+        v_pos += 1;
+        return transform_from_message<Type>(v.at(v_pos - 1));
+    }
+
+    template<typename Type>
+    std::enable_if_t<std::is_const<Type>::value> choose_vector_to_push(mes_id<Type> m, std::vector<local_message_id>& v, std::vector<local_message_id>& cv)
+    { cv.push_back(m); }
+
+    template<typename Type>
+    std::enable_if_t<!std::is_const<Type>::value> choose_vector_to_push(mes_id<Type> m, std::vector<local_message_id>& v, std::vector<local_message_id>& cv)
+    { v.push_back(m); }
+
+    template<typename... Args>
+    std::vector<bool> get_const_map()
+    {
+        std::vector<bool> v(sizeof...(Args));
+        tuple_processers<sizeof...(Args), Args...>::get_const_map_impl(v);
+        return v;
+    }
+
+    template<typename Type>
+    std::enable_if_t<std::is_const<Type>::value, bool> mark_const_as_bool()
+    { return true; }
+
+    template<typename Type>
+    std::enable_if_t<!std::is_const<Type>::value, bool> mark_const_as_bool()
+    { return false; }
+
     template<size_t Pos, typename... Args>
     class tuple_processers
     {
@@ -121,10 +166,28 @@ namespace apl
             tuple_processers<Pos - 1, Args...>::vector_to_ref_tuple(v, t);
         }
 
+        static void two_vectors_to_ref_tuple(const std::vector<message*>& v, const std::vector<const message*>& cv, size_t& v_pos, size_t& cv_pos, std::tuple<empty_ref_wrapper<Args>...>& t)
+        {
+            std::get<sizeof...(Args) - Pos>(t).set(*choose_vector<arg_type>(v, cv, v_pos, cv_pos));
+            tuple_processers<Pos - 1, Args...>::two_vectors_to_ref_tuple(v, cv, v_pos, cv_pos, t);
+        }
+
         static void create_vector_from_pointers(std::vector<message*>& v, const std::tuple<Args*...>& t)
         {
             v.push_back(transform_to_message(std::get<sizeof...(Args) - Pos>(t)));
             tuple_processers<Pos - 1, Args...>::create_vector_from_pointers(v, t);
+        }
+
+        static void ids_to_two_vectors(std::vector<local_message_id>& v, std::vector<local_message_id>& cv, const std::tuple<mes_id<Args>...>& t)
+        {
+            choose_vector_to_push<arg_type>(std::get<sizeof...(Args) - Pos>(t), v, cv);
+            tuple_processers<Pos - 1, Args...>::ids_to_two_vectors(v, cv, t);
+        }
+
+        static void get_const_map_impl(std::vector<bool>& v)
+        {
+            v.at(sizeof...(Args) - Pos) = mark_const_as_bool<arg_type>();
+            tuple_processers<Pos - 1, Args...>::get_const_map_impl(v);
         }
     };
 
@@ -138,7 +201,16 @@ namespace apl
         static void vector_to_ref_tuple(const std::vector<message*>& v, std::tuple<empty_ref_wrapper<Args>...>& t)
         { }
 
+        static void two_vectors_to_ref_tuple(const std::vector<message*>& v, const std::vector<const message*>& cv, size_t& v_pos, size_t& cv_pos, std::tuple<empty_ref_wrapper<Args>...>& t)
+        { }
+
         static void create_vector_from_pointers(std::vector<message*>& v, const std::tuple<Args*...>& tp)
+        { }
+
+        static void ids_to_two_vectors(std::vector<local_message_id>& v, std::vector<local_message_id>& cv, const std::tuple<mes_id<Args>...>& t)
+        { }
+
+        static void get_const_map_impl(std::vector<bool>& v)
         { }
     };
 
@@ -193,10 +265,10 @@ namespace apl
         };
 
         message_init_factory() = delete;
-        static std::vector<creator_base*>& message_vec();
+        static std::vector<std::unique_ptr<creator_base>>& message_vec();
 
         template<typename Type, typename... InfoTypes>
-        static task_type add();
+        static message_type add();
 
     public:
 
@@ -250,7 +322,8 @@ namespace apl
     template<typename Type, typename... InfoTypes>
     message_type message_init_factory::add()
     {
-        message_vec().push_back(new creator<Type, InfoTypes...>());
+        std::unique_ptr<creator_base> p(new creator<Type, InfoTypes...>());
+        message_vec().push_back(std::move(p));
         return message_vec().size() - 1;
     }
 
@@ -307,7 +380,7 @@ namespace apl
         };
 
         message_child_factory() = delete;
-        static std::vector<creator_base*>& message_vec();
+        static std::vector<std::unique_ptr<creator_base>>& message_vec();
 
         template<typename Type, typename ParentType, typename... InfoTypes>
         static message_type add();
@@ -344,7 +417,7 @@ namespace apl
         tuple_processers<sizeof...(InfoTypes), InfoTypes...>::vector_to_ref_tuple(info, tp);
         apply([&p, &parent](empty_ref_wrapper<InfoTypes>... args)->void
         {
-            p = transform_to_message(new Type(*transform_from_message<ParentType>(parent), static_cast<InfoTypes>(args)...));
+            p = transform_to_message(new Type(*transform_from_message<ParentType>(parent), static_cast<InfoTypes&>(args)...));
         }, tp);
         return p;
     }
@@ -391,7 +464,8 @@ namespace apl
     template<typename Type, typename ParentType, typename... InfoTypes>
     message_type message_child_factory::add()
     {
-        message_vec().push_back(new creator<Type, ParentType, InfoTypes...>());
+        std::unique_ptr<creator_base> p(new creator<Type, ParentType, InfoTypes...>());
+        message_vec().push_back(std::move(p));
         return message_vec().size() - 1;
     }
 

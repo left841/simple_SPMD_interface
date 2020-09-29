@@ -25,22 +25,22 @@ namespace apl
         intracomm comm;
         intracomm instr_comm;
 
-        std::queue<task_id> ready_tasks;
+        std::queue<perform_id> ready_tasks;
         memory_manager memory;
 
         void master();
         void worker();
 
-        void send_task_data(task_id tid, process proc, instruction& ins, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con);
-        void assign_task(task_id tid, process proc, instruction& ins, std::vector<std::set<task_id>>& com);
+        void send_task_data(perform_id tid, process proc, instruction& ins, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con);
+        void assign_task(task_id tid, process proc, instruction& ins, std::vector<std::set<perform_id>>& com);
         void send_instruction(process proc, instruction& ins);
-        void end_main_task(task_id tid, task_environment& te, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<task_id>>& con_t);
-        void wait_task(process proc, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<task_id>>& con_t);
+        void end_main_task(perform_id tid, task_environment& te, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<perform_id>>& con_t);
+        void wait_task(process proc, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<perform_id>>& con_t);
 
 
-        void update_ready_tasks(task_id tid);
+        void update_ready_tasks(perform_id tid);
 
-        void execute_task(task_id id);
+        void execute_task(perform_id id);
 
         void clear();
 
@@ -59,8 +59,20 @@ namespace apl
 
         void execution();
         void execution(task_graph& _tg);
-        void execution(task* root);
+        template<class TaskType, class... InfoTypes, class... ArgTypes>
+        void execution(TaskType* root, std::tuple<InfoTypes*...> info, ArgTypes*... args);
     };
+
+    template<class TaskType, class... InfoTypes, class... ArgTypes>
+    void parallelizer::execution(TaskType* root, std::tuple<InfoTypes*...> info, ArgTypes*... args)
+    {
+        task_graph tg;
+        std::vector<message*> info_v, args_v;
+        tuple_processers<sizeof...(InfoTypes), InfoTypes...>::create_vector_from_pointers(info_v, info);
+        tuple_processers<sizeof...(ArgTypes), typename std::remove_const<ArgTypes>::type...>::create_vector_from_pointers(args_v, std::make_tuple(const_cast<typename std::remove_const<ArgTypes>::type*>(args)...));
+        tg.add_task(root, {message_init_factory::get_type<TaskType, InfoTypes...>(), task_factory::get_type<TaskType, ArgTypes...>()}, args_v, info_v);
+        execution(tg);
+    }
 
 }
 

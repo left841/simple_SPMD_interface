@@ -19,28 +19,28 @@ namespace apl
     }
 
     template<>
-    void sender::send<message>(const message* buf, int size) const
+    void sender::send<message>(const message* buf, size_t size) const
     {
         for (size_t i = 0; i < size; ++i)
             (buf + i)->send(*this);
     }
 
     template<>
-    void sender::isend<message>(const message* buf, int size) const
+    void sender::isend<message>(const message* buf, size_t size) const
     {
         for (size_t i = 0; i < size; ++i)
             (buf + i)->send(*this);
     }
 
     template<>
-    void receiver::recv<message>(message* buf, int size) const
+    void receiver::recv<message>(message* buf, size_t size) const
     {
         for (size_t i = 0; i < size; ++i)
             (buf + i)->recv(*this);
     }
 
     template<>
-    void receiver::irecv<message>(message* buf, int size) const
+    void receiver::irecv<message>(message* buf, size_t size) const
     {
         for (size_t i = 0; i < size; ++i)
             (buf + i)->recv(*this);

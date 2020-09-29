@@ -54,14 +54,8 @@ class merge_task: public task
 public:
     merge_task(): task()
     { }
-    merge_task(const std::vector<message*> vm, const std::vector<const message*> cvm): task(vm, cvm)
-    { }
-    void perform()
+    void operator()(const array& s1, const array& s2, array& out)
     {
-        const array& s1 = dynamic_cast<const array&>(const_arg(0));
-        const array& s2 = dynamic_cast<const array&>(const_arg(1));
-        array& out = dynamic_cast<array&>(arg(0));
-
         size_t first = 0, second = 0;
         for (size_t i = 0; i < out.size(); ++i)
         {
@@ -73,16 +67,6 @@ public:
                 out[i] = s1[first++];
         }
     }
-
-    array* get_out()
-    { return (array*)&arg(0); }
-
-    array* get_first()
-    { return (array*)&const_arg(0); }
-
-    array* get_second()
-    { return (array*)&const_arg(1); }
-
 };
 
 class merge_all_task: public task
@@ -90,13 +74,9 @@ class merge_all_task: public task
 public:
     merge_all_task(): task()
     { }
-    merge_all_task(const std::vector<message*> vm): task(vm)
-    { }
-    void perform()
+    void operator()(array& s1, array& s2)
     {
-        array& s1 = dynamic_cast<array&>(arg(0));
-        array& s2 = dynamic_cast<array&>(arg(1));
-        for (int i = 0; i < s1.size(); ++i)
+        for (size_t i = 0; i < s1.size(); ++i)
             s2[i] = s1[i];
         merge_it(&s1[0], &s2[0], s1.size()/2, s1.size());
     }
@@ -170,7 +150,8 @@ int main(int argc, char** argv)
         layers = i;
     }
 
-    std::vector<message*> fin;
+    std::vector<message*> fin, tmp;
+    std::vector<std::vector<message*>> args, args2;
     std::vector<task*> v1, v2;
     if (layers != 0)
     {
@@ -179,55 +160,66 @@ int main(int argc, char** argv)
         array* arr1 = new array(size / 2, p2);
         array* arr2 = new array(size - size / 2, p2 + size / 2);
         array* arr_p1 = new array(size, p1);
-        v2.push_back(new merge_task({arr_p1}, {arr1, arr2}));
+
+        v2.push_back(new merge_task());
+        args.push_back({arr1, arr2, arr_p1});
+
+        tg.add_task(v2.back(), {message_init_factory::get_type<merge_task>(), task_factory::get_type<merge_task, const array, const array, array>()}, args.back(), {});
+
         fin.push_back(arr_p1);
         for (size_t i = 1; i < layers; ++i)
         {
             size_t q = 1ull << i;
             v1.resize(q);
+            args2.resize(q);
             for (size_t j = 0; j < q; ++j)
             {
-                array* me;
                 int* ptr;
                 if (j%2)
                 {
-                    me = &((array&)((merge_task*)v2[j/2])->const_arg(1));
-                    ptr = ((merge_task*)v2[j/2])->get_out()->data() + ((merge_task*)v2[j/2])->get_first()->size();
+                    arr_p1 = (array*)args[j / 2][1];
+                    ptr = ((array*)args[j / 2][2])->data() + ((array*)args[j / 2][0])->size();
                 }
                 else
                 {
-                    me = ((merge_task*)v2[j/2])->get_first();
-                    ptr = ((merge_task*)v2[j/2])->get_out()->data();
+                    arr_p1 = (array*)args[j / 2][0];
+                    ptr = ((array*)args[j / 2][2])->data();
                 }
 
-                arr1 = new array(me->size() / 2, ptr);
+                arr1 = new array(arr_p1->size() / 2, ptr);
 
-                arr2 = new array(me->size() - me->size() / 2, ptr + me->size() / 2);
-                arr_p1 = me;
+                arr2 = new array(arr_p1->size() - arr_p1->size() / 2, ptr + arr_p1->size() / 2);
 
-                v1[j] = new merge_task({arr_p1}, {arr1, arr2});
+                v1[j] = new merge_task();
+                args2[j] = {arr1, arr2, arr_p1};
+                tg.add_task(v1[j], {message_init_factory::get_type<merge_task>(), task_factory::get_type<merge_task, const array, const array, array>()}, args2[j], {});
 
                 tg.add_dependence(v1[j], v2[j/2]);
             }
             swap(v1, v2);
+            swap(args, args2);
         }
 
         for (size_t i = 0; i < v2.size(); ++i)
         {
-            arr1 = new array(((merge_task*)v2[i])->get_first()->size(), ((merge_task*)v2[i])->get_out()->data());
-            arr2 = ((merge_task*)v2[i])->get_first();
-            tg.add_dependence(new merge_all_task({arr1, arr2}), v2[i]);
-            arr1 = new array(((merge_task*)v2[i])->get_second()->size(), ((merge_task*)v2[i])->get_out()->data()
-                + ((merge_task*)v2[i])->get_first()->size());
-            arr2 = ((merge_task*)v2[i])->get_second();
-            tg.add_dependence(new merge_all_task({arr1, arr2}), v2[i]);
+            arr1 = new array(((array*)args[i][0])->size(), ((array*)args[i][2])->data());
+            arr2 = ((array*)args[i][0]);
+            task* tt = new merge_all_task();
+            tg.add_task(tt, {message_init_factory::get_type<merge_all_task>(), task_factory::get_type<merge_all_task, array, array>()}, {arr1, arr2}, {});
+            tg.add_dependence(tt, v2[i]);
+
+            arr1 = new array(((array*)args[i][1])->size(), ((array*)args[i][2])->data() + ((array*)args[i][0])->size());
+            arr2 = ((array*)args[i][1]);
+            tt = new merge_all_task();
+            tg.add_task(tt, {message_init_factory::get_type<merge_all_task>(), task_factory::get_type<merge_all_task, array, array>()}, {arr1, arr2}, {});
+            tg.add_dependence(tt, v2[i]);
         }
     }
     else
     {
         array* arr1 = new array(size, p1);
         array* arr2 = new array(size, p2);
-        tg.add_task(new merge_all_task({arr1, arr2}));
+        tg.add_task(new merge_all_task(), {message_init_factory::get_type<merge_all_task>(), task_factory::get_type<merge_all_task, array, array>()}, {arr1, arr2}, {});
         std::swap(p1, p2);
         fin.push_back(arr1);
         fin.push_back(arr2);

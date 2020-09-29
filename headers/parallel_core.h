@@ -1,6 +1,7 @@
 #ifndef __PARALLEL_CORE_H__
 #define __PARALLEL_CORE_H__
 
+#include <vector>
 #include "mpi.h"
 
 namespace apl
@@ -11,6 +12,7 @@ namespace apl
     private:
 
         static double start_time;
+        static std::vector<MPI_Datatype> created_datatypes;
 
     public:
 
@@ -19,6 +21,8 @@ namespace apl
 
         void init_library(int* argc, char*** argv);
         void finalize_library();
+
+        static void add_datatype(MPI_Datatype dt);
 
         static double get_start_time();
     };

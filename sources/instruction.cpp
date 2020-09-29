@@ -216,15 +216,16 @@ namespace apl
     { }
 
     size_t instruction_task_execute::size() const
-    { return 2; }
+    { return 3; }
 
     task_id instruction_task_execute::id() const
-    { return static_cast<task_id>(ins[1]); }
+    { return {ins[1], ins[2]}; }
 
     void instruction::add_task_execution(task_id id)
     {
         add_cmd(INSTRUCTION::TASK_EXE);
-        v.push_back(id);
+        v.push_back(id.mi);
+        v.push_back(id.pi);
     }
 
     // TASK_CREATE
@@ -233,37 +234,39 @@ namespace apl
 
     size_t instruction_task_create::size() const
     {
-        size_t n = ins[3];
-        return 5 + n + ins[4 + n];
+        size_t n = ins[5];
+        return 7 + n + ins[6 + n];
     }
 
     task_id instruction_task_create::id() const
-    { return static_cast<task_id>(ins[1]); }
+    { return {ins[1], ins[2]}; }
 
-    size_t instruction_task_create::type() const
-    { return ins[2]; }
+    task_type instruction_task_create::type() const
+    { return {ins[3], ins[4]}; }
 
     std::vector<message_id> instruction_task_create::data() const
     {
-        std::vector<message_id> v(ins[3]);
+        std::vector<message_id> v(ins[5]);
         for (size_t i = 0; i < v.size(); ++i)
-            v[i] = ins[4 + i];
+            v[i] = ins[6 + i];
         return v;
     }
 
     std::vector<message_id> instruction_task_create::const_data() const
     {
-        std::vector<message_id> v(ins[4 + ins[3]]);
+        std::vector<message_id> v(ins[6 + ins[5]]);
         for (size_t i = 0; i < v.size(); ++i)
-            v[i] = ins[5 + ins[3] + i];
+            v[i] = ins[7 + ins[5] + i];
         return v;
     }
 
     void instruction::add_task_creation(task_id id, task_type type, std::vector<message_id> data, std::vector<message_id> c_data)
     {
         add_cmd(INSTRUCTION::TASK_CREATE);
-        v.push_back(id);
-        v.push_back(type);
+        v.push_back(id.mi);
+        v.push_back(id.pi);
+        v.push_back(type.mt);
+        v.push_back(type.pt);
         v.push_back(data.size());
         for (message_id i: data)
             v.push_back(i);
@@ -277,15 +280,16 @@ namespace apl
     { }
 
     size_t instruction_task_result::size() const
-    { return 2; }
+    { return 3; }
 
     task_id instruction_task_result::id() const
-    { return static_cast<task_id>(ins[1]); }
+    { return {ins[1], ins[2]}; }
 
     void instruction::add_task_result(task_id id)
     {
         add_cmd(INSTRUCTION::TASK_RES);
-        v.push_back(id);
+        v.push_back(id.mi);
+        v.push_back(id.pi);
     }
 
     // ADD_RES_TO_MEMORY
@@ -294,12 +298,10 @@ namespace apl
         offsets[0] = 1;
         offsets[1] = offsets[0] + ins[offsets[0]] + 1;
         offsets[2] = offsets[1] + ins[offsets[1]] + 1;
-        offsets[3] = offsets[2] + ins[offsets[2]] + 1;
-        offsets[4] = offsets[3] + ins[offsets[3]] + 1;
     }
 
     size_t instruction_add_result_to_memory::size() const
-    { return offsets[4]; }
+    { return offsets[2]; }
 
     std::vector<message_id> instruction_add_result_to_memory::added_messages_init() const
     {
@@ -321,27 +323,7 @@ namespace apl
         return v;
     }
 
-    std::vector<task_id> instruction_add_result_to_memory::added_tasks_simple() const
-    {
-        size_t pos = offsets[2];
-        std::vector<task_id> v = read_vector<task_id>(pos, [this](size_t& p)->task_id
-        {
-            return ins[p++];
-        });
-        return v;
-    }
-
-    std::vector<task_id> instruction_add_result_to_memory::added_tasks_child() const
-    {
-        size_t pos = offsets[3];
-        std::vector<task_id> v = read_vector<task_id>(pos, [this](size_t& p)->task_id
-        {
-            return ins[p++];
-        });
-        return v;
-    }
-
-    void instruction::add_add_result_to_memory(const std::vector<message_id>& mes, const std::vector<message_id>& mes_c, const std::vector<task_id>& tasks, const std::vector<task_id>& tasks_c)
+    void instruction::add_add_result_to_memory(const std::vector<message_id>& mes, const std::vector<message_id>& mes_c)
     {
         add_cmd(INSTRUCTION::ADD_RES_TO_MEMORY);
         v.push_back(mes.size());
@@ -349,12 +331,6 @@ namespace apl
             v.push_back(i);
         v.push_back(mes_c.size());
         for (message_id i: mes_c)
-            v.push_back(i);
-        v.push_back(tasks.size());
-        for (task_id i: tasks)
-            v.push_back(i);
-        v.push_back(tasks_c.size());
-        for (task_id i: tasks_c)
             v.push_back(i);
     }
 

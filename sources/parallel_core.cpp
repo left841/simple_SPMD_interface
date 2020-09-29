@@ -5,6 +5,8 @@ namespace apl
 
     double parallel_engine::start_time;
 
+    std::vector<MPI_Datatype> parallel_engine::created_datatypes;
+
     parallel_engine::parallel_engine(int* argc, char*** argv)
     {
         init_library(argc, argv);
@@ -31,7 +33,16 @@ namespace apl
         int flag;
         MPI_Initialized(&flag);
         if (flag)
+        {
+            for (MPI_Datatype& t: created_datatypes)
+                MPI_Type_free(&t);
             MPI_Finalize();
+        }
+    }
+
+    void parallel_engine::add_datatype(MPI_Datatype dt)
+    {
+        created_datatypes.push_back(dt);
     }
 
     double parallel_engine::get_start_time()

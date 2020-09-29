@@ -69,13 +69,10 @@ class merge_all_task: public task
 {
 public:
 
-    merge_all_task(const std::vector<message*> vm, const std::vector<const message*> cvm): task(vm, cvm)
+    merge_all_task(): task()
     { }
-    void perform()
+    void operator()(array& s1, array& s2)
     {
-        array& s1 = dynamic_cast<array&>(arg(0));
-        array& s2 = dynamic_cast<array&>(arg(1));
-
         for (size_t i = 0; i < s1.size(); ++i)
             s2[i] = s1[i];
         merge_it(&s1[0], &s2[0], s1.size() / 2, s1.size());
@@ -110,13 +107,11 @@ class merge_task: public task
 {
 public:
 
-    merge_task(const std::vector<message*> vm, const std::vector<const message*> cvm): task(vm, cvm)
+    merge_task(): task()
     { }
 
-    void perform()
+    void operator()(const array& src, array& out)
     {
-        const array& src = dynamic_cast<const array&>(const_arg(0));
-        array& out = dynamic_cast<array&>(arg(0));
         size_t h_size = src.size() / 2;
         size_t first = 0, second = h_size;
 
@@ -136,30 +131,27 @@ class merge_organizer: public task
 {
 public:
 
-    static size_t pred;
+    size_t depth;
 
-    merge_organizer(const std::vector<message*> vm, const std::vector<const message*> cvm): task(vm, cvm)
+    merge_organizer(size_t d): task(), depth(d)
     { }
 
-    void perform()
+    void operator()(const array& in, const array& out)
     {
-        const array& in = dynamic_cast<const array&>(const_arg(0));
-        const array& out = dynamic_cast<const array&>(const_arg(1));
-
-        if (in.size() <= pred)
-            create_child_task<merge_all_task>({const_arg_id(0), const_arg_id(1)}, {});
+        if (depth >= working_processes())
+            create_child_task<merge_all_task>(std::make_tuple(arg_id<0, array>(), arg_id<1, array>()));
         else
         {
             size_t half_size = in.size() / 2;
-            local_message_id in1 = create_message_child<array>(const_arg_id(0), new size_t(half_size), new size_t(0));
-            local_message_id in2 = create_message_child<array>(const_arg_id(0), new size_t(in.size() - half_size), new size_t(half_size));
+            mes_id<array> in1 = create_message_child<array>(arg_id<0, array>(), new size_t(half_size), new size_t(0));
+            mes_id<array> in2 = create_message_child<array>(arg_id<0, array>(), new size_t(in.size() - half_size), new size_t(half_size));
 
-            local_message_id out1 = create_message_child<array>(const_arg_id(1), new size_t(half_size), new size_t(0));
-            local_message_id out2 = create_message_child<array>(const_arg_id(1), new size_t(out.size() - half_size), new size_t(half_size));
+            mes_id<array> out1 = create_message_child<array>(arg_id<1, array>(), new size_t(half_size), new size_t(0));
+            mes_id<array> out2 = create_message_child<array>(arg_id<1, array>(), new size_t(out.size() - half_size), new size_t(half_size));
 
-            local_task_id org1 = create_child_task<merge_organizer>({}, {out1, in1});
-            local_task_id org2 = create_child_task<merge_organizer>({}, {out2, in2});
-            local_task_id mer = create_child_task<merge_task>({const_arg_id(1)}, {const_arg_id(0)});
+            local_task_id org1 = create_child_task<merge_organizer>(std::make_tuple(out1.as_const(), in1.as_const()), new size_t(depth << 1));
+            local_task_id org2 = create_child_task<merge_organizer>(std::make_tuple(out2.as_const(), in2.as_const()), new size_t(depth << 1));
+            local_task_id mer = create_child_task<merge_task>(std::make_tuple(arg_id<0, array>().as_const(), arg_id<1, array>()));
 
             add_dependence(org1, mer);
             add_dependence(org2, mer);
@@ -167,21 +159,16 @@ public:
     }
 };
 
-size_t merge_organizer::pred = 1000;
-
 class check_task: public task
 {
 public:
     static bool checking;
 
-    check_task(const std::vector<message*>& mes_v, const std::vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
+    check_task(): task()
     { }
 
-    void perform()
+    void operator()(array& a1, array& a2, double t)
     {
-        double t = dynamic_cast<const message_wrapper<double>&>(const_arg(0));
-        array& a1 = dynamic_cast<array&>(arg(0));
-        array& a2 = dynamic_cast<array&>(arg(1));
         double tm1 = MPI_Wtime();
         if (checking)
         {
@@ -205,15 +192,14 @@ class init_task: public task
 {
 public:
 
-    init_task(const std::vector<message*>& mes_v, const std::vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
+    init_task(): task()
     { }
 
-    void perform()
+    void operator()(double& t, size_t size)
     {
         std::mt19937 mt(static_cast<int>(time(0)));
         std::uniform_int_distribution<int> uid(0, 10000);
-        double& t = dynamic_cast<message_wrapper<double>&>(arg(0));
-        size_t size = dynamic_cast<const message_wrapper<size_t>&>(const_arg(0));
+
         array& a1 = *new array(size);
         array& a2 = *new array(size);
         array& a3 = *new array(size);
@@ -222,12 +208,12 @@ public:
             a1[i] = a2[i] = a3[i] = uid(mt);
         t = MPI_Wtime();
 
-        local_message_id m_id1 = add_message_init(&a1, new size_t(size));
-        local_message_id m_id2 = add_message_init(&a2, new size_t(size));
-        local_message_id m_id3 = add_message_init(&a3, new size_t(size));
+        mes_id<array> m_id1 = add_message(&a1, new size_t(size));
+        mes_id<array> m_id2 = add_message(&a2, new size_t(size));
+        mes_id<array> m_id3 = add_message(&a3, new size_t(size));
 
-        local_task_id merge = create_task<merge_organizer>({}, {m_id1, m_id3});
-        local_task_id check = create_task<check_task>({m_id3, m_id2}, {arg_id(0)});
+        local_task_id merge = create_task<merge_organizer>(std::make_tuple(m_id1.as_const(), m_id3.as_const()), new size_t(1));
+        local_task_id check = create_task<check_task>(std::make_tuple(m_id3, m_id2, arg_id<0, double>().as_const()));
 
         add_dependence(merge, check);
     }
@@ -243,10 +229,6 @@ int main(int argc, char** argv)
         {
             size = atoll(argv[++i]);
         }
-        else if ((strcmp(argv[i], "-l") == 0) || (strcmp(argv[i], "-limit") == 0))
-        {
-            merge_organizer::pred = atoll(argv[++i]);
-        }
         else if (strcmp(argv[i], "-check") == 0)
         {
             check_task::checking = true;
@@ -255,8 +237,5 @@ int main(int argc, char** argv)
 
     parallelizer pz;
 
-    int comm_size = pz.get_proc_count();
-    merge_organizer::pred = size / comm_size;
-
-    pz.execution(new init_task({new message_wrapper<double>(new double)}, {new message_wrapper<size_t>(new size_t(size))}));
+    pz.execution(new init_task(), std::make_tuple(), new double(0), const_cast<const size_t*>(new size_t(size)));
 }

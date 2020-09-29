@@ -134,15 +134,13 @@ namespace apl
     class instruction_add_result_to_memory: public instruction_block
     {
     private:
-        std::array<size_t, 5> offsets;
+        std::array<size_t, 3> offsets;
     public:
         instruction_add_result_to_memory(const size_t* const p);
 
         size_t size() const;
         std::vector<message_id> added_messages_init() const;
         std::vector<message_id> added_messages_child() const;
-        std::vector<task_id> added_tasks_simple() const;
-        std::vector<task_id> added_tasks_child() const;
     };
 
     class instruction: public message
@@ -199,7 +197,7 @@ namespace apl
         void add_task_execution(task_id id);
         void add_task_creation(task_id id, task_type type, std::vector<message_id> data, std::vector<message_id> c_data);
         void add_task_result(task_id id);
-        void add_add_result_to_memory(const std::vector<message_id>& mes, const std::vector<message_id>& mes_c, const std::vector<task_id>& tasks, const std::vector<task_id>& tasks_c);
+        void add_add_result_to_memory(const std::vector<message_id>& mes, const std::vector<message_id>& mes_c);
 
         const_iterator begin() const;
         const_iterator end() const;

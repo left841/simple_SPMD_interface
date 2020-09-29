@@ -63,15 +63,11 @@ public:
 class vector_sum: public task
 {
 public:
-    vector_sum(std::vector<message*> mes_v, std::vector<const message*> const_mes_v): task(mes_v, const_mes_v)
+    vector_sum(): task()
     { }
 
-    void perform()
+    void operator()(const my_vector& first, const my_vector& second, my_vector& output)
     {
-        const my_vector& first = dynamic_cast<const my_vector&>(const_arg(0));
-        const my_vector& second = dynamic_cast<const my_vector&>(const_arg(1));
-        my_vector& output = dynamic_cast<my_vector&>(arg(0));
-
         for (size_t i = 0; i < output.size(); ++i)
             output[i] = first[i] + second[i];
     }
@@ -80,15 +76,11 @@ public:
 class end_task: public task
 {
 public:
-    end_task(std::vector<message*> mes_v, std::vector<const message*> const_mes_v): task(mes_v, const_mes_v)
+    end_task(): task()
     { }
 
-    void perform()
+    void operator()(const my_vector& first, const my_vector& second, const my_vector& output)
     {
-        const my_vector& first = dynamic_cast<const my_vector&>(const_arg(0));
-        const my_vector& second = dynamic_cast<const my_vector&>(const_arg(1));
-        const my_vector& output = dynamic_cast<const my_vector&>(const_arg(2));
-
         my_vector check(output.size());
 
         for (size_t i = 0; i < check.size(); ++i)
@@ -107,13 +99,11 @@ public:
 class vector_sum_init: public task
 {
 public:
-    vector_sum_init(std::vector<message*> mes_v, std::vector<const message*> const_mes_v): task(mes_v, const_mes_v)
+    vector_sum_init(): task()
     { }
 
-    void perform()
+    void operator()(size_t size)
     {
-        size_t size = dynamic_cast<const message_wrapper<size_t>&>(const_arg(0));
-
         my_vector& first = *new my_vector(size);
         my_vector& second = *new my_vector(size);
 
@@ -124,25 +114,25 @@ public:
         for (size_t i = 0; i < second.size(); ++i)
             second[i] = uid(mt);
 
-        local_message_id first_id = add_message_init(&first, new size_t(size));
-        local_message_id second_id = add_message_init(&second, new size_t(size));
-        local_message_id output_id = create_message_init<my_vector>(new size_t(size));
+        mes_id<my_vector> first_id = add_message(&first, new size_t(size));
+        mes_id<my_vector> second_id = add_message(&second, new size_t(size));
+        mes_id<my_vector> output_id = create_message<my_vector>(new size_t(size));
 
-        int offset = 0;
+        size_t offset = 0;
         for (int i = 0; i < working_processes(); ++i)
         {
-            int new_size = size / working_processes() + ((size % working_processes() > i) ? 1 : 0);
+            size_t new_size = size / working_processes() + ((size % working_processes() > i) ? 1 : 0);
 
-            local_message_id first_child = create_message_child<my_vector>(first_id, new size_t(new_size), new size_t(offset));
-            local_message_id second_child = create_message_child<my_vector>(second_id, new size_t(new_size), new size_t(offset));
-            local_message_id output_child = create_message_child<my_vector>(output_id, new size_t(new_size), new size_t(offset));
+            mes_id<my_vector> first_child = create_message_child<my_vector>(first_id, new size_t(new_size), new size_t(offset));
+            mes_id<my_vector> second_child = create_message_child<my_vector>(second_id, new size_t(new_size), new size_t(offset));
+            mes_id<my_vector> output_child = create_message_child<my_vector>(output_id, new size_t(new_size), new size_t(offset));
 
-            create_child_task<vector_sum>({output_child}, {first_child, second_child});
+            create_child_task<vector_sum>(std::make_tuple(first_child.as_const(), second_child.as_const(), output_child));
 
             offset += new_size;
         }
 
-        add_dependence(this_task_id(), create_task<end_task>({}, {first_id, second_id, output_id}));
+        add_dependence(this_task_id<vector_sum_init>(), create_task<end_task>(std::make_tuple(first_id.as_const(), second_id.as_const(), output_id.as_const())));
     }
 };
 
@@ -152,7 +142,7 @@ int main(int argc, char** argv)
 
     parallelizer pz;
 
-    vector_sum_init vsi_task({}, {new message_wrapper<size_t>(new size_t(10000000))});
+    vector_sum_init vsi_task;
 
-    pz.execution(&vsi_task);
+    pz.execution(&vsi_task, std::make_tuple(), const_cast<const size_t*>(new size_t(10000000)));
 }

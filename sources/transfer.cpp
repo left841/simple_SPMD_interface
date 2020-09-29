@@ -3,305 +3,601 @@
 namespace apl
 {
 
-    sender::sender(): tag(0)
+    simple_datatype::simple_datatype(MPI_Datatype t): type(t)
+    {
+        MPI_Aint lb, extent;
+        MPI_Type_get_extent(t, &lb, &extent);
+        size_in_bytes = extent - lb;
+    }
+
+    simple_datatype::simple_datatype(std::vector<MPI_Datatype> types, std::vector<size_t> offsets)
+    {
+        std::vector<int> block_legth(types.size());
+        for (size_t i = 0; i < types.size(); ++i)
+            block_legth[i] = 1;
+        std::vector<MPI_Aint> mpi_offsets(offsets.size());
+        for (size_t i = 0; i < offsets.size(); ++i)
+            mpi_offsets[i] = offsets[i];
+        MPI_Type_create_struct(static_cast<int>(types.size()), block_legth.data(), mpi_offsets.data(), types.data(), &type);
+        MPI_Type_commit(&type);
+        MPI_Aint lb, extent;
+        MPI_Type_get_extent(type, &lb, &extent);
+        size_in_bytes = extent - lb;
+        parallel_engine::add_datatype(type);
+    }
+
+    const simple_datatype& byte_datatype()
+    {
+        static simple_datatype d(MPI_BYTE);
+        return d;
+    }
+
+    sender::sender()
     { }
 
     sender::~sender()
     { }
 
-    void sender::send_bytes(const void* buf, int count) const
-    { send(buf, count, MPI_BYTE); }
+    void sender::send(const void* buf, size_t size, simple_datatype type) const
+    {
+        if (size * type.size_in_bytes > INT_MAX)
+        {
+            send_impl(&size, 1, datatype<size_t>(), TAG::SIZE);
+            size_t part = INT_MAX / type.size_in_bytes;
+            while (size * type.size_in_bytes > INT_MAX)
+            {
+                send_impl(buf, part, type, TAG::MAIN);
+                buf = reinterpret_cast<void*>(reinterpret_cast<size_t>(buf) + part * type.size_in_bytes);
+                size -= part;
+            }
+        }
+        send_impl(buf, size, type, TAG::MAIN);
+    }
 
-    void sender::isend_bytes(const void* buf, int count) const
-    { isend(buf, count, MPI_BYTE); }
+    void sender::isend(const void* buf, size_t size, simple_datatype type) const
+    {
+        if (size * type.size_in_bytes > INT_MAX)
+        {
+            send_impl(&size, 1, datatype<size_t>(), TAG::SIZE);
+            size_t part = INT_MAX / type.size_in_bytes;
+            while (size * type.size_in_bytes > INT_MAX)
+            {
+                store_request(isend_impl(buf, part, type, TAG::MAIN));
+                buf = reinterpret_cast<void*>(reinterpret_cast<size_t>(buf) + part * type.size_in_bytes);
+                size -= part;
+            }
+        }
+        store_request(isend_impl(buf, size, type, TAG::MAIN));
+    }
 
-    receiver::receiver(): tag(0)
+    void sender::send_bytes(const void* buf, size_t count) const
+    { send(buf, count, byte_datatype()); }
+
+    void sender::isend_bytes(const void* buf, size_t count) const
+    { isend(buf, count, byte_datatype()); }
+
+    receiver::receiver(): probe_flag(false)
     { }
 
     receiver::~receiver()
     { }
 
-    void receiver::recv_bytes(void* buf, int count) const
-    { recv(buf, count, MPI_BYTE); }
+    void receiver::recv(void* buf, size_t size, simple_datatype type) const
+    {
+        if (size * type.size_in_bytes > INT_MAX)
+        {
+            if (probe_flag)
+            {
+                (void)recv_impl(&size, 1, datatype<size_t>(), TAG::SIZE);
+                probe_flag = false;
+            }
+            size_t part = INT_MAX / type.size_in_bytes;
+            while (size * sizeof(int) > INT_MAX)
+            {
+                (void)recv_impl(buf, part, type, TAG::MAIN);
+                buf = reinterpret_cast<void*>(reinterpret_cast<size_t>(buf) + part * type.size_in_bytes);
+                size -= part;
+            }
+        }
+        (void)recv_impl(buf, size, type, TAG::MAIN);
+    }
 
-    void receiver::irecv_bytes(void* buf, int count) const
-    { irecv(buf, count, MPI_BYTE); }
+    void receiver::irecv(void* buf, size_t size, simple_datatype type) const
+    {
+        if (size * type.size_in_bytes > INT_MAX)
+        {
+            if (probe_flag)
+            {
+                (void)recv_impl(&size, 1, datatype<size_t>(), TAG::SIZE);
+                probe_flag = false;
+            }
+            size_t part = INT_MAX / type.size_in_bytes;
+            while (size * sizeof(int) > INT_MAX)
+            {
+                store_request(irecv_impl(buf, part, type, TAG::MAIN));
+                buf = reinterpret_cast<void*>(reinterpret_cast<size_t>(buf) + part * type.size_in_bytes);
+                size -= part;
+            }
+        }
+        store_request(irecv_impl(buf, size, type, TAG::MAIN));
+    }
 
-    int receiver::probe_bytes() const
-    { return probe(MPI_BYTE); }
+    size_t receiver::probe(simple_datatype type) const
+    {
+        size_t size;
+        MPI_Status status = probe_impl();
+        if (status.MPI_TAG == 0)
+        {
+            int sz;
+            MPI_Get_count(&status, type.type, &sz);
+            size = sz;
+        }
+        else
+        {
+            (void)recv_impl(&size, 1, datatype<size_t>(), TAG::SIZE);
+            probe_flag = true;
+        }
+        return size;
+    }
+
+    void receiver::recv_bytes(void* buf, size_t count) const
+    { recv(buf, count, byte_datatype()); }
+
+    void receiver::irecv_bytes(void* buf, size_t count) const
+    { irecv(buf, count, byte_datatype()); }
+
+    size_t receiver::probe_bytes() const
+    { return probe(byte_datatype()); }
 
     //send-recv specifications
     // char
     template<>
-    void sender::send<char>(const char* buf, int size) const
-    { send(buf, size, MPI_SIGNED_CHAR); }
+    const simple_datatype& datatype<char>()
+    {
+        static simple_datatype d(MPI_SIGNED_CHAR);
+        return d;
+    }
 
     template<>
-    void sender::isend<char>(const char* buf, int size) const
-    { isend(buf, size, MPI_SIGNED_CHAR); }
+    void sender::send<char>(const char* buf, size_t size) const
+    { send(buf, size, datatype<char>()); }
 
     template<>
-    void receiver::recv<char>(char* buf, int size) const
-    { recv(buf, size, MPI_SIGNED_CHAR); }
+    void sender::isend<char>(const char* buf, size_t size) const
+    { isend(buf, size, datatype<char>()); }
 
     template<>
-    void receiver::irecv<char>(char* buf, int size) const
-    { irecv(buf, size, MPI_SIGNED_CHAR); }
+    void receiver::recv<char>(char* buf, size_t size) const
+    { recv(buf, size, datatype<char>()); }
 
     template<>
-    int receiver::probe<char>() const
-    { return probe(MPI_SIGNED_CHAR); }
+    void receiver::irecv<char>(char* buf, size_t size) const
+    { irecv(buf, size, datatype<char>()); }
+
+    template<>
+    size_t receiver::probe<char>() const
+    { return probe(datatype<char>()); }
 
     // unsigned char
     template<>
-    void sender::send<unsigned char>(const unsigned char* buf, int size) const
-    { send(buf, size, MPI_UNSIGNED_CHAR); }
+    const simple_datatype& datatype<unsigned char>()
+    {
+        static simple_datatype d(MPI_UNSIGNED_CHAR);
+        return d;
+    }
 
     template<>
-    void sender::isend<unsigned char>(const unsigned char* buf, int size) const
-    { isend(buf, size, MPI_UNSIGNED_CHAR); }
+    void sender::send<unsigned char>(const unsigned char* buf, size_t size) const
+    { send(buf, size, datatype<unsigned char>()); }
 
     template<>
-    void receiver::recv<unsigned char>(unsigned char* buf, int size) const
-    { recv(buf, size, MPI_UNSIGNED_CHAR); }
+    void sender::isend<unsigned char>(const unsigned char* buf, size_t size) const
+    { isend(buf, size, datatype<unsigned char>()); }
 
     template<>
-    void receiver::irecv<unsigned char>(unsigned char* buf, int size) const
-    { irecv(buf, size, MPI_UNSIGNED_CHAR); }
+    void receiver::recv<unsigned char>(unsigned char* buf, size_t size) const
+    { recv(buf, size, datatype<unsigned char>()); }
 
     template<>
-    int receiver::probe<unsigned char>() const
-    { return probe(MPI_UNSIGNED_CHAR); }
+    void receiver::irecv<unsigned char>(unsigned char* buf, size_t size) const
+    { irecv(buf, size, datatype<unsigned char>()); }
+
+    template<>
+    size_t receiver::probe<unsigned char>() const
+    { return probe(datatype<unsigned char>()); }
 
     // short
     template<>
-    void sender::send<short>(const short* buf, int size) const
-    { send(buf, size, MPI_SHORT); }
+    const simple_datatype& datatype<short>()
+    {
+        static simple_datatype d(MPI_SHORT);
+        return d;
+    }
 
     template<>
-    void sender::isend<short>(const short* buf, int size) const
-    { isend(buf, size, MPI_SHORT); }
+    void sender::send<short>(const short* buf, size_t size) const
+    { send(buf, size, datatype<short>()); }
 
     template<>
-    void receiver::recv<short>(short* buf, int size) const
-    { recv(buf, size, MPI_SHORT); }
+    void sender::isend<short>(const short* buf, size_t size) const
+    { isend(buf, size, datatype<short>()); }
 
     template<>
-    void receiver::irecv<short>(short* buf, int size) const
-    { irecv(buf, size, MPI_SHORT); }
+    void receiver::recv<short>(short* buf, size_t size) const
+    { recv(buf, size, datatype<short>()); }
 
     template<>
-    int receiver::probe<short>() const
-    { return probe(MPI_SHORT); }
+    void receiver::irecv<short>(short* buf, size_t size) const
+    { irecv(buf, size, datatype<short>()); }
+
+    template<>
+    size_t receiver::probe<short>() const
+    { return probe(datatype<short>()); }
 
     // unsigned short
     template<>
-    void sender::send<unsigned short>(const unsigned short* buf, int size) const
-    { send(buf, size, MPI_UNSIGNED_SHORT); }
+    const simple_datatype& datatype<unsigned short>()
+    {
+        static simple_datatype d(MPI_UNSIGNED_SHORT);
+        return d;
+    }
 
     template<>
-    void sender::isend<unsigned short>(const unsigned short* buf, int size) const
-    { isend(buf, size, MPI_UNSIGNED_SHORT); }
+    void sender::send<unsigned short>(const unsigned short* buf, size_t size) const
+    { send(buf, size, datatype<unsigned short>()); }
 
     template<>
-    void receiver::recv<unsigned short>(unsigned short* buf, int size) const
-    { recv(buf, size, MPI_UNSIGNED_SHORT); }
+    void sender::isend<unsigned short>(const unsigned short* buf, size_t size) const
+    { isend(buf, size, datatype<unsigned short>()); }
 
     template<>
-    void receiver::irecv<unsigned short>(unsigned short* buf, int size) const
-    { irecv(buf, size, MPI_UNSIGNED_SHORT); }
+    void receiver::recv<unsigned short>(unsigned short* buf, size_t size) const
+    { recv(buf, size, datatype<unsigned short>()); }
 
     template<>
-    int receiver::probe<unsigned short>() const
-    { return probe(MPI_UNSIGNED_SHORT); }
+    void receiver::irecv<unsigned short>(unsigned short* buf, size_t size) const
+    { irecv(buf, size, datatype<unsigned short>()); }
+
+    template<>
+    size_t receiver::probe<unsigned short>() const
+    { return probe(datatype<unsigned short>()); }
 
     // int
     template<>
-    void sender::send<int>(const int* buf, int size) const
-    { send(buf, size, MPI_INT); }
+    const simple_datatype& datatype<int>()
+    {
+        static simple_datatype d(MPI_INT);
+        return d;
+    }
 
     template<>
-    void sender::isend<int>(const int* buf, int size) const
-    { isend(buf, size, MPI_INT); }
+    void sender::send<int>(const int* buf, size_t size) const
+    { send(buf, size, datatype<int>()); }
 
     template<>
-    void receiver::recv<int>(int* buf, int size) const
-    { recv(buf, size, MPI_INT); }
+    void sender::isend<int>(const int* buf, size_t size) const
+    { isend(buf, size, datatype<int>()); }
 
     template<>
-    void receiver::irecv<int>(int* buf, int size) const
-    { irecv(buf, size, MPI_INT); }
+    void receiver::recv<int>(int* buf, size_t size) const
+    { recv(buf, size, datatype<int>()); }
 
     template<>
-    int receiver::probe<int>() const
-    { return probe(MPI_INT); }
+    void receiver::irecv<int>(int* buf, size_t size) const
+    { irecv(buf, size, datatype<int>()); }
+
+    template<>
+    size_t receiver::probe<int>() const
+    { return probe(datatype<int>()); }
 
     // unsigned
     template<>
-    void sender::send<unsigned>(const unsigned* buf, int size) const
-    { send(buf, size, MPI_UNSIGNED); }
+    const simple_datatype& datatype<unsigned>()
+    {
+        static simple_datatype d(MPI_UNSIGNED);
+        return d;
+    }
 
     template<>
-    void sender::isend<unsigned>(const unsigned* buf, int size) const
-    { isend(buf, size, MPI_UNSIGNED); }
+    void sender::send<unsigned>(const unsigned* buf, size_t size) const
+    { send(buf, size, datatype<unsigned>()); }
 
     template<>
-    void receiver::recv<unsigned>(unsigned* buf, int size) const
-    { recv(buf, size, MPI_UNSIGNED); }
+    void sender::isend<unsigned>(const unsigned* buf, size_t size) const
+    { isend(buf, size, datatype<unsigned>()); }
 
     template<>
-    void receiver::irecv<unsigned>(unsigned* buf, int size) const
-    { irecv(buf, size, MPI_UNSIGNED); }
+    void receiver::recv<unsigned>(unsigned* buf, size_t size) const
+    { recv(buf, size, datatype<unsigned>()); }
 
     template<>
-    int receiver::probe<unsigned>() const
-    { return probe(MPI_UNSIGNED); }
+    void receiver::irecv<unsigned>(unsigned* buf, size_t size) const
+    { irecv(buf, size, datatype<unsigned>()); }
+
+    template<>
+    size_t receiver::probe<unsigned>() const
+    { return probe(datatype<unsigned>()); }
 
     // long
     template<>
-    void sender::send<long>(const long* buf, int size) const
-    { send(buf, size, MPI_LONG); }
+    const simple_datatype& datatype<long>()
+    {
+        static simple_datatype d(MPI_LONG);
+        return d;
+    }
 
     template<>
-    void sender::isend<long>(const long* buf, int size) const
-    { isend(buf, size, MPI_LONG); }
+    void sender::send<long>(const long* buf, size_t size) const
+    { send(buf, size, datatype<long>()); }
 
     template<>
-    void receiver::recv<long>(long* buf, int size) const
-    { recv(buf, size, MPI_LONG); }
+    void sender::isend<long>(const long* buf, size_t size) const
+    { isend(buf, size, datatype<long>()); }
 
     template<>
-    void receiver::irecv<long>(long* buf, int size) const
-    { irecv(buf, size, MPI_LONG); }
+    void receiver::recv<long>(long* buf, size_t size) const
+    { recv(buf, size, datatype<long>()); }
 
     template<>
-    int receiver::probe<long>() const
-    { return probe(MPI_LONG); }
+    void receiver::irecv<long>(long* buf, size_t size) const
+    { irecv(buf, size, datatype<long>()); }
+
+    template<>
+    size_t receiver::probe<long>() const
+    { return probe(datatype<long>()); }
 
     // unsigned long
     template<>
-    void sender::send<unsigned long>(const unsigned long* buf, int size) const
-    { send(buf, size, MPI_UNSIGNED_LONG); }
+    const simple_datatype& datatype<unsigned long>()
+    {
+        static simple_datatype d(MPI_UNSIGNED_LONG);
+        return d;
+    }
 
     template<>
-    void sender::isend<unsigned long>(const unsigned long* buf, int size) const
-    { isend(buf, size, MPI_UNSIGNED_LONG); }
+    void sender::send<unsigned long>(const unsigned long* buf, size_t size) const
+    { send(buf, size, datatype<unsigned long>()); }
 
     template<>
-    void receiver::recv<unsigned long>(unsigned long* buf, int size) const
-    { recv(buf, size, MPI_UNSIGNED_LONG); }
+    void sender::isend<unsigned long>(const unsigned long* buf, size_t size) const
+    { isend(buf, size, datatype<unsigned long>()); }
 
     template<>
-    void receiver::irecv<unsigned long>(unsigned long* buf, int size) const
-    { irecv(buf, size, MPI_UNSIGNED_LONG); }
+    void receiver::recv<unsigned long>(unsigned long* buf, size_t size) const
+    { recv(buf, size, datatype<unsigned long>()); }
 
     template<>
-    int receiver::probe<unsigned long>() const
-    { return probe(MPI_UNSIGNED_LONG); }
+    void receiver::irecv<unsigned long>(unsigned long* buf, size_t size) const
+    { irecv(buf, size, datatype<unsigned long>()); }
+
+    template<>
+    size_t receiver::probe<unsigned long>() const
+    { return probe(datatype<unsigned long>()); }
 
     // long long
     template<>
-    void sender::send<long long>(const long long* buf, int size) const
-    { send(buf, size, MPI_LONG_LONG); }
+    const simple_datatype& datatype<long long>()
+    {
+        static simple_datatype d(MPI_LONG_LONG);
+        return d;
+    }
 
     template<>
-    void sender::isend<long long>(const long long* buf, int size) const
-    { isend(buf, size, MPI_LONG_LONG); }
+    void sender::send<long long>(const long long* buf, size_t size) const
+    { send(buf, size, datatype<long long>()); }
 
     template<>
-    void receiver::recv<long long>(long long* buf, int size) const
-    { recv(buf, size, MPI_LONG_LONG); }
+    void sender::isend<long long>(const long long* buf, size_t size) const
+    { isend(buf, size, datatype<long long>()); }
 
     template<>
-    void receiver::irecv<long long>(long long* buf, int size) const
-    { irecv(buf, size, MPI_LONG_LONG); }
+    void receiver::recv<long long>(long long* buf, size_t size) const
+    { recv(buf, size, datatype<long long>()); }
 
     template<>
-    int receiver::probe<long long>() const
-    { return probe(MPI_LONG_LONG); }
+    void receiver::irecv<long long>(long long* buf, size_t size) const
+    { irecv(buf, size, datatype<long long>()); }
+
+    template<>
+    size_t receiver::probe<long long>() const
+    { return probe(datatype<long long>()); }
 
     // unsigned long long
     template<>
-    void sender::send<unsigned long long>(const unsigned long long* buf, int size) const
-    { send(buf, size, MPI_UNSIGNED_LONG_LONG); }
+    const simple_datatype& datatype<unsigned long long>()
+    {
+        static simple_datatype d(MPI_UNSIGNED_LONG_LONG);
+        return d;
+    }
 
     template<>
-    void sender::isend<unsigned long long>(const unsigned long long* buf, int size) const
-    { isend(buf, size, MPI_UNSIGNED_LONG_LONG); }
+    void sender::send<unsigned long long>(const unsigned long long* buf, size_t size) const
+    { send(buf, size, datatype<unsigned long long>()); }
 
     template<>
-    void receiver::recv<unsigned long long>(unsigned long long* buf, int size) const
-    { recv(buf, size, MPI_UNSIGNED_LONG_LONG); }
+    void sender::isend<unsigned long long>(const unsigned long long* buf, size_t size) const
+    { isend(buf, size, datatype<unsigned long long>()); }
 
     template<>
-    void receiver::irecv<unsigned long long>(unsigned long long* buf, int size) const
-    { irecv(buf, size, MPI_UNSIGNED_LONG_LONG); }
+    void receiver::recv<unsigned long long>(unsigned long long* buf, size_t size) const
+    { recv(buf, size, datatype<unsigned long long>()); }
 
     template<>
-    int receiver::probe<unsigned long long>() const
-    { return probe(MPI_UNSIGNED_LONG_LONG); }
+    void receiver::irecv<unsigned long long>(unsigned long long* buf, size_t size) const
+    { irecv(buf, size, datatype<unsigned long long>()); }
+
+    template<>
+    size_t receiver::probe<unsigned long long>() const
+    { return probe(datatype<unsigned long long>()); }
 
     // float
     template<>
-    void sender::send<float>(const float* buf, int size) const
-    { send(buf, size, MPI_FLOAT); }
+    const simple_datatype& datatype<float>()
+    {
+        static simple_datatype d(MPI_FLOAT);
+        return d;
+    }
 
     template<>
-    void sender::isend<float>(const float* buf, int size) const
-    { isend(buf, size, MPI_FLOAT); }
+    void sender::send<float>(const float* buf, size_t size) const
+    { send(buf, size, datatype<float>()); }
 
     template<>
-    void receiver::recv<float>(float* buf, int size) const
-    { recv(buf, size, MPI_FLOAT); }
+    void sender::isend<float>(const float* buf, size_t size) const
+    { isend(buf, size, datatype<float>()); }
 
     template<>
-    void receiver::irecv<float>(float* buf, int size) const
-    { irecv(buf, size, MPI_FLOAT); }
+    void receiver::recv<float>(float* buf, size_t size) const
+    { recv(buf, size, datatype<float>()); }
 
     template<>
-    int receiver::probe<float>() const
-    { return probe(MPI_FLOAT); }
+    void receiver::irecv<float>(float* buf, size_t size) const
+    { irecv(buf, size, datatype<float>()); }
+
+    template<>
+    size_t receiver::probe<float>() const
+    { return probe(datatype<float>()); }
 
     // double
     template<>
-    void sender::send<double>(const double* buf, int size) const
-    { send(buf, size, MPI_DOUBLE); }
+    const simple_datatype& datatype<double>()
+    {
+        static simple_datatype d(MPI_DOUBLE);
+        return d;
+    }
 
     template<>
-    void sender::isend<double>(const double* buf, int size) const
-    { isend(buf, size, MPI_DOUBLE); }
+    void sender::send<double>(const double* buf, size_t size) const
+    { send(buf, size, datatype<double>()); }
 
     template<>
-    void receiver::recv<double>(double* buf, int size) const
-    { recv(buf, size, MPI_DOUBLE); }
+    void sender::isend<double>(const double* buf, size_t size) const
+    { isend(buf, size, datatype<double>()); }
 
     template<>
-    void receiver::irecv<double>(double* buf, int size) const
-    { irecv(buf, size, MPI_DOUBLE); }
+    void receiver::recv<double>(double* buf, size_t size) const
+    { recv(buf, size, datatype<double>()); }
 
     template<>
-    int receiver::probe<double>() const
-    { return probe(MPI_DOUBLE); }
+    void receiver::irecv<double>(double* buf, size_t size) const
+    { irecv(buf, size, datatype<double>()); }
+
+    template<>
+    size_t receiver::probe<double>() const
+    { return probe(datatype<double>()); }
 
     // long double
     template<>
-    void sender::send<long double>(const long double* buf, int size) const
-    { send(buf, size, MPI_LONG_DOUBLE); }
+    const simple_datatype& datatype<long double>()
+    {
+        static simple_datatype d(MPI_LONG_DOUBLE);
+        return d;
+    }
 
     template<>
-    void sender::isend<long double>(const long double* buf, int size) const
-    { isend(buf, size, MPI_LONG_DOUBLE); }
+    void sender::send<long double>(const long double* buf, size_t size) const
+    { send(buf, size, datatype<long double>()); }
 
     template<>
-    void receiver::recv<long double>(long double* buf, int size) const
-    { recv(buf, size, MPI_LONG_DOUBLE); }
+    void sender::isend<long double>(const long double* buf, size_t size) const
+    { isend(buf, size, datatype<long double>()); }
 
     template<>
-    void receiver::irecv<long double>(long double* buf, int size) const
-    { irecv(buf, size, MPI_LONG_DOUBLE); }
+    void receiver::recv<long double>(long double* buf, size_t size) const
+    { recv(buf, size, datatype<long double>()); }
 
     template<>
-    int receiver::probe<long double>() const
-    { return probe(MPI_LONG_DOUBLE); }
+    void receiver::irecv<long double>(long double* buf, size_t size) const
+    { irecv(buf, size, datatype<long double>()); }
+
+    template<>
+    size_t receiver::probe<long double>() const
+    { return probe(datatype<long double>()); }
+
+    // local_message_id
+    template<>
+    const simple_datatype& datatype<local_message_id>()
+    {
+        static simple_datatype d({datatype<size_t>().type, datatype<size_t>().type}, {offset_of(&local_message_id::id), offset_of(&local_message_id::src)});
+        return d;
+    }
+
+    template<>
+    void sender::send<local_message_id>(const local_message_id* buf, size_t size) const
+    { send(buf, size, datatype<local_message_id>()); }
+
+    template<>
+    void sender::isend<local_message_id>(const local_message_id* buf, size_t size) const
+    { isend(buf, size, datatype<local_message_id>()); }
+
+    template<>
+    void receiver::recv<local_message_id>(local_message_id* buf, size_t size) const
+    { recv(buf, size, datatype<local_message_id>()); }
+
+    template<>
+    void receiver::irecv<local_message_id>(local_message_id* buf, size_t size) const
+    { irecv(buf, size, datatype<local_message_id>()); }
+
+    template<>
+    size_t receiver::probe<local_message_id>() const
+    { return probe(datatype<local_message_id>()); }
+
+    // local_task_id
+    template<>
+    const simple_datatype& datatype<local_task_id>()
+    {
+        static simple_datatype d({datatype<local_message_id>().type, datatype<size_t>().type, datatype<size_t>().type},
+            {offset_of(&local_task_id::mes), offset_of(&local_task_id::id), offset_of(&local_task_id::src)});
+        return d;
+    }
+
+    template<>
+    void sender::send<local_task_id>(const local_task_id* buf, size_t size) const
+    { send(buf, size, datatype<local_task_id>()); }
+
+    template<>
+    void sender::isend<local_task_id>(const local_task_id* buf, size_t size) const
+    { isend(buf, size, datatype<local_task_id>()); }
+
+    template<>
+    void receiver::recv<local_task_id>(local_task_id* buf, size_t size) const
+    { recv(buf, size, datatype<local_task_id>()); }
+
+    template<>
+    void receiver::irecv<local_task_id>(local_task_id* buf, size_t size) const
+    { irecv(buf, size, datatype<local_task_id>()); }
+
+    template<>
+    size_t receiver::probe<local_task_id>() const
+    { return probe(datatype<local_task_id>()); }
+
+    // task_dependence
+    template<>
+    const simple_datatype& datatype<task_dependence>()
+    {
+        static simple_datatype d({datatype<local_task_id>().type, datatype<local_task_id>().type},
+            {offset_of(&task_dependence::parent), offset_of(&task_dependence::child) });
+        return d;
+    }
+
+    template<>
+    void sender::send<task_dependence>(const task_dependence* buf, size_t size) const
+    { send(buf, size, datatype<task_dependence>()); }
+
+    template<>
+    void sender::isend<task_dependence>(const task_dependence* buf, size_t size) const
+    { isend(buf, size, datatype<task_dependence>()); }
+
+    template<>
+    void receiver::recv<task_dependence>(task_dependence* buf, size_t size) const
+    { recv(buf, size, datatype<task_dependence>()); }
+
+    template<>
+    void receiver::irecv<task_dependence>(task_dependence* buf, size_t size) const
+    { irecv(buf, size, datatype<task_dependence>()); }
+
+    template<>
+    size_t receiver::probe<task_dependence>() const
+    { return probe(datatype<task_dependence>()); }
 
 }

@@ -14,14 +14,16 @@ namespace apl
         process proc;
         std::queue<MPI_Request>* q;
 
+        void send_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const;
+        MPI_Request isend_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const;
+
     public:
 
         synchronous_sender(MPI_Comm _comm, process _proc, std::queue<MPI_Request>* _q);
 
-        virtual void send(const void* buf, int size, MPI_Datatype type) const;
-        virtual void isend(const void* buf, int size, MPI_Datatype type) const;
-
         virtual void wait_all() const;
+
+        virtual void store_request(MPI_Request req) const;
 
     };
 

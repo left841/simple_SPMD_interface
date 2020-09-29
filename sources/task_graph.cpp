@@ -4,12 +4,12 @@ namespace apl
 {
 
     task_graph::task_graph()
-    { base_data_id = base_task_id = 0; }
+    { base_message_id = base_perform_id = 0; }
 
     task_graph::task_graph(const task_graph& _tg)
     {
-        base_data_id = _tg.base_data_id;
-        base_task_id = _tg.base_task_id;
+        base_message_id = _tg.base_message_id;
+        base_perform_id = _tg.base_perform_id;
         t_map = _tg.t_map;
         d_map = _tg.d_map;
     }
@@ -18,40 +18,39 @@ namespace apl
     {
         if (&_tg == this)
             return *this;
-        base_data_id = _tg.base_data_id;
-        base_task_id = _tg.base_task_id;
+        base_message_id = _tg.base_message_id;
+        base_perform_id = _tg.base_perform_id;
         t_map = _tg.t_map;
         d_map = _tg.d_map;
         return *this;
     }
 
-    void task_graph::add_task(task* t)
+    void task_graph::add_task(task* t, task_type type, const std::vector<message*>& data, const std::vector<message*>& info)
     {
-        for (message* i:t->data)
+        for (message* i: data)
         {
             if (d_map.find(i) == d_map.end())
-                d_map.insert(std::make_pair(i, d_id(base_data_id++)));
-            ++d_map[i].ref_count;
+            {
+                std::vector<message*> m_info;
+                d_map.insert({i, {base_message_id++, MESSAGE_TYPE_UNDEFINED, 1, m_info}});
+            }
+            else
+                ++d_map[i].ref_count;
         }
-        for (const message* j : t->c_data)
-        {
-            message* i = const_cast<message*>(j);
-            if (d_map.find(i) == d_map.end())
-                d_map.insert(std::make_pair(i, d_id(base_data_id++)));
-            ++d_map[i].ref_count;
-        }
-        t_map.insert(std::make_pair(t, t_id(base_task_id++)));
+        std::set<task*> childs;
+        std::set<task*> parents;
+        if (d_map.find(t) == d_map.end())
+            d_map.insert({t, {base_message_id++, type.mt, 1, info}});
+        else
+            ++d_map[t].ref_count;
+        t_map.insert({t, {base_perform_id++, type.pt, data, childs, parents}});
     }
 
-    void task_graph::add_data(message* m)
-    { d_map.insert(std::make_pair(m, d_id(base_data_id++))); }
+    void task_graph::add_data(message* m, message_type type, const std::vector<message*>& info)
+    { d_map.insert({m, {base_message_id++, type, 1, info}}); }
 
     void task_graph::add_dependence(task* parent, task* child)
     {
-        if (t_map.find(parent) == t_map.end())
-            add_task(parent);
-        if (t_map.find(child) == t_map.end())
-            add_task(child);
         t_map[parent].childs.insert(child);
         t_map[child].parents.insert(parent);
     }
@@ -66,19 +65,15 @@ namespace apl
         tmp = t_map[t].parents;
         for (auto it = tmp.begin(); it != tmp.end(); ++it)
             t_map[(*it)].childs.erase(t);
-        for (message* i:t->data)
+        for (message* i: t_map.find(t)->second.data)
         {
             --d_map[i].ref_count;
             if (d_map[i].ref_count < 1)
                 d_map.erase(i);
         }
-        for (const message* j : t->c_data)
-        {
-            message* i = const_cast<message*>(j);
-            --d_map[i].ref_count;
-            if (d_map[i].ref_count < 1)
-                d_map.erase(i);
-        }
+        --d_map[t].ref_count;
+        if (d_map[t].ref_count < 1)
+            d_map.erase(t);
         t_map.erase(t);
     }
 
@@ -97,51 +92,6 @@ namespace apl
             t_map[child].parents.erase(parent);
     }
 
-    void task_graph::change_task(task* old_t, task* new_t)
-    {
-        t_id tmp(t_map[old_t].id);
-        tmp.childs = t_map[old_t].childs;
-        tmp.parents = t_map[old_t].parents;
-        t_map.erase(old_t);
-        t_map.insert(std::make_pair(new_t, tmp));
-        for (auto it = tmp.childs.begin(); it != tmp.childs.end(); ++it)
-        {
-            t_map[(*it)].parents.erase(old_t);
-            t_map[(*it)].parents.insert(new_t);
-        }
-        for (auto it = tmp.parents.begin(); it != tmp.parents.end(); ++it)
-        {
-            t_map[(*it)].childs.erase(old_t);
-            t_map[(*it)].childs.insert(new_t);
-        }
-        for (message* i:old_t->data)
-        {
-            --d_map[i].ref_count;
-            if (d_map[i].ref_count < 1)
-                d_map.erase(i);
-        }
-        for (message* i:new_t->data)
-        {
-            if (d_map.find(i) == d_map.end())
-                d_map.insert(std::make_pair(i, d_id(base_data_id++)));
-            ++d_map[i].ref_count;
-        }
-        for (const message* j : old_t->c_data)
-        {
-            message* i = const_cast<message*>(j);
-            --d_map[i].ref_count;
-            if (d_map[i].ref_count < 1)
-                d_map.erase(i);
-        }
-        for (const message* j : new_t->c_data)
-        {
-            message* i = const_cast<message*>(j);
-            if (d_map.find(i) == d_map.end())
-                d_map.insert(std::make_pair(i, d_id(base_data_id++)));
-            ++d_map[i].ref_count;
-        }
-    }
-
     bool task_graph::contain_task(task* t)
     { return t_map.find(t) != t_map.end(); }
 
@@ -154,36 +104,6 @@ namespace apl
             return false;
         return t_map[parent].childs.find(child) != t_map[parent].childs.end();
     }
-
-    void task_graph::add_task(task& t)
-    { add_task(&t); }
-
-    void task_graph::add_data(message& m)
-    { add_data(&m); }
-
-    void task_graph::add_dependence(task& parent, task& child)
-    { add_dependence(&parent, &child); }
-
-    void task_graph::del_task(task& t)
-    { del_task(&t); }
-
-    void task_graph::del_data(message& m)
-    { del_data(&m); }
-
-    void task_graph::del_dependence(task& parent, task& child)
-    { del_dependence(&parent, &child); }
-
-    void task_graph::change_task(task& old_t, task& new_t)
-    { change_task(&old_t, &new_t); }
-
-    bool task_graph::contain_task(task& t)
-    { return contain_task(&t); }
-
-    bool task_graph::contain_data(message& m)
-    { return contain_data(&m); }
-
-    bool task_graph::contain_dependence(task& parent, task& child)
-    { return contain_dependence(&parent, &child); }
 
     void task_graph::clear()
     {

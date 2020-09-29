@@ -4,6 +4,7 @@
 #include <vector>
 #include <random>
 #include <algorithm>
+#include <thread>
 #include "parallel.h"
 using namespace apl;
 
@@ -97,15 +98,14 @@ private:
     }
 
 public:
-    static int pred;
+    static size_t pred;
 
-    quick_task(const std::vector<message*>& mes_v, const std::vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
+    quick_task(): task()
     { }
 
-    void perform()
+    void operator()(array& a)
     {
-        array& a = dynamic_cast<array&>(arg(0));
-        size_t sz = static_cast<int>(a.size);
+        size_t sz = a.size;
 
         if (sz < pred)
             simple_quicksort(a.p, sz);
@@ -134,20 +134,20 @@ public:
 
             if (r + 1 > 1)
             {
-                local_message_id p1 = create_message_child<array>(arg_id(0), new size_t(r + 1), new size_t(0));
-                create_child_task<quick_task>({p1}, {});
+                mes_id<array> p1 = create_message_child<array>(arg_id<0, array>(), new size_t(r + 1), new size_t(0));
+                create_child_task<quick_task>(std::make_tuple(p1));
             }
 
             if (sz - (r + 1) > 1)
             {
-                local_message_id p2 = create_message_child<array>(arg_id(0), new size_t(sz - r - 1), new size_t(r + 1));
-                create_child_task<quick_task>({p2}, {});
+                mes_id<array> p2 = create_message_child<array>(arg_id<0, array>(), new size_t(sz - r - 1), new size_t(r + 1));
+                create_child_task<quick_task>(std::make_tuple(p2));
             }
         }
     }
 };
 
-int quick_task::pred = 1000;
+size_t quick_task::pred = 1000;
 
 class check_task;
 
@@ -155,26 +155,24 @@ class init_task: public task
 {
 public:
 
-    init_task(const std::vector<message*>& mes_v, const std::vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
+    init_task(): task()
     { }
 
-    void perform()
+    void operator()(size_t size, double& t)
     {
         std::mt19937 mt(static_cast<unsigned>(time(0)));
         std::uniform_int_distribution<int> uid(0, 10000);
-        size_t size = dynamic_cast<const message_wrapper<size_t>&>(const_arg(0));
         array& a1 = *new array(size);
         array& a2 = *new array(size);
-        double& t = dynamic_cast<message_wrapper<double>&>(arg(0));
-        for (int i = 0; i < a1.size; ++i)
+        for (size_t i = 0; i < a1.size; ++i)
             a1[i] = a2[i] = uid(mt);
         t = MPI_Wtime();
 
-        local_message_id a1_id = add_message_init(&a1, new size_t(size));
-        local_message_id a2_id = add_message_init(&a2, new size_t(size));
+        mes_id<array> a1_id = add_message(&a1, new size_t(size));
+        mes_id<array> a2_id = add_message(&a2, new size_t(size));
 
-        create_child_task<quick_task>({a1_id}, {});
-        add_dependence(this_task_id(), create_task<check_task>({a2_id}, {a1_id, arg_id(0)}));
+        create_child_task<quick_task>(std::make_tuple(a1_id));
+        add_dependence(this_task_id<init_task>(), create_task<check_task>(std::make_tuple(a1_id.as_const(), a2_id, arg_id<1, double>().as_const())));
     }
 };
 
@@ -183,14 +181,11 @@ class check_task: public task
 public:
     static bool checking;
 
-    check_task(const std::vector<message*>& mes_v, const std::vector<const message*>& c_mes_v): task(mes_v, c_mes_v)
+    check_task(): task()
     { }
 
-    void perform()
+    void operator()(const array& a1, array& a2, double t)
     {
-        const double& t = dynamic_cast<const message_wrapper<double>&>(const_arg(1));
-        const array& a1 = dynamic_cast<const array&>(const_arg(0));
-        array& a2 = dynamic_cast<array&>(arg(0));
         double tm1 = MPI_Wtime();
         if (checking)
         {
@@ -238,6 +233,6 @@ int main(int argc, char** argv)
     if (!pred_initialized)
         quick_task::pred = sz / (3 * comm_size / 2);
 
-    init_task it({new message_wrapper<double>(new double(0))}, {new message_wrapper<size_t>(new size_t(sz))});
-    pz.execution(&it);
+    init_task it;
+    pz.execution(&it, std::make_tuple(), const_cast<const size_t*>(new size_t(sz)), new double(0));
 }

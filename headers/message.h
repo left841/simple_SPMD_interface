@@ -30,16 +30,16 @@ namespace apl
     };
 
     template<>
-    void sender::send<message>(const message* buf, int size) const;
+    void sender::send<message>(const message* buf, size_t size) const;
 
     template<>
-    void sender::isend<message>(const message* buf, int size) const;
+    void sender::isend<message>(const message* buf, size_t size) const;
 
     template<>
-    void receiver::recv<message>(message* buf, int size) const;
+    void receiver::recv<message>(message* buf, size_t size) const;
 
     template<>
-    void receiver::irecv<message>(message* buf, int size) const;
+    void receiver::irecv<message>(message* buf, size_t size) const;
 
     template<typename Type>
     class message_wrapper: public message
@@ -89,11 +89,11 @@ namespace apl
 
     template<typename Type>
     void message_wrapper<Type>::send(const sender& se) const
-    { se.isend(value); }
+    { se.send(value); }
 
     template<typename Type>
     void message_wrapper<Type>::recv(const receiver& re)
-    { re.irecv(value); }
+    { re.recv(value); }
 
 }
 

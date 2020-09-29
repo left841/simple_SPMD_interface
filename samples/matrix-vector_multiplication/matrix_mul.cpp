@@ -110,13 +110,10 @@ template<typename Type>
 class multiply_task: public task
 {
 public:
-    multiply_task(const std::vector<message*>& mes_v, const std::vector<const message*>& cmes_v): task(mes_v, cmes_v)
+    multiply_task(): task()
     { }
-    void perform()
+    void operator()(const matrix<Type>& m, const vector<Type>& b, vector<Type>& c)
     {
-        const matrix<Type>& m = dynamic_cast<const matrix<int>&>(const_arg(0));
-        const vector<Type>& b = dynamic_cast<const vector<int>&>(const_arg(1));
-        vector<Type>& c = dynamic_cast<vector<int>&>(arg(0));
         for (size_t i = 0; i < m.size(); ++i)
         {
             c[i] = 0;
@@ -131,13 +128,10 @@ class out_task: public task
 public:
     static bool checking;
 
-    out_task(const std::vector<message*>& mes_v, const std::vector<const message*>& cmes_v): task(mes_v, cmes_v)
+    out_task(): task()
     { }
-    void perform()
+    void operator()(const matrix<int>& a, const vector<int>& b, const vector<int>& c, double start)
     {
-        const matrix<int>& a = dynamic_cast<const matrix<int>&>(const_arg(0));
-        const vector<int>& b = dynamic_cast<const vector<int>&>(const_arg(1));
-        const vector<int>& c = dynamic_cast<const vector<int>&>(const_arg(2));
         vector<int> d(c.size());
 
         double t = MPI_Wtime();
@@ -158,7 +152,7 @@ public:
             std::cout << "correct" << std::endl;
         }
         gh:
-        std::cout <<  t - dynamic_cast<const message_wrapper<double>&>(const_arg(3)) << std::endl;
+        std::cout <<  t - start << std::endl;
     }
 };
 
@@ -167,20 +161,17 @@ bool out_task::checking = false;
 class init_task: public task
 {
     public:
-    init_task(const std::vector<message*>& mes_v, const std::vector<const message*>& cmes_v): task(mes_v, cmes_v)
+    init_task(): task()
     { }
-    void perform()
+    void operator()(size_t n, size_t m, double& t)
     {
-        size_t n = dynamic_cast<const message_wrapper<size_t>&>(const_arg(0));
-        size_t m = dynamic_cast<const message_wrapper<size_t>&>(const_arg(1));
-
         matrix<int>& a = *new matrix<int>(n, m);
-        local_message_id a_id = add_message_init(&a, new size_t(n), new size_t(m));
+        mes_id<matrix<int>> a_id = add_message(&a, new size_t(n), new size_t(m));
 
         vector<int>& b = *new vector<int>(m);
-        local_message_id b_id = add_message_init(&b, new size_t(m));
+        mes_id<vector<int>> b_id = add_message(&b, new size_t(m));
 
-        local_message_id c_id = create_message_init<vector<int>>(new size_t(n));
+        mes_id<vector<int>> c_id = create_message<vector<int>>(new size_t(n));
 
         std::mt19937 mt(static_cast<unsigned>(time(0)));
         std::uniform_int_distribution<int> uid(-500, 500);
@@ -191,19 +182,18 @@ class init_task: public task
         for (size_t i = 0; i < b.size(); i++)
             b[i] = uid(mt);
 
-        double& t = dynamic_cast<message_wrapper<double>&>(arg(0));
         t = MPI_Wtime();
 
         size_t offset = 0;
         for (size_t i = 0; i < working_processes(); i++)
         {
             size_t h = n / working_processes() + ((i < n % working_processes()) ? 1: 0);
-            local_message_id a_child = create_message_child<matrix<int>>(a_id, new size_t(h), new size_t(m), new size_t(offset), new size_t(0));
-            local_message_id c_child = create_message_child<vector<int>>(c_id, new size_t(h), new size_t(offset));
-            create_child_task<multiply_task<int>>({c_child}, {a_child, b_id});
+            mes_id<matrix<int>> a_child = create_message_child<matrix<int>>(a_id, new size_t(h), new size_t(m), new size_t(offset), new size_t(0));
+            mes_id<vector<int>> c_child = create_message_child<vector<int>>(c_id, new size_t(h), new size_t(offset));
+            create_child_task<multiply_task<int>>(std::make_tuple(a_child.as_const(), b_id.as_const(), c_child));
             offset += h;
         }
-        add_dependence(this_task_id(), create_task<out_task>({}, {a_id, b_id, c_id, arg_id(0)}));
+        add_dependence(this_task_id<init_task>(), create_task<out_task>(std::make_tuple(a_id.as_const(), b_id.as_const(), c_id.as_const(), arg_id<2, double>().as_const())));
     }
 };
 
@@ -226,7 +216,7 @@ int main(int argc, char** argv)
     }
     parallelizer pz;
 
-    init_task ti({new message_wrapper<double>(new double)}, {new message_wrapper<size_t>(new size_t(n)), new message_wrapper<size_t>(new size_t(m))});
+    init_task ti;
 
-    pz.execution(&ti);
+    pz.execution(&ti, std::make_tuple(), const_cast<const size_t*>(new size_t(n)), const_cast<const size_t*>(new size_t(m)), new double);
 }

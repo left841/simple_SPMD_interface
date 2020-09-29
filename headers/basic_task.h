@@ -11,49 +11,6 @@ namespace apl
 
     class task;
 
-    enum class MESSAGE_SOURCE: size_t
-    {
-        TASK_ARG, TASK_ARG_C, REFERENCE,
-        INIT, CHILD,
-        INIT_A, CHILD_A
-    };
-
-    enum class TASK_SOURCE: size_t
-    {
-        GLOBAL, SIMPLE, SIMPLE_A, REFERENCE,
-        SIMPLE_C, SIMPLE_AC
-    };
-
-    enum class TASK_FACTORY_TYPE: size_t
-    {
-        UNDEFINED, SIMPLE
-    };
-
-    struct local_task_id
-    {
-        size_t id;
-        TASK_SOURCE src;
-    };
-
-    struct local_message_id
-    {
-        size_t id;
-        MESSAGE_SOURCE src;
-    };
-
-    struct task_data
-    {
-        task_type type;
-        std::vector<local_message_id> data, c_data;
-    };
-
-    struct task_add_data
-    {
-        task_type type;
-        std::vector<local_message_id> data, c_data;
-        task* t;
-    };
-
     struct message_init_data
     {
         message_type type;
@@ -82,10 +39,10 @@ namespace apl
         message* mes;
     };
 
-    struct task_dependence
+    struct task_data
     {
-        local_task_id parent;
-        local_task_id child;
+        perform_type type;
+        std::vector<local_message_id> data, c_data;
     };
 
     class task_environment: public message
@@ -94,6 +51,7 @@ namespace apl
 
         size_t proc_count;
         task_data this_task;
+        std::vector<local_message_id> all_task_data;
         local_task_id this_task_id;
 
         std::vector<local_message_id> created_messages_v;
@@ -104,16 +62,19 @@ namespace apl
 
         std::vector<local_task_id> created_tasks_v;
         std::vector<task_data> tasks_v;
-        std::vector<task_add_data> tasks_add_v;
         std::vector<task_data> tasks_child_v;
-        std::vector<task_add_data> tasks_child_add_v;
 
         std::vector<task_dependence> dependence_v;
 
+        void set_all_task_data();
+
     public:
 
+        task_environment(perform_id id);
         task_environment(task_data& td, task_id id);
         task_environment(task_data&& td, task_id id);
+        task_environment(task_data& td, perform_id id);
+        task_environment(task_data&& td, perform_id id);
 
         local_message_id create_message_init(message_type type, const std::vector<message*>& info);
         local_message_id create_message_child(message_type type, local_message_id source, const std::vector<message*>& info);
@@ -121,19 +82,17 @@ namespace apl
         local_message_id add_message_init(message_type type, message* m, const std::vector<message*>& info);
         local_message_id add_message_child(message_type type, message* m, local_message_id source, const std::vector<message*>& info);
 
-        local_task_id create_task(task_type type, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
-        local_task_id create_child_task(task_type type, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
+        local_task_id create_task(task_type type, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data, const std::vector<message*>& info);
+        local_task_id create_child_task(task_type type, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data, const std::vector<message*>& info);
 
-        local_task_id add_task(task_type type, task* t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
-        local_task_id add_child_task(task_type type, task* t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
+        local_task_id add_task(task_type type, local_message_id t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
+        local_task_id add_child_task(task_type type, local_message_id t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
 
         void add_dependence(local_task_id parent, local_task_id child);
 
         std::vector<local_task_id>& result_task_ids();
         std::vector<task_data>& created_tasks_simple();
         std::vector<task_data>& created_child_tasks();
-        std::vector<task_add_data>& added_tasks();
-        std::vector<task_add_data>& added_child_tasks();
 
         std::vector<local_message_id>& result_message_ids();
         std::vector<message_init_data>& created_messages_init();
@@ -144,7 +103,6 @@ namespace apl
         std::vector<task_dependence>& created_dependences();
 
         local_message_id arg_id(size_t n);
-        local_message_id const_arg_id(size_t n);
         task_data get_this_task_data();
         local_task_id get_this_task_id();
 
@@ -156,12 +114,42 @@ namespace apl
 
     };
 
-    class task
+    template<typename Type>
+    struct new_task_id
+    {
+        mes_id<Type> m_id;
+        size_t id;
+        TASK_SOURCE src;
+
+        typedef Type type;
+
+        new_task_id(local_task_id id);
+
+        new_task_id<const Type> as_const();
+        operator local_task_id();
+    };
+
+    template<typename Type>
+    new_task_id<Type>::new_task_id(local_task_id id): m_id(id.mes), id(id.id), src(id.src)
+    { }
+
+    template<typename Type>
+    new_task_id<const Type> new_task_id<Type>::as_const()
+    {
+        new_task_id<const Type> i{m_id, id, src};
+        return i;
+    }
+
+    template<typename Type>
+    new_task_id<Type>::operator local_task_id()
+    { return {m_id, id, src}; }
+
+
+    // new task
+    class task: public message
     {
     private:
 
-        std::vector<message*> data;
-        std::vector<const message*> c_data;
         task_environment* env;
 
         void set_environment(task_environment* e);
@@ -169,56 +157,56 @@ namespace apl
     protected:
 
         template<class Type, class... InfoTypes>
-        local_message_id create_message_init(InfoTypes*... info);
-        template<class Type, class ParentType = Type, class... InfoTypes>
-        local_message_id create_message_child(local_message_id source, InfoTypes*... info);
+        mes_id<Type> create_message(InfoTypes*... info);
+        template<class Type, class ParentType, class... InfoTypes>
+        mes_id<Type> create_message_child(mes_id<ParentType> source, InfoTypes*... info);
 
         template<class Type, class... InfoTypes>
-        local_message_id add_message_init(Type* m, InfoTypes*... info);
-        template<class Type, class ParentType = Type, class... InfoTypes>
-        local_message_id add_message_child(Type* m, local_message_id source, InfoTypes*... info);
+        mes_id<Type> add_message(Type* m, InfoTypes*... info);
+        template<class Type, class ParentType, class... InfoTypes>
+        mes_id<Type> add_message_child(Type* m, mes_id<ParentType> source, InfoTypes*... info);
 
-        template<class Type>
-        local_task_id create_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
-        template<class Type>
-        local_task_id create_child_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
+        template<class Type, class... InfoTypes, class... ArgTypes>
+        new_task_id<Type> create_task(std::tuple<mes_id<ArgTypes>...> args, InfoTypes*... info);
+        template<class Type, class... InfoTypes, class... ArgTypes>
+        new_task_id<Type> create_child_task(std::tuple<mes_id<ArgTypes>...> args, InfoTypes*... info);
 
-        template<class Type>
-        local_task_id add_task(Type* t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
-        template<class Type>
-        local_task_id add_child_task(Type* t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data);
+        template<class Type, class... ArgTypes>
+        new_task_id<Type> add_task(mes_id<Type> t, mes_id<ArgTypes>... args);
+        template<class Type, class... ArgTypes>
+        new_task_id<Type> add_child_task(mes_id<Type> t, mes_id<ArgTypes>... args);
 
         void add_dependence(local_task_id parent, local_task_id child);
 
-        local_message_id arg_id(size_t n);
-        local_message_id const_arg_id(size_t n);
-        task_data this_task_data();
-        local_task_id this_task_id();
+        template<size_t Index, class Type>
+        mes_id<Type> arg_id();
+
+
+        //task_data this_task_data();
+        template<class Type>
+        new_task_id<Type> this_task_id();
 
         size_t working_processes();
 
     public:
 
         task();
-        task(const std::vector<message*>& mes_v);
-        task(const std::vector<message*>& mes_v, const std::vector<const message*>& c_mes_v);
         virtual ~task();
 
-        virtual void perform() = 0;
-
-        void put_arg(message* mes);
-        void put_const_arg(const message* mes);
-
-        message& arg(size_t id);
-        const message& const_arg(size_t id);
+        virtual void send(const sender& se) const;
+        virtual void recv(const receiver& re);
 
         friend class task_graph;
         friend class parallelizer;
         friend class memory_manager;
     };
 
+    template<size_t Index, class Type>
+    mes_id<Type> task::arg_id()
+    { return env->arg_id(Index); }
+
     template<class Type, class... InfoTypes>
-    local_message_id task::create_message_init(InfoTypes*... info)
+    mes_id<Type> task::create_message(InfoTypes*... info)
     {
         std::vector<message*> v;
         tuple_processers<sizeof...(InfoTypes), InfoTypes...>::create_vector_from_pointers(v, std::make_tuple(info...));
@@ -226,7 +214,7 @@ namespace apl
     }
 
     template<class Type, class ParentType, class... InfoTypes>
-    local_message_id task::create_message_child(local_message_id source, InfoTypes*... info)
+    mes_id<Type> task::create_message_child(mes_id<ParentType> source, InfoTypes*... info)
     {
         std::vector<message*> v;
         tuple_processers<sizeof...(InfoTypes), InfoTypes...>::create_vector_from_pointers(v, std::make_tuple(info...));
@@ -234,7 +222,7 @@ namespace apl
     }
 
     template<class Type, class... InfoTypes>
-    local_message_id task::add_message_init(Type* m, InfoTypes*... info)
+    mes_id<Type> task::add_message(Type* m, InfoTypes*... info)
     {
         std::vector<message*> v;
         tuple_processers<sizeof...(InfoTypes), InfoTypes...>::create_vector_from_pointers(v, std::make_tuple(info...));
@@ -242,117 +230,168 @@ namespace apl
     }
 
     template<class Type, class ParentType, class... InfoTypes>
-    local_message_id task::add_message_child(Type* m, local_message_id source, InfoTypes*... info)
+    mes_id<Type> task::add_message_child(Type* m, mes_id<ParentType> source, InfoTypes*... info)
     {
         std::vector<message*> v;
         tuple_processers<sizeof...(InfoTypes), InfoTypes...>::create_vector_from_pointers(v, std::make_tuple(info...));
-        return env->add_message_child(message_child_factory::get_type<Type, ParentType, InfoTypes...>(), source, v);
+        return env->add_message_child(message_child_factory::get_type<Type, ParentType, InfoTypes...>(), m, source, v);
     }
 
+    template<class Type>
+    new_task_id<Type> task::this_task_id()
+    { return env->get_this_task_id(); }
+
+
+    // new task factory
     class task_factory
     {
     private:
 
-        class creator_base
+        class performer_base
         {
         public:
 
-            creator_base();
-            virtual ~creator_base();
+            performer_base();
+            virtual ~performer_base();
 
-            virtual task* get_task(std::vector<message*>& data, std::vector<const message*>& c_data) = 0;
+            virtual void perform(task* t, const std::vector<message*>& args, const std::vector<const message*>& c_args) = 0;
+            virtual const std::vector<bool>& const_map() = 0;
 
         };
 
-        template<typename Type>
+        template<typename Type, typename... ArgTypes>
         struct id
         {
-            task_type value;
+            perform_type value;
             id();
         };
 
-        template<typename Type>
-        class creator: public creator_base
+        template<typename Type, typename... ArgTypes>
+        class performer: public performer_base
         {
         private:
 
-            static id<Type> my_type;
+            static id<Type, ArgTypes...> my_type;
+            static std::vector<bool> const_map_v;
 
         public:
 
-            creator();
-            ~creator();
+            performer();
+            ~performer();
 
-            task* get_task(std::vector<message*>& data, std::vector<const message*>& c_data);
-            static task_type get_type();
-
-            friend class task_factory;
+            void perform(task* t, const std::vector<message*>& args, const std::vector<const message*>& c_args);
+            const std::vector<bool>& const_map();
+            static perform_type get_type();
         };
 
         task_factory() = delete;
-        static std::vector<creator_base*>& task_vec();
+        static std::vector<std::unique_ptr<performer_base>>& task_vec();
 
-        template<typename Type>
-        static task_type add();
+        template<typename Type, typename... ArgTypes>
+        static perform_type add();
+
 
     public:
 
-        static task* get(task_type id, std::vector<message*>& data, std::vector<const message*>& c_data);
+        static task* get(message_type id, const std::vector<message*>& info);
+        static std::vector<message*> get_info(message_type id);
 
-        template<typename Type>
-        static task_type get_type();
+        static void perform(perform_type id, task* t, const std::vector<message*>& args, const std::vector<const message*>& c_args);
+
+        static const std::vector<bool>& const_map(perform_type id);
+
+        template<typename Type, typename... ArgTypes>
+        static perform_type get_type();
 
     };
 
-    template<typename Type>
-    task_factory::id<Type>::id(): value(task_factory::add<Type>())
+    template<typename Type, typename... ArgTypes>
+    task_factory::id<Type, ArgTypes...>::id(): value(task_factory::add<Type, ArgTypes...>())
     { }
 
-    template<typename Type>
-    task_factory::creator<Type>::creator()
+    template<typename Type, typename... ArgTypes>
+    task_factory::performer<Type, ArgTypes...>::performer(): performer_base()
     { }
 
-    template<typename Type>
-    task_factory::creator<Type>::~creator()
+    template<typename Type, typename... ArgTypes>
+    task_factory::performer<Type, ArgTypes...>::~performer()
     { }
 
-    template<typename Type>
-    task* task_factory::creator<Type>::get_task(std::vector<message*>& data, std::vector<const message*>& c_data)
-    { return new Type(data, c_data); }
+    template<typename Type, typename... ArgTypes>
+    task_factory::id<Type, ArgTypes...> task_factory::performer<Type, ArgTypes...>::my_type;
 
-    template<typename Type>
-    task_factory::id<Type> task_factory::creator<Type>::my_type;
-
-    template<typename Type>
-    task_type task_factory::creator<Type>::get_type()
+    template<typename Type, typename... ArgTypes>
+    perform_type task_factory::performer<Type, ArgTypes...>::get_type()
     { return my_type.value; }
 
-    template<typename Type>
-    task_type task_factory::add()
+    template<typename Type, typename... ArgTypes>
+    void task_factory::performer<Type, ArgTypes...>::perform(task* t, const std::vector<message*>& args, const std::vector<const message*>& c_args)
     {
-        task_vec().push_back(new creator<Type>);
+        std::tuple<empty_ref_wrapper<ArgTypes>...> tp;
+        size_t ind1 = 0, ind2 = 0;
+        tuple_processers<sizeof...(ArgTypes), ArgTypes...>::two_vectors_to_ref_tuple(args, c_args, ind1, ind2, tp);
+        apply([&t](empty_ref_wrapper<ArgTypes>... args2)->void
+        {
+            (*dynamic_cast<Type*>(t))(static_cast<ArgTypes&>(args2)...);
+        }, tp);
+    }
+
+    template<typename Type, typename... ArgTypes>
+    std::vector<bool> task_factory::performer<Type, ArgTypes...>::const_map_v(get_const_map<ArgTypes...>());
+
+    template<typename Type, typename... ArgTypes>
+    const std::vector<bool>& task_factory::performer<Type, ArgTypes...>::const_map()
+    { return const_map_v; }
+
+    template<typename Type, typename... ArgTypes>
+    perform_type task_factory::add()
+    {
+        std::unique_ptr<performer_base> p(new performer<Type, ArgTypes...>());
+        task_vec().push_back(std::move(p));
         return task_vec().size() - 1;
     }
 
-    template<typename Type>
-    task_type task_factory::get_type()
-    { return creator<Type>::get_type(); }
+    template<typename Type, typename... ArgTypes>
+    perform_type task_factory::get_type()
+    { return performer<Type, ArgTypes...>::get_type(); }
 
-    template<class Type>
-    local_task_id task::create_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
-    { return env->create_task(task_factory::get_type<Type>(), data, const_data); }
 
-    template<class Type>
-    local_task_id task::create_child_task(const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
-    { return env->create_child_task(task_factory::get_type<Type>(), data, const_data); }
+    // new task
+    template<class Type, class... ArgTypes>
+    new_task_id<Type> task::add_task(mes_id<Type> t, mes_id<ArgTypes>... args)
+    {
+        std::vector<local_message_id> data, const_data;
+        tuple_processers<sizeof...(ArgTypes), ArgTypes...>::ids_to_two_vectors(data, const_data, std::make_tuple<mes_id<ArgTypes>...>(args...));
+        return env->add_task(task_factory::get_type<Type>(), t, data, const_data);
+    }
 
-    template<class Type>
-    local_task_id task::add_task(Type* t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
-    { return env->add_task(task_factory::get_type<Type>(), t, data, const_data); }
+    template<class Type, class... ArgTypes>
+    new_task_id<Type> task::add_child_task(mes_id<Type> t, mes_id<ArgTypes>... args)
+    {
+        std::vector<local_message_id> data, const_data;
+        tuple_processers<sizeof...(ArgTypes), ArgTypes...>::ids_to_two_vectors(data, const_data, std::make_tuple<mes_id<ArgTypes>...>(args...));
+        return env->add_child_task(task_factory::get_type<Type>(), t, data, const_data);
+    }
 
-    template<class Type>
-    local_task_id task::add_child_task(Type* t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
-    { return env->add_child_task(task_factory::get_type<Type>(), t, data, const_data); }
+    template<class Type, class... InfoTypes, class... ArgTypes>
+    new_task_id<Type> task::create_task(std::tuple<mes_id<ArgTypes>...> args, InfoTypes*... info)
+    {
+        std::vector<message*> v;
+        tuple_processers<sizeof...(InfoTypes), InfoTypes...>::create_vector_from_pointers(v, std::make_tuple(info...));
+        std::vector<local_message_id> data, const_data;
+        tuple_processers<sizeof...(ArgTypes), ArgTypes...>::ids_to_two_vectors(data, const_data, args);
+        return env->create_task({message_init_factory::get_type<Type, InfoTypes...>(), task_factory::get_type<Type, ArgTypes...>()}, data, const_data, v);
+    }
+
+    template<class Type, class... InfoTypes, class... ArgTypes>
+    new_task_id<Type> task::create_child_task(std::tuple<mes_id<ArgTypes>...> args, InfoTypes*... info)
+    {
+        std::vector<message*> v;
+        tuple_processers<sizeof...(InfoTypes), InfoTypes...>::create_vector_from_pointers(v, std::make_tuple(info...));
+        std::vector<local_message_id> data, const_data;
+        tuple_processers<sizeof...(ArgTypes), ArgTypes...>::ids_to_two_vectors(data, const_data, args);
+        return env->create_child_task({message_init_factory::get_type<Type, InfoTypes...>(), task_factory::get_type<Type, ArgTypes...>()}, data, const_data, v);
+    }
 
 }
 

@@ -10,9 +10,9 @@ namespace apl
     message_init_factory::creator_base::~creator_base()
     { }
 
-    std::vector<message_init_factory::creator_base*>& message_init_factory::message_vec()
+    std::vector<std::unique_ptr<message_init_factory::creator_base>>& message_init_factory::message_vec()
     {
-        static std::vector<creator_base*> v;
+        static std::vector<std::unique_ptr<creator_base>> v;
         return v;
     }
 
@@ -29,9 +29,9 @@ namespace apl
     message_child_factory::creator_base::~creator_base()
     { }
 
-    std::vector<message_child_factory::creator_base*>& message_child_factory::message_vec()
+    std::vector<std::unique_ptr<message_child_factory::creator_base>>& message_child_factory::message_vec()
     {
-        static std::vector<creator_base*> v;
+        static std::vector<std::unique_ptr<creator_base>> v;
         return v;
     }
 
