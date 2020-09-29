@@ -108,7 +108,7 @@ namespace apl
 
     enum class TAG
     {
-        UNDEFINED = INT_MAX,
+        UNDEFINED = std::numeric_limits<int>::max(),
         ANY = MPI_ANY_TAG,
         MAIN = 0,
         SIZE = 1

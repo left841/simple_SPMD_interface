@@ -4,6 +4,7 @@
 #include <queue>
 #include <climits>
 #include <cassert>
+#include <cstddef>
 #include "mpi.h"
 #include "parallel_defs.h"
 #include "parallel_core.h"
@@ -14,7 +15,7 @@ namespace apl
     template<typename Type, typename Member>
     constexpr size_t offset_of(Member Type::* member)
     {
-        return reinterpret_cast<char*>(&(reinterpret_cast<Type*>(nullptr)->*member)) - reinterpret_cast<char*>(nullptr);
+        return reinterpret_cast<char*>(&(reinterpret_cast<Type*>(0)->*member)) - reinterpret_cast<char*>(0);
     }
 
     struct simple_datatype
@@ -23,7 +24,7 @@ namespace apl
         MPI_Datatype type;
 
         simple_datatype(MPI_Datatype type);
-        
+
         simple_datatype(std::vector<MPI_Datatype> types, std::vector<size_t> offsets);
     };
 

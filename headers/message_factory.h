@@ -66,7 +66,7 @@ namespace apl
 
     template<typename Type>
     empty_ref_wrapper<Type>& empty_ref_wrapper<Type>::operator=(const empty_ref_wrapper<Type>& src)
-    { 
+    {
         p = src.p;
         return *this;
     }
@@ -110,9 +110,9 @@ namespace apl
 
     template<typename Type>
     std::enable_if_t<std::is_const<Type>::value, Type*> choose_vector(const std::vector<message*>& v, const std::vector<const message*>& cv, size_t& v_pos, size_t& cv_pos)
-    { 
+    {
         cv_pos += 1;
-        return transform_from_message<std::remove_const<Type>::type>(cv.at(cv_pos - 1));
+        return transform_from_message<typename std::remove_const<Type>::type>(cv.at(cv_pos - 1));
     }
 
     template<typename Type>
@@ -129,14 +129,6 @@ namespace apl
     template<typename Type>
     std::enable_if_t<!std::is_const<Type>::value> choose_vector_to_push(mes_id<Type> m, std::vector<local_message_id>& v, std::vector<local_message_id>& cv)
     { v.push_back(m); }
-
-    template<typename... Args>
-    std::vector<bool> get_const_map()
-    {
-        std::vector<bool> v(sizeof...(Args));
-        tuple_processers<sizeof...(Args), Args...>::get_const_map_impl(v);
-        return v;
-    }
 
     template<typename Type>
     std::enable_if_t<std::is_const<Type>::value, bool> mark_const_as_bool()
@@ -214,6 +206,13 @@ namespace apl
         { }
     };
 
+    template<typename... Args>
+    std::vector<bool> get_const_map()
+    {
+        std::vector<bool> v(sizeof...(Args));
+        tuple_processers<sizeof...(Args), Args...>::get_const_map_impl(v);
+        return v;
+    }
 
     enum class MESSAGE_FACTORY_TYPE: size_t
     {
