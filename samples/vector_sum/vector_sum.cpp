@@ -127,12 +127,12 @@ public:
             mes_id<my_vector> second_child = create_message_child<my_vector>(second_id, new size_t(new_size), new size_t(offset));
             mes_id<my_vector> output_child = create_message_child<my_vector>(output_id, new size_t(new_size), new size_t(offset));
 
-            create_child_task<vector_sum>(std::make_tuple(first_child.as_const(), second_child.as_const(), output_child));
+            create_child_task<vector_sum>(first_child.as_const(), second_child.as_const(), output_child);
 
             offset += new_size;
         }
 
-        add_dependence(this_task_id<vector_sum_init>(), create_task<end_task>(std::make_tuple(first_id.as_const(), second_id.as_const(), output_id.as_const())));
+        add_dependence(this_task_id<vector_sum_init>(), create_task<end_task>(first_id.as_const(), second_id.as_const(), output_id.as_const()));
     }
 };
 

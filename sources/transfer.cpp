@@ -514,6 +514,34 @@ namespace apl
     size_t receiver::probe<long double>() const
     { return probe(datatype<long double>()); }
 
+    // wchar_t
+    template<>
+    const simple_datatype& datatype<wchar_t>()
+    {
+        static simple_datatype d(MPI_WCHAR);
+        return d;
+    }
+
+    template<>
+    void sender::send<wchar_t>(const wchar_t* buf, size_t size) const
+    { send(buf, size, datatype<wchar_t>()); }
+
+    template<>
+    void sender::isend<wchar_t>(const wchar_t* buf, size_t size) const
+    { isend(buf, size, datatype<wchar_t>()); }
+
+    template<>
+    void receiver::recv<wchar_t>(wchar_t* buf, size_t size) const
+    { recv(buf, size, datatype<wchar_t>()); }
+
+    template<>
+    void receiver::irecv<wchar_t>(wchar_t* buf, size_t size) const
+    { irecv(buf, size, datatype<wchar_t>()); }
+
+    template<>
+    size_t receiver::probe<wchar_t>() const
+    { return probe(datatype<wchar_t>()); }
+
     // local_message_id
     template<>
     const simple_datatype& datatype<local_message_id>()

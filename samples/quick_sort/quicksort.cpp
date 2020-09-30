@@ -4,7 +4,6 @@
 #include <vector>
 #include <random>
 #include <algorithm>
-#include <thread>
 #include "parallel.h"
 using namespace apl;
 
@@ -106,7 +105,6 @@ public:
     void operator()(array& a)
     {
         size_t sz = a.size;
-
         if (sz < pred)
             simple_quicksort(a.p, sz);
         else
@@ -135,13 +133,13 @@ public:
             if (r + 1 > 1)
             {
                 mes_id<array> p1 = create_message_child<array>(arg_id<0, array>(), new size_t(r + 1), new size_t(0));
-                create_child_task<quick_task>(std::make_tuple(p1));
+                create_child_task<quick_task>(p1);
             }
 
             if (sz - (r + 1) > 1)
             {
                 mes_id<array> p2 = create_message_child<array>(arg_id<0, array>(), new size_t(sz - r - 1), new size_t(r + 1));
-                create_child_task<quick_task>(std::make_tuple(p2));
+                create_child_task<quick_task>(p2);
             }
         }
     }
@@ -171,8 +169,8 @@ public:
         mes_id<array> a1_id = add_message(&a1, new size_t(size));
         mes_id<array> a2_id = add_message(&a2, new size_t(size));
 
-        create_child_task<quick_task>(std::make_tuple(a1_id));
-        add_dependence(this_task_id<init_task>(), create_task<check_task>(std::make_tuple(a1_id.as_const(), a2_id, arg_id<1, double>().as_const())));
+        create_child_task<quick_task>(a1_id);
+        add_dependence(this_task_id<init_task>(), create_task<check_task>(a1_id.as_const(), a2_id, arg_id<1, double>().as_const()));
     }
 };
 

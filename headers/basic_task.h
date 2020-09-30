@@ -145,7 +145,7 @@ namespace apl
     { return {m_id, id, src}; }
 
 
-    // new task
+    // task
     class task: public message
     {
     private:
@@ -170,6 +170,11 @@ namespace apl
         new_task_id<Type> create_task(std::tuple<mes_id<ArgTypes>...> args, InfoTypes*... info);
         template<class Type, class... InfoTypes, class... ArgTypes>
         new_task_id<Type> create_child_task(std::tuple<mes_id<ArgTypes>...> args, InfoTypes*... info);
+
+        template<class Type, class... ArgTypes>
+        new_task_id<Type> create_task(mes_id<ArgTypes>... args);
+        template<class Type, class... ArgTypes>
+        new_task_id<Type> create_child_task(mes_id<ArgTypes>... args);
 
         template<class Type, class... ArgTypes>
         new_task_id<Type> add_task(mes_id<Type> t, mes_id<ArgTypes>... args);
@@ -391,6 +396,24 @@ namespace apl
         std::vector<local_message_id> data, const_data;
         tuple_processers<sizeof...(ArgTypes), ArgTypes...>::ids_to_two_vectors(data, const_data, args);
         return env->create_child_task({message_init_factory::get_type<Type, InfoTypes...>(), task_factory::get_type<Type, ArgTypes...>()}, data, const_data, v);
+    }
+
+    template<class Type, class... ArgTypes>
+    new_task_id<Type> task::create_task(mes_id<ArgTypes>... args)
+    {
+        std::vector<message*> v;
+        std::vector<local_message_id> data, const_data;
+        tuple_processers<sizeof...(ArgTypes), ArgTypes...>::ids_to_two_vectors(data, const_data, std::make_tuple(args...));
+        return env->create_task({message_init_factory::get_type<Type>(), task_factory::get_type<Type, ArgTypes...>()}, data, const_data, v);
+    }
+
+    template<class Type, class... ArgTypes>
+    new_task_id<Type> task::create_child_task(mes_id<ArgTypes>... args)
+    {
+        std::vector<message*> v;
+        std::vector<local_message_id> data, const_data;
+        tuple_processers<sizeof...(ArgTypes), ArgTypes...>::ids_to_two_vectors(data, const_data, std::make_tuple(args...));
+        return env->create_child_task({message_init_factory::get_type<Type>(), task_factory::get_type<Type, ArgTypes...>()}, data, const_data, v);
     }
 
 }

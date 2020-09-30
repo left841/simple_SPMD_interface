@@ -138,8 +138,8 @@ public:
 
     void operator()(const array& in, const array& out)
     {
-        if (depth >= working_processes())
-            create_child_task<merge_all_task>(std::make_tuple(arg_id<0, array>(), arg_id<1, array>()));
+        if ((depth << 1) > working_processes())
+            create_child_task<merge_all_task>(arg_id<0, array>(), arg_id<1, array>());
         else
         {
             size_t half_size = in.size() / 2;
@@ -151,7 +151,7 @@ public:
 
             local_task_id org1 = create_child_task<merge_organizer>(std::make_tuple(out1.as_const(), in1.as_const()), new size_t(depth << 1));
             local_task_id org2 = create_child_task<merge_organizer>(std::make_tuple(out2.as_const(), in2.as_const()), new size_t(depth << 1));
-            local_task_id mer = create_child_task<merge_task>(std::make_tuple(arg_id<0, array>().as_const(), arg_id<1, array>()));
+            local_task_id mer = create_child_task<merge_task>(arg_id<0, array>().as_const(), arg_id<1, array>());
 
             add_dependence(org1, mer);
             add_dependence(org2, mer);
@@ -213,7 +213,7 @@ public:
         mes_id<array> m_id3 = add_message(&a3, new size_t(size));
 
         local_task_id merge = create_task<merge_organizer>(std::make_tuple(m_id1.as_const(), m_id3.as_const()), new size_t(1));
-        local_task_id check = create_task<check_task>(std::make_tuple(m_id3, m_id2, arg_id<0, double>().as_const()));
+        local_task_id check = create_task<check_task>(m_id3, m_id2, arg_id<0, double>().as_const());
 
         add_dependence(merge, check);
     }

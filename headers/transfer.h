@@ -14,9 +14,17 @@ namespace apl
 
     template<typename Type, typename Member>
     constexpr size_t offset_of(Member Type::* member)
+    { return reinterpret_cast<char*>(&(reinterpret_cast<Type*>(0)->*member)) - reinterpret_cast<char*>(0); }
+
+    template<typename Type, typename Member, size_t off>
+    struct type_offset
     {
-        return reinterpret_cast<char*>(&(reinterpret_cast<Type*>(0)->*member)) - reinterpret_cast<char*>(0);
-    }
+        size_t offset;
+        typedef Member type;
+
+        type_offset(Member Type::* member)
+        { offset = reinterpret_cast<char*>(&(reinterpret_cast<Type*>(0)->*member)) - reinterpret_cast<char*>(0); }
+    };
 
     struct simple_datatype
     {
@@ -351,6 +359,25 @@ namespace apl
 
     template<>
     size_t receiver::probe<long double>() const;
+
+    // wchar_t
+    template<>
+    const simple_datatype& datatype<wchar_t>();
+
+    template<>
+    void sender::send<wchar_t>(const wchar_t* buf, size_t size) const;
+
+    template<>
+    void sender::isend<wchar_t>(const wchar_t* buf, size_t size) const;
+
+    template<>
+    void receiver::recv<wchar_t>(wchar_t* buf, size_t size) const;
+
+    template<>
+    void receiver::irecv<wchar_t>(wchar_t* buf, size_t size) const;
+
+    template<>
+    size_t receiver::probe<wchar_t>() const;
 
     // local_message_id
     template<>

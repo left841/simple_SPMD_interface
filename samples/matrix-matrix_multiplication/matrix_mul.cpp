@@ -146,10 +146,10 @@ class init_task: public task
             size_t h = n / working_processes() + ((i < n % working_processes()) ? 1: 0);
             mes_id<matrix<int>> a_child = create_message_child<matrix<int>>(a_id, new size_t(h), new size_t(m), new size_t(offset), new size_t(0));
             mes_id<matrix<int>> c_child = create_message_child<matrix<int>>(c_id, new size_t(h), new size_t(l), new size_t(offset), new size_t(0));
-            create_child_task<multiply_task<int>>(std::make_tuple(a_child.as_const(), b_id.as_const(), c_child));
+            create_child_task<multiply_task<int>>(a_child.as_const(), b_id.as_const(), c_child);
             offset += h;
         }
-        add_dependence(this_task_id<init_task>(), create_task<out_task>(std::make_tuple(a_id.as_const(), b_id.as_const(), c_id.as_const(), arg_id<3, double>().as_const())));
+        add_dependence(this_task_id<init_task>(), create_task<out_task>(a_id.as_const(), b_id.as_const(), c_id.as_const(), arg_id<3, double>().as_const()));
     }
 };
 

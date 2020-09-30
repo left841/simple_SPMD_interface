@@ -62,9 +62,17 @@ namespace apl
             size_t sub = ready_tasks.size() / comm.size();
             size_t per = ready_tasks.size() % comm.size();
 
+            size_t px = sub + ((per != 0) ? 1: 0);
+            for (size_t j = 0; j < px; ++j)
+            {
+                assigned[0].push_back(ready_tasks.front());
+                ready_tasks.pop();
+                ++all_assigned;
+            }
+
             for (process i = 1; i < comm.size(); ++i)
             {
-                size_t px = sub + ((static_cast<size_t>(comm.size()) - i <= per) ? 1: 0);
+                px = sub + ((i < per) ? 1: 0);
                 for (size_t j = 0; j < px; ++j)
                 {
                     send_task_data(ready_tasks.front(), i, ins[i], versions, contained);
@@ -72,12 +80,6 @@ namespace apl
                     ready_tasks.pop();
                     ++all_assigned;
                 }
-            }
-            for (size_t j = 0; j < sub; ++j)
-            {
-                assigned[0].push_back(ready_tasks.front());
-                ready_tasks.pop();
-                ++all_assigned;
             }
 
             for (process i = 1; i < comm.size(); ++i)
