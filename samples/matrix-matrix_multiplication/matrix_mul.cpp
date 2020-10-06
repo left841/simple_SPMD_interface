@@ -62,8 +62,7 @@ template<typename Type>
 class multiply_task: public task
 {
 public:
-    multiply_task(): task()
-    { }
+
     void operator()(const matrix<Type>& m, const matrix<Type>& b, matrix<Type>& c)
     {
         for (size_t i = 0; i < c.size(); i++)
@@ -81,8 +80,6 @@ class out_task: public task
 public:
     static bool checking;
 
-    out_task(): task()
-    { }
     void operator()(const matrix<int>& a, const matrix<int>& b, const matrix<int>& c, double start)
     {
         matrix<int> d(c.size(), c.length());
@@ -116,8 +113,7 @@ bool out_task::checking = false;
 class init_task: public task
 {
     public:
-    init_task(): task()
-    { }
+
     void operator()(size_t n, size_t m, size_t l, double& t)
     {
         matrix<int>& a = *new matrix<int>(n, m);

@@ -546,7 +546,7 @@ namespace apl
     template<>
     const simple_datatype& datatype<local_message_id>()
     {
-        static simple_datatype d({datatype<size_t>().type, datatype<size_t>().type}, {offset_of(&local_message_id::id), offset_of(&local_message_id::src)});
+        static simple_datatype d({datatype<size_t>().type, datatype<MESSAGE_SOURCE>().type}, {offset_of(&local_message_id::id), offset_of(&local_message_id::src)});
         return d;
     }
 
@@ -574,7 +574,7 @@ namespace apl
     template<>
     const simple_datatype& datatype<local_task_id>()
     {
-        static simple_datatype d({datatype<local_message_id>().type, datatype<size_t>().type, datatype<size_t>().type},
+        static simple_datatype d({datatype<local_message_id>().type, datatype<size_t>().type, datatype<TASK_SOURCE>().type},
             {offset_of(&local_task_id::mes), offset_of(&local_task_id::id), offset_of(&local_task_id::src)});
         return d;
     }

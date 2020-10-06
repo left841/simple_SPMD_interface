@@ -36,8 +36,12 @@ namespace apl
         simple_datatype(std::vector<MPI_Datatype> types, std::vector<size_t> offsets);
     };
 
-    template<typename Type, ptrdiff_t offset = 0>
-    const simple_datatype& datatype();
+    template<typename Type>
+    std::enable_if_t<!std::is_enum<Type>::value, const simple_datatype&> datatype();
+
+    template<typename Type>
+    std::enable_if_t<std::is_enum<Type>::value, const simple_datatype&> datatype()
+    { return datatype<std::underlying_type_t<Type>>(); }
 
     //template<typename... Types, ptrdiff_t... offsets>
     //const simple_datatype& datatype()

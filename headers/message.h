@@ -44,7 +44,7 @@ namespace apl
     template<typename Type>
     class message_wrapper: public message
     {
-    private:
+    protected:
 
         Type* value;
 
@@ -94,6 +94,52 @@ namespace apl
     template<typename Type>
     void message_wrapper<Type>::recv(const receiver& re)
     { re.recv(value); }
+
+    template<typename Type>
+    class message_wrapper<Type*>: public message
+    {
+    protected:
+
+        Type* ptr;
+        bool allocated;
+
+    public:
+
+        //message_wrapper();
+        //message_wrapper(Type** src);
+        message_wrapper(Type* src, bool alloc_flag);
+        virtual ~message_wrapper();
+
+        operator Type*&();
+        operator Type* const&() const;
+
+        Type** get();
+        Type* const* get() const;
+    };
+
+    template<typename Type>
+    message_wrapper<Type*>::message_wrapper(Type* src, bool alloc_flag): ptr(src), allocated(alloc_flag)
+    { }
+
+    template<typename Type>
+    message_wrapper<Type*>::~message_wrapper()
+    { }
+
+    template<typename Type>
+    message_wrapper<Type*>::operator Type*&()
+    { return ptr; }
+
+    template<typename Type>
+    message_wrapper<Type*>::operator Type* const&() const
+    { return ptr; }
+
+    template<typename Type>
+    Type** message_wrapper<Type*>::get()
+    { return &ptr; }
+
+    template<typename Type>
+    Type* const* message_wrapper<Type*>::get() const
+    { return &ptr; }
 
 }
 

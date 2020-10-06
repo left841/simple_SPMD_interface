@@ -69,8 +69,6 @@ class merge_all_task: public task
 {
 public:
 
-    merge_all_task(): task()
-    { }
     void operator()(array& s1, array& s2)
     {
         for (size_t i = 0; i < s1.size(); ++i)
@@ -106,9 +104,6 @@ public:
 class merge_task: public task
 {
 public:
-
-    merge_task(): task()
-    { }
 
     void operator()(const array& src, array& out)
     {
@@ -164,9 +159,6 @@ class check_task: public task
 public:
     static bool checking;
 
-    check_task(): task()
-    { }
-
     void operator()(array& a1, array& a2, double t)
     {
         double tm1 = MPI_Wtime();
@@ -191,9 +183,6 @@ bool check_task::checking = false;
 class init_task: public task
 {
 public:
-
-    init_task(): task()
-    { }
 
     void operator()(double& t, size_t size)
     {

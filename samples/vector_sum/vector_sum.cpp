@@ -63,8 +63,6 @@ public:
 class vector_sum: public task
 {
 public:
-    vector_sum(): task()
-    { }
 
     void operator()(const my_vector& first, const my_vector& second, my_vector& output)
     {
@@ -76,8 +74,6 @@ public:
 class end_task: public task
 {
 public:
-    end_task(): task()
-    { }
 
     void operator()(const my_vector& first, const my_vector& second, const my_vector& output)
     {
@@ -99,8 +95,6 @@ public:
 class vector_sum_init: public task
 {
 public:
-    vector_sum_init(): task()
-    { }
 
     void operator()(size_t size)
     {
