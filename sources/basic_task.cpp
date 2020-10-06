@@ -111,16 +111,16 @@ namespace apl
         return created_tasks_v.back();
     }
 
-    local_task_id task_environment::add_task(task_type type, local_message_id t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
+    local_task_id task_environment::add_task(perform_type type, local_message_id t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
     {
-        tasks_v.push_back({type.pt, data, const_data});
+        tasks_v.push_back({type, data, const_data});
         created_tasks_v.push_back({t, tasks_v.size() - 1, TASK_SOURCE::INIT});
         return created_tasks_v.back();
     }
 
-    local_task_id task_environment::add_child_task(task_type type, local_message_id t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
+    local_task_id task_environment::add_child_task(perform_type type, local_message_id t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
     {
-        tasks_child_v.push_back({type.pt, data, const_data});
+        tasks_child_v.push_back({type, data, const_data});
         created_tasks_v.push_back({t, tasks_child_v.size() - 1, TASK_SOURCE::CHILD});
         return created_tasks_v.back();
     }
