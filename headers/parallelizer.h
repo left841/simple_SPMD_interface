@@ -26,6 +26,7 @@ namespace apl
         intracomm instr_comm;
 
         std::queue<perform_id> ready_tasks;
+        std::vector<perform_id> tasks_to_del;
         memory_manager memory;
 
         void master();

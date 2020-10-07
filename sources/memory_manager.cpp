@@ -125,7 +125,7 @@ namespace apl
     {
         std::vector<message_id> childs;
         size_t id = acquire_d_info();
-        data_v[id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true, std::numeric_limits<size_t>::max()};
+        data_v[id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true, 0, std::numeric_limits<size_t>::max()};
         mes_map[base_mes_id] = id;
         return base_mes_id++;
     }
@@ -134,10 +134,13 @@ namespace apl
     {
         std::vector<message_id> childs;
         size_t id = acquire_d_info();
-        data_v[id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::CHILD, type, parent, childs, true, std::numeric_limits<size_t>::max()};
+        data_v[id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::CHILD, type, parent, childs, true, 0, std::numeric_limits<size_t>::max()};
         mes_map[base_mes_id] = id;
         if (message_contained(parent))
+        {
+            ++resolve_mes_id(parent).refs_count;
             resolve_mes_id(parent).childs.push_back(base_mes_id);
+        }
         return base_mes_id++;
     }
 
@@ -174,7 +177,7 @@ namespace apl
         for (message* i: info)
             i->wait_requests();
         if (message_contained(parent))
-            mes = message_child_factory::get(type, resolve_mes_id(parent).d, info);
+            mes = message_child_factory::get(type, get_message(parent), info);
         else
             mes = message_child_factory::get(type, info);
         return add_message_child(mes, type, parent, info);
@@ -211,7 +214,7 @@ namespace apl
     {
         std::vector<message_id> childs;
         size_t ac_id = acquire_d_info();
-        data_v[ac_id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true, std::numeric_limits<size_t>::max()};
+        data_v[ac_id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true, 0, std::numeric_limits<size_t>::max()};
         mes_map[id] = ac_id;
     }
 
@@ -219,10 +222,13 @@ namespace apl
     {
         std::vector<message_id> childs;
         size_t ac_id = acquire_d_info();
-        data_v[ac_id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::CHILD, type, parent, childs, true, std::numeric_limits<size_t>::max()};
+        data_v[ac_id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::CHILD, type, parent, childs, true, 0, std::numeric_limits<size_t>::max()};
         mes_map[id] = ac_id;
         if (message_contained(parent))
+        {
+            ++resolve_mes_id(parent).refs_count;
             resolve_mes_id(parent).childs.push_back(id);
+        }
     }
 
     void memory_manager::add_perform_with_id(task_id id, perform_type type, const std::vector<message_id>& data, const std::vector<message_id>& const_data)
@@ -253,7 +259,7 @@ namespace apl
         for (message* i: info)
             i->wait_requests();
         if (message_contained(parent))
-            mes = message_child_factory::get(type, resolve_mes_id(parent).d, info);
+            mes = message_child_factory::get(type, get_message(parent), info);
         else
             mes = message_child_factory::get(type, info);
         return add_message_child_with_id(mes, id, type, parent, info);

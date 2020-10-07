@@ -14,7 +14,8 @@ namespace apl
     enum class INSTRUCTION: size_t
     {
         UNDEFINED, END, MES_SEND, MES_RECV, MES_CREATE,
-        MES_P_CREATE, TASK_EXE, TASK_CREATE, TASK_RES, ADD_RES_TO_MEMORY
+        MES_P_CREATE, TASK_EXE, TASK_CREATE, TASK_RES, ADD_RES_TO_MEMORY,
+        MES_DEL, TASK_DEL
     };
 
     class instruction_block
@@ -143,6 +144,24 @@ namespace apl
         std::vector<message_id> added_messages_child() const;
     };
 
+    class instruction_message_delete: public instruction_block
+    {
+    public:
+        instruction_message_delete(const size_t* const p);
+
+        size_t size() const;
+        message_id id() const;
+    };
+
+    class instruction_task_delete: public instruction_block
+    {
+    public:
+        instruction_task_delete(const size_t* const p);
+
+        size_t size() const;
+        perform_id id() const;
+    };
+
     class instruction: public message
     {
     private:
@@ -198,6 +217,8 @@ namespace apl
         void add_task_creation(task_id id, task_type type, std::vector<message_id> data, std::vector<message_id> c_data);
         void add_task_result(task_id id);
         void add_add_result_to_memory(const std::vector<message_id>& mes, const std::vector<message_id>& mes_c);
+        void add_message_del(message_id id);
+        void add_task_del(perform_id id);
 
         const_iterator begin() const;
         const_iterator end() const;

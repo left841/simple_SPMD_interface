@@ -74,7 +74,13 @@ namespace apl
         { return new instruction_task_result(p); },
 
         [](const size_t* const p)->const instruction_block*
-        { return new instruction_add_result_to_memory(p); }
+        { return new instruction_add_result_to_memory(p); },
+
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_message_delete(p); },
+
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_task_delete(p); }
     };
 
     const instruction_block* instruction::block_factory::get(const size_t* const p)
@@ -332,6 +338,38 @@ namespace apl
         v.push_back(mes_c.size());
         for (message_id i: mes_c)
             v.push_back(i);
+    }
+
+    // MES_DEL
+    instruction_message_delete::instruction_message_delete(const size_t* const p): instruction_block(p)
+    { }
+
+    size_t instruction_message_delete::size() const
+    { return 2; }
+
+    message_id instruction_message_delete::id() const
+    { return static_cast<message_id>(ins[1]); }
+
+    void instruction::add_message_del(message_id id)
+    {
+        add_cmd(INSTRUCTION::MES_DEL);
+        v.push_back(id);
+    }
+
+    // TASK_DEL
+    instruction_task_delete::instruction_task_delete(const size_t* const p): instruction_block(p)
+    { }
+
+    size_t instruction_task_delete::size() const
+    { return 2; }
+
+    perform_id instruction_task_delete::id() const
+    { return static_cast<perform_id>(ins[1]); }
+
+    void instruction::add_task_del(perform_id id)
+    {
+        add_cmd(INSTRUCTION::TASK_DEL);
+        v.push_back(id);
     }
 
 }

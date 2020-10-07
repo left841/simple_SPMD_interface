@@ -62,6 +62,21 @@ namespace apl
             size_t sub = ready_tasks.size() / comm.size();
             size_t per = ready_tasks.size() % comm.size();
 
+            for (perform_id i: tasks_to_del)
+            {
+                contained_tasks[0].erase(i);
+                memory.delete_perform(i);
+                for (process j = 1; j < comm.size(); ++j)
+                {
+                    if (contained_tasks[j].find(i) != contained_tasks[j].end())
+                    {
+                        contained_tasks[j].erase(i);
+                        ins[j].add_task_del(i);
+                    }
+                }
+            }
+            tasks_to_del.clear();
+
             size_t px = sub + ((per != 0) ? 1: 0);
             for (size_t j = 0; j < px; ++j)
             {
@@ -235,10 +250,9 @@ namespace apl
                 break;
             }
             case INSTRUCTION::TASK_CREATE:
-
-                break;
-
             case INSTRUCTION::TASK_EXE:
+            case INSTRUCTION::MES_DEL:
+            case INSTRUCTION::TASK_DEL:
 
                 break;
 
@@ -275,7 +289,6 @@ namespace apl
 
         for (message_id i: memory.get_perform_data(tid))
         {
-            memory.get_message(i)->wait_requests();
             memory.include_child_to_parent_recursive(i);
             message_id j = i;
             while (memory.message_has_parent(j))
@@ -339,7 +352,6 @@ namespace apl
                             break;
                         }
                     }
-                    memory.get_message(src)->wait_requests();
                     messages_childs_id.push_back(memory.create_message_child(d.type, src, d.pi));
                     con[main_proc].insert(messages_childs_id.back());
                     ver[main_proc].insert(messages_childs_id.back());
@@ -380,7 +392,6 @@ namespace apl
                     }
                     for (process k = 1; k < comm.size(); ++k)
                         ver[k].erase(src);
-                    memory.get_message(src)->wait_requests();
                     messages_childs_add_id.push_back(memory.add_message_child(d.mes, d.type, src, d.pi));
                     con[main_proc].insert(messages_childs_add_id.back());
                     ver[main_proc].insert(messages_childs_add_id.back());
@@ -638,7 +649,6 @@ namespace apl
 
         for (message_id i: memory.get_task_data(tid))
         {
-            memory.get_message(i)->wait_requests();
             memory.include_child_to_parent_recursive(i);
             message_id j = i;
             while (memory.message_has_parent(j))
@@ -656,8 +666,6 @@ namespace apl
                 case MESSAGE_SOURCE::INIT:
                 {
                     message_init_data& d = env.created_messages_init()[i.id];
-                    for (message* p: d.ii)
-                        p->wait_requests();
                     messages_init_id.push_back(memory.create_message_init(d.type, d.ii));
                     con[main_proc].insert(messages_init_id.back());
                     ver[main_proc].insert(messages_init_id.back());
@@ -666,8 +674,6 @@ namespace apl
                 case MESSAGE_SOURCE::INIT_A:
                 {
                     message_init_add_data& d = env.added_messages_init()[i.id];
-                    for (message* p: d.ii)
-                        p->wait_requests();
                     messages_init_add_id.push_back(memory.create_message_init(d.type, d.ii));
                     comm.recv(memory.get_message(messages_init_add_id.back()), proc);
                     con[main_proc].insert(messages_init_add_id.back());
@@ -711,9 +717,6 @@ namespace apl
                         default:
                             comm.abort(765);
                     }
-                    memory.get_message(src)->wait_requests();
-                    for (message* p: d.pi)
-                        p->wait_requests();
                     messages_childs_id.push_back(memory.create_message_child(d.type, src, d.pi));
                     con[main_proc].insert(messages_childs_id.back());
                     ver[main_proc].insert(messages_childs_id.back());
@@ -756,9 +759,6 @@ namespace apl
                     }
                     for (process k = 1; k < comm.size(); ++k)
                         ver[k].erase(src);
-                    memory.get_message(src)->wait_requests();
-                    for (message* p: d.pi)
-                        p->wait_requests();
                     messages_childs_add_id.push_back(memory.create_message_child(d.type, src, d.pi));
                     comm.recv(memory.get_message(messages_childs_add_id.back()), proc);
                     con[main_proc].insert(messages_childs_add_id.back());
@@ -1001,12 +1001,15 @@ namespace apl
         while (1)
         {
             if (memory.get_perform_created_childs(c_t) == 0)
+            {
                 for (perform_id i: memory.get_perform_childs(c_t))
                 {
                     memory.set_perform_parents_count(i, memory.get_perform_parents_count(i) - 1);
                     if (memory.get_perform_parents_count(i) == 0)
                         ready_tasks.push(i);
                 }
+                tasks_to_del.push_back(c_t);
+            }
             else
                 break;
             if (!memory.perform_has_parent(c_t))
@@ -1048,8 +1051,6 @@ namespace apl
                     std::vector<message*> iib = message_init_factory::get_info(j.type());
                     for (message* p: iib)
                         instr_comm.recv(p, main_proc);
-                    for (message* p: iib)
-                        p->wait_requests();
                     memory.create_message_init_with_id(j.id(), j.type(), iib);
                     break;
                 }
@@ -1059,10 +1060,6 @@ namespace apl
                     std::vector<message*> pib = message_child_factory::get_info(j.type());
                     for (message* p: pib)
                         instr_comm.recv(p, main_proc);
-                    for (message* p: pib)
-                        p->wait_requests();
-                    if (memory.message_contained(j.source()))
-                        memory.get_message(j.source())->wait_requests();
                     memory.create_message_child_with_id(j.id(), j.type(), j.source(), pib);
                     break;
                 }
@@ -1076,6 +1073,18 @@ namespace apl
                 {
                     const instruction_task_execute& j = dynamic_cast<const instruction_task_execute&>(i);
                     execute_task(j.id().pi);
+                    break;
+                }
+                case INSTRUCTION::MES_DEL:
+                {
+                    const instruction_message_delete& j = dynamic_cast<const instruction_message_delete&>(i);
+                    memory.delete_message(j.id());
+                    break;
+                }
+                case INSTRUCTION::TASK_DEL:
+                {
+                    const instruction_task_delete& j = dynamic_cast<const instruction_task_delete&>(i);
+                    memory.delete_perform(j.id());
                     break;
                 }
                 case INSTRUCTION::END:
@@ -1167,7 +1176,6 @@ namespace apl
                 case MESSAGE_SOURCE::INIT_A:
                 {
                     message_init_add_data& d = env.added_messages_init()[i.id];
-                    d.mes->wait_requests();
                     memory.add_message_init_with_id(d.mes, messages_init_add_id[i.id], d.type, d.ii);
                     break;
                 }
@@ -1184,7 +1192,6 @@ namespace apl
                 case MESSAGE_SOURCE::CHILD_A:
                 {
                     message_child_add_data& d = env.added_messages_child()[i.id];
-                    d.mes->wait_requests();
                     memory.add_message_child_with_id(d.mes, messages_childs_add_id[i.id], d.type, MESSAGE_ID_UNDEFINED, d.pi);
                     break;
                 }
