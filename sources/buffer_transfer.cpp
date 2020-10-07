@@ -3,7 +3,7 @@
 namespace apl
 {
 
-    buffer_sender::buffer_sender(MPI_Comm _comm, process _proc, std::queue<MPI_Request>* _q): sender(), comm(_comm), proc(_proc), q(_q)
+    buffer_sender::buffer_sender(MPI_Comm _comm, process _proc, std::vector<MPI_Request>* _q): sender(), comm(_comm), proc(_proc), q(_q)
     { }
 
     void buffer_sender::send_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const
@@ -36,16 +36,7 @@ namespace apl
         return req;
     }
 
-    void buffer_sender::wait_all() const
-    {
-        while (!q->empty())
-        {
-            MPI_Wait(&q->front(), MPI_STATUS_IGNORE);
-            q->pop();
-        }
-    }
-
     void buffer_sender::store_request(MPI_Request req) const
-    { q->push(req); }
+    { q->push_back(req); }
 
 }

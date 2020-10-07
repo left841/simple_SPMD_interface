@@ -70,8 +70,6 @@ namespace apl
         template<class T>
         void isend(const T* buf, size_t size = 1) const;
 
-        virtual void wait_all() const = 0;
-
         virtual void store_request(MPI_Request req) const = 0;
 
     };
@@ -105,8 +103,6 @@ namespace apl
         void irecv(T* buf, size_t size = 1) const;
         template<class T>
         size_t probe() const;
-
-        virtual void wait_all() const = 0;
 
         virtual void store_request(MPI_Request req) const = 0;
 

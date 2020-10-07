@@ -3,7 +3,7 @@
 namespace apl
 {
 
-    standard_sender::standard_sender(MPI_Comm _comm, process _proc, std::queue<MPI_Request>* _q): sender(), comm(_comm), proc(_proc), q(_q)
+    standard_sender::standard_sender(MPI_Comm _comm, process _proc, std::vector<MPI_Request>* _q): sender(), comm(_comm), proc(_proc), q(_q)
     { }
 
     void standard_sender::send_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const
@@ -36,19 +36,10 @@ namespace apl
         return req;
     }
 
-    void standard_sender::wait_all() const
-    {
-        while (!q->empty())
-        {
-            MPI_Wait(&q->front(), MPI_STATUS_IGNORE);
-            q->pop();
-        }
-    }
-
     void standard_sender::store_request(MPI_Request req) const
-    { q->push(req); }
+    { q->push_back(req); }
 
-    standard_receiver::standard_receiver(MPI_Comm _comm, process _proc, std::queue<MPI_Request>* _q): receiver(), comm(_comm), proc(_proc), q(_q)
+    standard_receiver::standard_receiver(MPI_Comm _comm, process _proc, std::vector<MPI_Request>* _q): receiver(), comm(_comm), proc(_proc), q(_q)
     { }
 
     MPI_Status standard_receiver::recv_impl(void* buf, size_t size, const simple_datatype& type, TAG tg = TAG::UNDEFINED) const
@@ -99,16 +90,7 @@ namespace apl
         return status;
     }
 
-    void standard_receiver::wait_all() const
-    {
-        while (!q->empty())
-        {
-            MPI_Wait(&q->front(), MPI_STATUS_IGNORE);
-            q->pop();
-        }
-    }
-
     void standard_receiver::store_request(MPI_Request req) const
-    { q->push(req); }
+    { q->push_back(req); }
 
 }

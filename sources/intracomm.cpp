@@ -18,35 +18,35 @@ namespace apl
     void intracomm::send(message* mes, process proc)
     {
         mes->wait_requests();
-        standard_sender se(comm, proc, &(mes->req_q));
+        standard_sender se(comm, proc, &(mes->req_v));
         mes->send(se);
     }
 
     void intracomm::bsend(message* mes, process proc)
     {
         mes->wait_requests();
-        buffer_sender se(comm, proc, &(mes->req_q));
+        buffer_sender se(comm, proc, &(mes->req_v));
         mes->send(se);
     }
 
     void intracomm::ssend(message* mes, process proc)
     {
         mes->wait_requests();
-        synchronous_sender se(comm, proc, &(mes->req_q));
+        synchronous_sender se(comm, proc, &(mes->req_v));
         mes->send(se);
     }
 
     void intracomm::rsend(message* mes, process proc)
     {
         mes->wait_requests();
-        ready_sender se(comm, proc, &(mes->req_q));
+        ready_sender se(comm, proc, &(mes->req_v));
         mes->send(se);
     }
 
     void intracomm::recv(message* mes, process proc)
     {
         mes->wait_requests();
-        standard_receiver re(comm, proc, &(mes->req_q));
+        standard_receiver re(comm, proc, &(mes->req_v));
         mes->recv(re);
     }
 

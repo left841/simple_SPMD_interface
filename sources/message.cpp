@@ -7,14 +7,14 @@ namespace apl
     { }
 
     message::~message()
-    { /*wait_requests();*/ }
+    { }
 
     void message::wait_requests()
     {
-        while (req_q.size())
+        if (req_v.size())
         {
-            MPI_Wait(&req_q.front(), MPI_STATUS_IGNORE);
-            req_q.pop();
+            MPI_Waitall(static_cast<int>(req_v.size()), req_v.data(), MPI_STATUSES_IGNORE);
+            req_v.clear();
         }
     }
 

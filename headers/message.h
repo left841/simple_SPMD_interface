@@ -1,7 +1,6 @@
 #ifndef __MESSAGE_H__
 #define __MESSAGE_H__
 
-#include <queue>
 #include <vector>
 #include "mpi.h"
 #include "parallel_defs.h"
@@ -14,7 +13,7 @@ namespace apl
     {
     private:
 
-        std::queue<MPI_Request> req_q;
+        std::vector<MPI_Request> req_v;
 
     public:
 
