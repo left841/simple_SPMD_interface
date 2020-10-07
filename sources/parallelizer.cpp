@@ -1001,11 +1001,11 @@ namespace apl
         while (1)
         {
             if (memory.get_perform_created_childs(c_t) == 0)
-                for (task_id i: memory.get_perform_childs(c_t))
+                for (perform_id i: memory.get_perform_childs(c_t))
                 {
-                    memory.set_task_parents_count(i, memory.get_task_parents_count(i) - 1);
-                    if (memory.get_task_parents_count(i) == 0)
-                        ready_tasks.push(i.pi);
+                    memory.set_perform_parents_count(i, memory.get_perform_parents_count(i) - 1);
+                    if (memory.get_perform_parents_count(i) == 0)
+                        ready_tasks.push(i);
                 }
             else
                 break;

@@ -24,22 +24,42 @@ namespace apl
             message_id parent;
             std::vector<message_id> childs;
             bool created;
+            size_t refs_count;
+            size_t next_empty = std::numeric_limits<size_t>::max();
         };
 
         struct t_info
         {
             message_id m_id;
             perform_type type;
-            task_id parent;
+            perform_id parent;
             size_t parents_count;
             size_t created_childs;
-            std::vector<task_id> childs;
+            std::vector<perform_id> childs;
             std::vector<message_id> data;
             std::vector<message_id> const_data;
+            size_t next_empty = std::numeric_limits<size_t>::max();
         };
+
+        size_t first_empty_message = std::numeric_limits<size_t>::max();
+        size_t first_empty_task = std::numeric_limits<size_t>::max();
+
+        std::map<message_id, size_t> mes_map;
+        std::map<perform_id, size_t> task_map;
 
         std::vector<t_info> task_v;
         std::vector<d_info> data_v;
+
+        std::vector<message_id> messages_to_del;
+        std::vector<perform_id> tasks_to_del;
+
+        d_info& resolve_mes_id(message_id id);
+        t_info& resolve_task_id(perform_id id);
+        size_t acquire_d_info();
+        size_t acquire_t_info();
+
+        message_id base_mes_id = 0;
+        perform_id base_task_id = 0;
 
     public:
         memory_manager();
@@ -53,24 +73,24 @@ namespace apl
         message_id add_message_init(message* ptr, message_type type, std::vector<message*>& info);
         message_id add_message_child(message* ptr, message_type type, message_id parent, std::vector<message*>& info);
         perform_id add_perform(message_id mes, perform_type type, const std::vector<message_id>& data, const std::vector<message_id>& const_data);
-        task_id add_task(task* ptr, task_type type, std::vector<message_id> data, std::vector<message_id> const_data, std::vector<message*>& info);
+        task_id add_task(task* ptr, task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info);
 
         message_id create_message_init(message_type type, std::vector<message*>& info);
         message_id create_message_child(message_type type, message_id parent, std::vector<message*>& info);
-        task_id create_task(task_type type, std::vector<message_id> data, std::vector<message_id> const_data, std::vector<message*>& info);
+        task_id create_task(task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info);
         void include_child_to_parent(message_id child);
         void include_child_to_parent_recursive(message_id child);
 
         void add_message_init_with_id(message* ptr, message_id id, message_type type, std::vector<message*>& info);
         void add_message_child_with_id(message* ptr, message_id id, message_type type, message_id parent, std::vector<message*>& info);
         void add_perform_with_id(task_id id, perform_type type, const std::vector<message_id>& data, const std::vector<message_id>& const_data);
-        void add_task_with_id(task* ptr, task_id id, task_type type, std::vector<message_id> data, std::vector<message_id> const_data, std::vector<message*>& info);
+        void add_task_with_id(task* ptr, task_id id, task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info);
 
         void create_message_init_with_id(message_id id, message_type type, std::vector<message*>& info);
         void create_message_child_with_id(message_id id, message_type type, message_id parent, std::vector<message*>& info);
-        void create_task_with_id(task_id id, task_type type, std::vector<message_id> data, std::vector<message_id> const_data, std::vector<message*>& info);
+        void create_task_with_id(task_id id, task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info);
 
-        void update_message_versions(message_id id);
+        void update_message_versions(perform_id id);
         void update_version(message_id id, size_t new_version);
 
         void add_dependence(perform_id parent, perform_id child);
@@ -87,10 +107,11 @@ namespace apl
         void set_task(task_id id, task* new_task);
         void set_task_type(task_id id, task_type new_type);
         void set_task_parent(task_id id, task_id new_parent);
+        void set_perform_parents_count(perform_id id, size_t new_parents_count);
         void set_task_parents_count(task_id id, size_t new_parents_count);
         void set_perform_created_childs(perform_id id, size_t new_created_childs);
         void set_task_created_childs(task_id id, size_t new_created_childs);
-        void set_task_childs(task_id id, std::vector<task_id> new_childs);
+        void set_task_childs(task_id id, std::vector<perform_id> new_childs);
         void set_task_data(task_id id, std::vector<message_id> new_data);
         void set_task_const_data(task_id id, std::vector<message_id> new_const_data);
 
@@ -104,16 +125,18 @@ namespace apl
 
         size_t task_count();
         task_id get_task_id(perform_id id);
+        task* get_task(message_id id);
         task* get_task(task_id id);
         perform_type get_perform_type(perform_id id);
         task_type get_task_type(task_id id);
         perform_id get_perform_parent(perform_id id);
         task_id get_task_parent(task_id id);
+        size_t get_perform_parents_count(perform_id id);
         size_t get_task_parents_count(task_id id);
         size_t get_perform_created_childs(perform_id id);
         size_t get_task_created_childs(task_id id);
-        std::vector<task_id>& get_perform_childs(perform_id id);
-        std::vector<task_id>& get_task_childs(task_id id);
+        std::vector<perform_id>& get_perform_childs(perform_id id);
+        std::vector<perform_id>& get_task_childs(task_id id);
         std::vector<message_id>& get_perform_data(perform_id id);
         std::vector<message_id>& get_task_data(task_id id);
         std::vector<message_id>& get_perform_const_data(perform_id id);
@@ -125,6 +148,7 @@ namespace apl
         bool task_has_parent(task_id id);
 
         void delete_message(message_id id);
+        void delete_perform(perform_id id);
         void delete_task(task_id id);
         void delete_message_recursive(task_id id);
         void delete_task_recursive(task_id id);

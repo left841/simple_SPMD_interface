@@ -27,9 +27,11 @@ namespace apl
 
     typedef int process;
 
+    const perform_id PERFORM_ID_UNDEFINED = std::numeric_limits<perform_id>::max();
     const task_id TASK_ID_UNDEFINED = {std::numeric_limits<message_id>::max(), std::numeric_limits<perform_id>::max()};
     const message_id MESSAGE_ID_UNDEFINED = std::numeric_limits<message_id>::max();
-    const task_type TASK_TYPE_UNDEFINED = std::numeric_limits<task_type>::max();
+    const perform_id PERFORM_TYPE_UNDEFINED = std::numeric_limits<perform_type>::max();
+    const task_type TASK_TYPE_UNDEFINED = {std::numeric_limits<message_type>::max(), std::numeric_limits<perform_type>::max()};
     const message_type MESSAGE_TYPE_UNDEFINED = std::numeric_limits<message_type>::max();
 
     enum class MESSAGE_SOURCE: size_t
