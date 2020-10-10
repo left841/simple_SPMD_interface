@@ -146,15 +146,16 @@ namespace apl
     { }
 
     size_t instruction_message_send::size() const
-    { return 2; }
+    { return 3; }
 
     message_id instruction_message_send::id() const
-    { return static_cast<message_id>(ins[1]); }
+    { return {ins[1], static_cast<process>(ins[2])}; }
 
     void instruction::add_message_sending(message_id id)
     {
         add_cmd(INSTRUCTION::MES_SEND);
-        v.push_back(id);
+        v.push_back(id.num);
+        v.push_back(id.proc);
     }
 
     // MES_RECV
@@ -162,15 +163,16 @@ namespace apl
     { }
 
     size_t instruction_message_recv::size() const
-    { return 2; }
+    { return 3; }
 
     message_id instruction_message_recv::id() const
-    { return static_cast<message_id>(ins[1]); }
+    { return {ins[1], static_cast<process>(ins[2])}; }
 
     void instruction::add_message_receiving(message_id id)
     {
         add_cmd(INSTRUCTION::MES_RECV);
-        v.push_back(id);
+        v.push_back(id.num);
+        v.push_back(id.proc);
     }
 
     // MES_CREATE
@@ -178,18 +180,19 @@ namespace apl
     { }
 
     size_t instruction_message_create::size() const
-    { return 3; }
+    { return 4; }
 
     message_id instruction_message_create::id() const
-    { return static_cast<message_id>(ins[1]); }
+    { return {ins[1], static_cast<process>(ins[2])}; }
 
     size_t instruction_message_create::type() const
-    { return ins[2]; }
+    { return ins[3]; }
 
     void instruction::add_message_creation(message_id id, message_type type)
     {
         add_cmd(INSTRUCTION::MES_CREATE);
-        v.push_back(id);
+        v.push_back(id.num);
+        v.push_back(id.proc);
         v.push_back(type);
     }
 
@@ -198,23 +201,25 @@ namespace apl
     { }
 
     size_t instruction_message_part_create::size() const
-    { return 4; }
+    { return 6; }
 
     message_id instruction_message_part_create::id() const
-    { return static_cast<message_id>(ins[1]); }
+    { return {ins[1], static_cast<process>(ins[2])}; }
 
     size_t instruction_message_part_create::type() const
-    { return ins[2]; }
+    { return ins[3]; }
 
     message_id instruction_message_part_create::source() const
-    { return ins[3]; }
+    { return {ins[4], static_cast<process>(ins[5])}; }
 
     void instruction::add_message_part_creation(message_id id, message_type type, message_id source)
     {
         add_cmd(INSTRUCTION::MES_P_CREATE);
-        v.push_back(id);
+        v.push_back(id.num);
+        v.push_back(id.proc);
         v.push_back(type);
-        v.push_back(source);
+        v.push_back(source.num);
+        v.push_back(source.proc);
     }
 
     // TASK_EXE
@@ -222,16 +227,18 @@ namespace apl
     { }
 
     size_t instruction_task_execute::size() const
-    { return 3; }
+    { return 5; }
 
     task_id instruction_task_execute::id() const
-    { return {ins[1], ins[2]}; }
+    { return {{ins[1], static_cast<process>(ins[2])}, {ins[3], static_cast<process>(ins[4])}}; }
 
     void instruction::add_task_execution(task_id id)
     {
         add_cmd(INSTRUCTION::TASK_EXE);
-        v.push_back(id.mi);
-        v.push_back(id.pi);
+        v.push_back(id.mi.num);
+        v.push_back(id.mi.proc);
+        v.push_back(id.pi.num);
+        v.push_back(id.pi.proc);
     }
 
     // TASK_CREATE
@@ -240,45 +247,54 @@ namespace apl
 
     size_t instruction_task_create::size() const
     {
-        size_t n = ins[5];
-        return 7 + n + ins[6 + n];
+        size_t n = ins[7];
+        return 9 + n * 2 + ins[8 + n * 2] * 2;
     }
 
     task_id instruction_task_create::id() const
-    { return {ins[1], ins[2]}; }
+    { return {{ins[1], static_cast<process>(ins[2])}, {ins[3], static_cast<process>(ins[4])}}; }
 
     task_type instruction_task_create::type() const
-    { return {ins[3], ins[4]}; }
+    { return {ins[5], ins[6]}; }
 
     std::vector<message_id> instruction_task_create::data() const
     {
-        std::vector<message_id> v(ins[5]);
+        std::vector<message_id> v(ins[7]);
         for (size_t i = 0; i < v.size(); ++i)
-            v[i] = ins[6 + i];
+            v[i] = {ins[8 + i * 2], static_cast<process>(ins[9 + i * 2])};
         return v;
     }
 
     std::vector<message_id> instruction_task_create::const_data() const
     {
-        std::vector<message_id> v(ins[6 + ins[5]]);
+        std::vector<message_id> v(ins[8 + ins[7] * 2]);
+        size_t n = 9 + ins[7] * 2;
         for (size_t i = 0; i < v.size(); ++i)
-            v[i] = ins[7 + ins[5] + i];
+            v[i] = {ins[n + i * 2], static_cast<process>(ins[n + i * 2 + 1])};
         return v;
     }
 
     void instruction::add_task_creation(task_id id, task_type type, std::vector<message_id> data, std::vector<message_id> c_data)
     {
         add_cmd(INSTRUCTION::TASK_CREATE);
-        v.push_back(id.mi);
-        v.push_back(id.pi);
+        v.push_back(id.mi.num);
+        v.push_back(id.mi.proc);
+        v.push_back(id.pi.num);
+        v.push_back(id.pi.proc);
         v.push_back(type.mt);
         v.push_back(type.pt);
         v.push_back(data.size());
         for (message_id i: data)
-            v.push_back(i);
+        {
+            v.push_back(i.num);
+            v.push_back(i.proc);
+        }
         v.push_back(c_data.size());
         for (message_id i: c_data)
-            v.push_back(i);
+        {
+            v.push_back(i.num);
+            v.push_back(i.proc);
+        }
     }
 
     // TASK_RES
@@ -286,24 +302,26 @@ namespace apl
     { }
 
     size_t instruction_task_result::size() const
-    { return 3; }
+    { return 5; }
 
     task_id instruction_task_result::id() const
-    { return {ins[1], ins[2]}; }
+    { return {{ins[1], static_cast<process>(ins[2])}, {ins[3], static_cast<process>(ins[4])}}; }
 
     void instruction::add_task_result(task_id id)
     {
         add_cmd(INSTRUCTION::TASK_RES);
-        v.push_back(id.mi);
-        v.push_back(id.pi);
+        v.push_back(id.mi.num);
+        v.push_back(id.mi.proc);
+        v.push_back(id.pi.num);
+        v.push_back(id.pi.proc);
     }
 
     // ADD_RES_TO_MEMORY
     instruction_add_result_to_memory::instruction_add_result_to_memory(const size_t* const p): instruction_block(p)
     {
         offsets[0] = 1;
-        offsets[1] = offsets[0] + ins[offsets[0]] + 1;
-        offsets[2] = offsets[1] + ins[offsets[1]] + 1;
+        offsets[1] = offsets[0] + ins[offsets[0]] * 2 + 1;
+        offsets[2] = offsets[1] + ins[offsets[1]] * 2 + 1;
     }
 
     size_t instruction_add_result_to_memory::size() const
@@ -314,7 +332,8 @@ namespace apl
         size_t pos = offsets[0];
         std::vector<message_id> v = read_vector<message_id>(pos, [this](size_t& p)->message_id
         {
-            return ins[p++];
+            p += 2;
+            return {ins[p - 2], static_cast<process>(ins[p - 1])};
         });
         return v;
     }
@@ -324,7 +343,8 @@ namespace apl
         size_t pos = offsets[1];
         std::vector<message_id> v = read_vector<message_id>(pos, [this](size_t& p)->message_id
         {
-            return ins[p++];
+            p += 2;
+            return {ins[p - 2], static_cast<process>(ins[p - 1])};
         });
         return v;
     }
@@ -334,10 +354,16 @@ namespace apl
         add_cmd(INSTRUCTION::ADD_RES_TO_MEMORY);
         v.push_back(mes.size());
         for (message_id i: mes)
-            v.push_back(i);
+        {
+            v.push_back(i.num);
+            v.push_back(i.proc);
+        }
         v.push_back(mes_c.size());
         for (message_id i: mes_c)
-            v.push_back(i);
+        {
+            v.push_back(i.num);
+            v.push_back(i.proc);
+        }
     }
 
     // MES_DEL
@@ -345,15 +371,16 @@ namespace apl
     { }
 
     size_t instruction_message_delete::size() const
-    { return 2; }
+    { return 3; }
 
     message_id instruction_message_delete::id() const
-    { return static_cast<message_id>(ins[1]); }
+    { return {ins[1], static_cast<process>(ins[2])}; }
 
     void instruction::add_message_del(message_id id)
     {
         add_cmd(INSTRUCTION::MES_DEL);
-        v.push_back(id);
+        v.push_back(id.num);
+        v.push_back(id.proc);
     }
 
     // TASK_DEL
@@ -361,15 +388,16 @@ namespace apl
     { }
 
     size_t instruction_task_delete::size() const
-    { return 2; }
+    { return 3; }
 
     perform_id instruction_task_delete::id() const
-    { return static_cast<perform_id>(ins[1]); }
+    { return {ins[1], static_cast<process>(ins[2])}; }
 
     void instruction::add_task_del(perform_id id)
     {
         add_cmd(INSTRUCTION::TASK_DEL);
-        v.push_back(id);
+        v.push_back(id.num);
+        v.push_back(id.proc);
     }
 
 }

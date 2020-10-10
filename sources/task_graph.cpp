@@ -3,6 +3,24 @@
 namespace apl
 {
 
+    bool message_id::operator!=(const message_id& other) const
+    { return (num != other.num) || (proc != other.proc); }
+
+    bool perform_id::operator!=(const perform_id& other) const
+    { return (num != other.num) || (proc != other.proc); }
+
+    bool task_id::operator!=(const task_id& other) const
+    { return (mi != other.mi) || (pi != other.pi); }
+
+    bool message_id::operator<(const message_id& other) const
+    { return (num != other.num) ? (num < other.num): (proc < other.proc); }
+
+    bool perform_id::operator<(const perform_id& other) const
+    { return (num != other.num) ? (num < other.num): (proc < other.proc); }
+
+    bool task_id::operator<(const task_id& other) const
+    { return (mi != other.mi) ? (mi < other.mi): (pi < other.pi); }
+
     task_graph::task_graph()
     { base_message_id = base_perform_id = 0; }
 
@@ -32,7 +50,7 @@ namespace apl
             if (d_map.find(i) == d_map.end())
             {
                 std::vector<message*> m_info;
-                d_map.insert({i, {base_message_id++, MESSAGE_TYPE_UNDEFINED, 1, m_info}});
+                d_map.insert({i, {{base_message_id++, MPI_PROC_NULL}, MESSAGE_TYPE_UNDEFINED, 1, m_info}});
             }
             else
                 ++d_map[i].ref_count;
@@ -40,14 +58,14 @@ namespace apl
         std::set<task*> childs;
         std::set<task*> parents;
         if (d_map.find(t) == d_map.end())
-            d_map.insert({t, {base_message_id++, type.mt, 1, info}});
+            d_map.insert({t, {{base_message_id++, MPI_PROC_NULL}, type.mt, 1, info}});
         else
             ++d_map[t].ref_count;
-        t_map.insert({t, {base_perform_id++, type.pt, data, childs, parents}});
+        t_map.insert({t, {{base_perform_id++, MPI_PROC_NULL}, type.pt, data, childs, parents}});
     }
 
     void task_graph::add_data(message* m, message_type type, const std::vector<message*>& info)
-    { d_map.insert({m, {base_message_id++, type, 1, info}}); }
+    { d_map.insert({m, {{base_message_id++, MPI_PROC_NULL}, type, 1, info}}); }
 
     void task_graph::add_dependence(task* parent, task* child)
     {

@@ -70,11 +70,9 @@ namespace apl
 
     public:
 
-        task_environment(perform_id id);
-        task_environment(task_data& td, task_id id);
-        task_environment(task_data&& td, task_id id);
-        task_environment(task_data& td, perform_id id);
-        task_environment(task_data&& td, perform_id id);
+        task_environment(local_task_id id);
+        task_environment(task_data& td, local_task_id id);
+        task_environment(task_data&& td, local_task_id id);
 
         local_message_id create_message_init(message_type type, const std::vector<message*>& info);
         local_message_id create_message_child(message_type type, local_message_id source, const std::vector<message*>& info);

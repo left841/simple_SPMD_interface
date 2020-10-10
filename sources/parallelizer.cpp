@@ -39,19 +39,18 @@ namespace apl
     void parallelizer::master()
     {
         std::vector<std::set<message_id>> versions(comm.size());
-        for (std::set<message_id>& i: versions)
-            for (size_t j = 0; j < memory.message_count(); ++j)
-                i.insert(j);
+        versions[0] = memory.get_messages_set();
+        for (process i = 1; i < comm.size(); ++i)
+            versions[i] = versions[0];
 
         std::vector<std::set<message_id>> contained(comm.size());
         for (process i = 0; i < comm.size(); ++i)
-            for (message_id j = 0; j < memory.message_count(); ++j)
-                contained[i].insert(j);
+            contained[i] = versions[0];
 
         std::vector<std::set<perform_id>> contained_tasks(comm.size());
-        for (process i = 0; i < comm.size(); ++i)
-            for (perform_id j = 0; j < memory.task_count(); ++j)
-                contained_tasks[i].insert(j);
+        contained_tasks[0] = memory.get_performs_set();
+        for (process i = 1; i < comm.size(); ++i)
+            contained_tasks[i] = contained_tasks[0];
 
         std::vector<instruction> ins(comm.size());
         std::vector<std::vector<perform_id>> assigned(comm.size());
@@ -129,12 +128,12 @@ namespace apl
                 {
                     perform_id i = assigned[0].back();
                     std::vector<local_message_id> data, c_data;
-                    for (message_id j: memory.get_perform_data(i))
+                    for (size_t j = 0; j < memory.get_perform_data(i).size(); ++j)
                         data.push_back({j, MESSAGE_SOURCE::TASK_ARG});
-                    for (message_id j: memory.get_perform_const_data(i))
+                    for (size_t j = 0; j < memory.get_perform_const_data(i).size(); ++j)
                         c_data.push_back({j, MESSAGE_SOURCE::TASK_ARG_C});
                     task_data td = {memory.get_perform_type(i), data, c_data};
-                    task_environment te(td, i);
+                    task_environment te(td, {{0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL});
                     te.set_proc_count(comm.size());
 
                     memory.perform_task(i, te);
@@ -342,9 +341,13 @@ namespace apl
                     switch (d.sourse.src)
                     {
                         case MESSAGE_SOURCE::TASK_ARG:
+                        {
+                            src = memory.get_perform_data(tid)[d.sourse.id];
+                            break;
+                        }
                         case MESSAGE_SOURCE::TASK_ARG_C:
                         {
-                            src = d.sourse.id;
+                            src = memory.get_perform_const_data(tid)[d.sourse.id];
                             break;
                         }
                         case MESSAGE_SOURCE::INIT:
@@ -380,9 +383,13 @@ namespace apl
                     switch (d.sourse.src)
                     {
                         case MESSAGE_SOURCE::TASK_ARG:
+                        {
+                            src = memory.get_perform_data(tid)[d.sourse.id];
+                            break;
+                        }
                         case MESSAGE_SOURCE::TASK_ARG_C:
                         {
-                            src = d.sourse.id;
+                            src = memory.get_perform_const_data(tid)[d.sourse.id];
                             break;
                         }
                         case MESSAGE_SOURCE::INIT:
@@ -443,9 +450,13 @@ namespace apl
             switch (i.mes.src)
             {
                 case MESSAGE_SOURCE::TASK_ARG:
+                {
+                    mes_t_id = memory.get_perform_data(tid)[i.mes.id];
+                    break;
+                }
                 case MESSAGE_SOURCE::TASK_ARG_C:
                 {
-                    mes_t_id = i.mes.id;
+                    mes_t_id = memory.get_perform_const_data(tid)[i.mes.id];
                     break;
                 }
                 case MESSAGE_SOURCE::INIT:
@@ -477,9 +488,13 @@ namespace apl
                 switch (k.src)
                 {
                     case MESSAGE_SOURCE::TASK_ARG:
+                    {
+                        data_id.push_back(memory.get_perform_data(tid)[k.id]);
+                        break;
+                    }
                     case MESSAGE_SOURCE::TASK_ARG_C:
                     {
-                        data_id.push_back(k.id);
+                        data_id.push_back(memory.get_perform_const_data(tid)[k.id]);
                         break;
                     }
                     case MESSAGE_SOURCE::INIT:
@@ -512,9 +527,13 @@ namespace apl
                 switch (k.src)
                 {
                     case MESSAGE_SOURCE::TASK_ARG:
+                    {
+                        const_data_id.push_back(memory.get_perform_data(tid)[k.id]);
+                        break;
+                    }
                     case MESSAGE_SOURCE::TASK_ARG_C:
                     {
-                        const_data_id.push_back(k.id);
+                        const_data_id.push_back(memory.get_perform_const_data(tid)[k.id]);
                         break;
                     }
                     case MESSAGE_SOURCE::INIT:
@@ -581,7 +600,7 @@ namespace apl
                 }
                 case TASK_SOURCE::GLOBAL:
                 {
-                    parent = i.parent.id;
+                    parent = tid;
                     break;
                 }
             }
@@ -599,7 +618,7 @@ namespace apl
                 }
                 case TASK_SOURCE::GLOBAL:
                 {
-                    child = i.child.id;
+                    child = tid;
                     break;
                 }
             }
@@ -632,7 +651,7 @@ namespace apl
         const instruction_task_result& result = dynamic_cast<const instruction_task_result&>(ins);
         
         task_id tid = result.id();
-        task_environment env(tid.pi);
+        task_environment env({{0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL});
         res_ins.clear();
 
         comm.recv(&env, proc);
@@ -705,9 +724,13 @@ namespace apl
                     switch (d.sourse.src)
                     {
                         case MESSAGE_SOURCE::TASK_ARG:
+                        {
+                            src = memory.get_perform_data(tid.pi)[d.sourse.id];
+                            break;
+                        }
                         case MESSAGE_SOURCE::TASK_ARG_C:
                         {
-                            src = d.sourse.id;
+                            src = memory.get_perform_const_data(tid.pi)[d.sourse.id];
                             break;
                         }
                         case MESSAGE_SOURCE::INIT:
@@ -745,9 +768,13 @@ namespace apl
                     switch (d.sourse.src)
                     {
                         case MESSAGE_SOURCE::TASK_ARG:
+                        {
+                            src = memory.get_perform_data(tid.pi)[d.sourse.id];
+                            break;
+                        }
                         case MESSAGE_SOURCE::TASK_ARG_C:
                         {
-                            src = d.sourse.id;
+                            src = memory.get_perform_const_data(tid.pi)[d.sourse.id];
                             break;
                         }
                         case MESSAGE_SOURCE::INIT:
@@ -816,9 +843,13 @@ namespace apl
             switch (i.mes.src)
             {
                 case MESSAGE_SOURCE::TASK_ARG:
+                {
+                    mes_t_id = memory.get_perform_data(tid.pi)[i.mes.id];
+                    break;
+                }
                 case MESSAGE_SOURCE::TASK_ARG_C:
                 {
-                    mes_t_id = i.mes.id;
+                    mes_t_id = memory.get_perform_const_data(tid.pi)[i.mes.id];
                     break;
                 }
                 case MESSAGE_SOURCE::INIT:
@@ -850,9 +881,13 @@ namespace apl
                 switch (k.src)
                 {
                     case MESSAGE_SOURCE::TASK_ARG:
+                    {
+                        data_id.push_back(memory.get_perform_data(tid.pi)[k.id]);
+                        break;
+                    }
                     case MESSAGE_SOURCE::TASK_ARG_C:
                     {
-                        data_id.push_back(k.id);
+                        data_id.push_back(memory.get_perform_const_data(tid.pi)[k.id]);
                         break;
                     }
                     case MESSAGE_SOURCE::INIT:
@@ -887,9 +922,13 @@ namespace apl
                 switch (k.src)
                 {
                     case MESSAGE_SOURCE::TASK_ARG:
+                    {
+                        const_data_id.push_back(memory.get_perform_data(tid.pi)[k.id]);
+                        break;
+                    }
                     case MESSAGE_SOURCE::TASK_ARG_C:
                     {
-                        const_data_id.push_back(k.id);
+                        const_data_id.push_back(memory.get_perform_const_data(tid.pi)[k.id]);
                         break;
                     }
                     case MESSAGE_SOURCE::INIT:
@@ -960,7 +999,7 @@ namespace apl
                 }
                 case TASK_SOURCE::GLOBAL:
                 {
-                    parent = memory.get_task_id(i.parent.id);
+                    parent = tid;
                     break;
                 }
                 default:
@@ -980,7 +1019,7 @@ namespace apl
                 }
                 case TASK_SOURCE::GLOBAL:
                 {
-                    child = memory.get_task_id(i.child.id);
+                    child = tid;
                     break;
                 }
                 default:
@@ -1120,13 +1159,13 @@ namespace apl
     void parallelizer::execute_task(perform_id id)
     {
         std::vector<local_message_id> data, c_data;
-        for (message_id i: memory.get_perform_data(id))
-            data.push_back({i, MESSAGE_SOURCE::TASK_ARG});
-        for (message_id i: memory.get_perform_const_data(id))
-            c_data.push_back({i, MESSAGE_SOURCE::TASK_ARG_C});
+        for (size_t j = 0; j < memory.get_perform_data(id).size(); ++j)
+            data.push_back({ j, MESSAGE_SOURCE::TASK_ARG });
+        for (size_t j = 0; j < memory.get_perform_const_data(id).size(); ++j)
+            c_data.push_back({j, MESSAGE_SOURCE::TASK_ARG_C});
 
         task_data td = {memory.get_perform_type(id), data, c_data};
-        task_environment env(std::move(td), id);
+        task_environment env(std::move(td), {{0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL});
         env.set_proc_count(comm.size());
 
         memory.perform_task(id, env);

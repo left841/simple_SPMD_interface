@@ -52,40 +52,17 @@ namespace apl
     {
         clear();
 
-        struct m_info
-        {
-            message* m = nullptr;
-            message_type type = MESSAGE_TYPE_UNDEFINED;
-            std::vector<message*> info;
-        };
-
-        struct t_info
-        {
-            task* t = nullptr;
-            perform_type type = PERFORM_TYPE_UNDEFINED;
-            std::vector<message*> data;
-        };
-
         std::map<task*, perform_id> tmp;
         std::map<message*, message_id> dmp;
-        std::map<size_t, t_info> tmpr;
-        std::map<size_t, m_info> dmpr;
 
         for (auto it = _tg.d_map.begin(); it != _tg.d_map.end(); ++it)
-            dmpr[it->second.id] = {it->first, it->second.type, it->second.info};
-
-        for (auto it = dmpr.begin(); it != dmpr.end(); ++it)
         {
-            message_id id = add_message_init(it->second.m, it->second.type, it->second.info);
-            resolve_mes_id(id).created = false;
-            dmp[it->second.m] = id;
+            add_message_init_with_id(it->first, it->second.id, it->second.type, it->second.info);
+            resolve_mes_id(it->second.id).created = false;
+            dmp[it->first] = it->second.id;
         }
-        dmpr.clear();
 
         for (auto it = _tg.t_map.begin(); it != _tg.t_map.end(); ++it)
-            tmpr[it->second.id] = {it->first, it->second.type, it->second.data};
-
-        for (auto it = tmpr.begin(); it != tmpr.end(); ++it)
         {
             std::vector<message_id> data, c_data;
             for (size_t i = 0; i < task_factory::const_map(it->second.type).size(); ++i)
@@ -95,11 +72,10 @@ namespace apl
                 else
                     data.push_back(dmp[it->second.data[i]]);
             }
-            perform_id id = add_perform(dmp[it->second.t], it->second.type, data, c_data);
-            tmp[it->second.t] = id;
-            resolve_task_id(id).parents_count = (*_tg.t_map.find(it->second.t)).second.parents.size();
+            add_perform_with_id({dmp[it->first], it->second.id}, it->second.type, data, c_data);
+            tmp[it->first] = it->second.id;
+            resolve_task_id(it->second.id).parents_count = it->second.parents.size();
         }
-        tmpr.clear();
 
         for (auto iit = task_map.begin(); iit != task_map.end(); ++iit)
         {
@@ -124,14 +100,31 @@ namespace apl
     std::set<message_id>& memory_manager::get_unreferenced_messages()
     { return messages_to_del; }
 
+    std::set<message_id> memory_manager::get_messages_set()
+    {
+        std::set<message_id> s;
+        for (auto it = mes_map.begin(); it != mes_map.end(); ++it)
+            s.insert(it->first);
+        return s;
+    }
+
+    std::set<perform_id> memory_manager::get_performs_set()
+    {
+        std::set<perform_id> s;
+        for (auto it = task_map.begin(); it != task_map.end(); ++it)
+            s.insert(it->first);
+        return s;
+    }
+
     message_id memory_manager::add_message_init(message* ptr, message_type type, std::vector<message*>& info)
     {
         std::vector<message_id> childs;
         size_t id = acquire_d_info();
         data_v[id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true, 0, std::numeric_limits<size_t>::max()};
-        mes_map[base_mes_id] = id;
-        messages_to_del.insert(base_mes_id);
-        return base_mes_id++;
+        message_id new_id = {base_mes_id++, parallel_engine::global_rank()};
+        mes_map[new_id] = id;
+        messages_to_del.insert(new_id);
+        return new_id;
     }
 
     message_id memory_manager::add_message_child(message* ptr, message_type type, message_id parent, std::vector<message*>& info)
@@ -139,14 +132,15 @@ namespace apl
         std::vector<message_id> childs;
         size_t id = acquire_d_info();
         data_v[id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::CHILD, type, parent, childs, true, 0, std::numeric_limits<size_t>::max()};
-        mes_map[base_mes_id] = id;
-        messages_to_del.insert(base_mes_id);
+        message_id new_id = {base_mes_id++, parallel_engine::global_rank()};
+        mes_map[new_id] = id;
+        messages_to_del.insert(new_id);
         if (message_contained(parent))
         {
             inc_ref_count(parent);
-            resolve_mes_id(parent).childs.push_back(base_mes_id);
+            resolve_mes_id(parent).childs.push_back(new_id);
         }
-        return base_mes_id++;
+        return new_id;
     }
 
     perform_id memory_manager::add_perform(message_id mes, perform_type type, const std::vector<message_id>& data, const std::vector<message_id>& const_data)
@@ -162,8 +156,9 @@ namespace apl
         for (message_id i: const_data)
             inc_ref_count(i);
 
-        task_map[base_task_id] = id;
-        return base_task_id++;
+        perform_id new_id = {base_task_id++, parallel_engine::global_rank()};
+        task_map[new_id] = id;
+        return new_id;
     }
 
     task_id memory_manager::add_task(task* ptr, task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info)
@@ -247,6 +242,14 @@ namespace apl
         std::vector<perform_id> childs;
         size_t ac_id = acquire_t_info();
         task_v[ac_id] = {id.mi, type, PERFORM_ID_UNDEFINED, 0, 0, childs, data, const_data, std::numeric_limits<size_t>::max()};
+
+        inc_ref_count(id.mi);
+        for (message_id i: data)
+            inc_ref_count(i);
+
+        for (message_id i: const_data)
+            inc_ref_count(i);
+
         task_map[id.pi] = ac_id;
     }
 

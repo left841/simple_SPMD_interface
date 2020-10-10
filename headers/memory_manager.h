@@ -11,6 +11,10 @@
 namespace apl
 {
 
+    constexpr const message_id MESSAGE_ID_UNDEFINED = {std::numeric_limits<size_t>::max(), MPI_PROC_NULL};
+    constexpr const perform_id PERFORM_ID_UNDEFINED = {std::numeric_limits<size_t>::max(), MPI_PROC_NULL};
+    constexpr const task_id TASK_ID_UNDEFINED = {MESSAGE_ID_UNDEFINED, PERFORM_ID_UNDEFINED};
+
     class memory_manager
     {
     private:
@@ -60,8 +64,8 @@ namespace apl
         void inc_ref_count(message_id id);
         void dec_ref_count(message_id id);
 
-        message_id base_mes_id = 0;
-        perform_id base_task_id = 0;
+        size_t base_mes_id = 0;
+        size_t base_task_id = 0;
 
     public:
         memory_manager();
@@ -72,6 +76,8 @@ namespace apl
 
         std::queue<perform_id> get_ready_tasks();
         std::set<message_id>& get_unreferenced_messages();
+        std::set<message_id> get_messages_set();
+        std::set<perform_id> get_performs_set();
 
         message_id add_message_init(message* ptr, message_type type, std::vector<message*>& info);
         message_id add_message_child(message* ptr, message_type type, message_id parent, std::vector<message*>& info);

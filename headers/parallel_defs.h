@@ -7,14 +7,7 @@
 namespace apl
 {
 
-    typedef size_t message_id;
-    typedef size_t perform_id;
-
-    struct task_id
-    {
-        message_id mi;
-        perform_id pi;
-    };
+    typedef int process;
 
     typedef size_t message_type;
     typedef size_t perform_type;
@@ -25,14 +18,9 @@ namespace apl
         perform_type pt;
     };
 
-    typedef int process;
-
-    const perform_id PERFORM_ID_UNDEFINED = std::numeric_limits<perform_id>::max();
-    const task_id TASK_ID_UNDEFINED = {std::numeric_limits<message_id>::max(), std::numeric_limits<perform_id>::max()};
-    const message_id MESSAGE_ID_UNDEFINED = std::numeric_limits<message_id>::max();
-    const perform_id PERFORM_TYPE_UNDEFINED = std::numeric_limits<perform_type>::max();
-    const task_type TASK_TYPE_UNDEFINED = {std::numeric_limits<message_type>::max(), std::numeric_limits<perform_type>::max()};
-    const message_type MESSAGE_TYPE_UNDEFINED = std::numeric_limits<message_type>::max();
+    constexpr const message_type MESSAGE_TYPE_UNDEFINED = std::numeric_limits<message_type>::max();
+    constexpr const perform_type PERFORM_TYPE_UNDEFINED = std::numeric_limits<perform_type>::max();
+    constexpr const task_type TASK_TYPE_UNDEFINED = {MESSAGE_TYPE_UNDEFINED, PERFORM_TYPE_UNDEFINED};
 
     enum class MESSAGE_SOURCE: size_t
     {
@@ -46,11 +34,6 @@ namespace apl
     {
         GLOBAL, INIT, REFERENCE,
         CHILD
-    };
-
-    enum class TASK_FACTORY_TYPE: size_t
-    {
-        UNDEFINED, SIMPLE
     };
 
     struct local_message_id

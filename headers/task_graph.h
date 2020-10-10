@@ -11,12 +11,39 @@
 namespace apl
 {
 
+    struct message_id
+    {
+        size_t num;
+        process proc;
+
+        bool operator!=(const message_id& other) const;
+        bool operator<(const message_id& other) const;
+    };
+
+    struct perform_id
+    {
+        size_t num;
+        process proc;
+
+        bool operator!=(const perform_id& other) const;
+        bool operator<(const perform_id& other) const;
+    };
+
+    struct task_id
+    {
+        message_id mi;
+        perform_id pi;
+
+        bool operator!=(const task_id& other) const;
+        bool operator<(const task_id& other) const;
+    };
+
     class task_graph
     {
     protected:
 
-        perform_id base_perform_id;
-        message_id base_message_id;
+        size_t base_perform_id;
+        size_t base_message_id;
 
         struct d_id
         {

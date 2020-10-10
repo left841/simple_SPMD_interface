@@ -3,25 +3,16 @@
 namespace apl
 {
 
-    task_environment::task_environment(perform_id id): this_task_id({ 0, MESSAGE_SOURCE::GLOBAL, id, TASK_SOURCE::GLOBAL }), proc_count(0)
+    task_environment::task_environment(local_task_id id): this_task_id(id), proc_count(0)
     { }
 
-    task_environment::task_environment(task_data& td, task_id id): this_task_id({0, MESSAGE_SOURCE::GLOBAL, id.pi, TASK_SOURCE::GLOBAL}), proc_count(0)
+    task_environment::task_environment(task_data& td, local_task_id id): this_task_id(id), proc_count(0)
     {
         this_task = td;
         set_all_task_data();
     }
 
-    task_environment::task_environment(task_data&& td, task_id id): this_task(std::move(td)), this_task_id({0, MESSAGE_SOURCE::GLOBAL, id.pi, TASK_SOURCE::GLOBAL}), proc_count(0)
-    { set_all_task_data(); }
-
-    task_environment::task_environment(task_data& td, perform_id id): this_task_id({0, MESSAGE_SOURCE::GLOBAL, id, TASK_SOURCE::GLOBAL}), proc_count(0)
-    {
-        this_task = td;
-        set_all_task_data();
-    }
-
-    task_environment::task_environment(task_data&& td, perform_id id): this_task(std::move(td)), this_task_id({0, MESSAGE_SOURCE::GLOBAL, id, TASK_SOURCE::GLOBAL}), proc_count(0)
+    task_environment::task_environment(task_data&& td, local_task_id id): this_task(std::move(td)), this_task_id(id), proc_count(0)
     { set_all_task_data(); }
 
     void task_environment::set_all_task_data()

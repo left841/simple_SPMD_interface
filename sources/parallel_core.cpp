@@ -5,6 +5,8 @@ namespace apl
 
     double parallel_engine::start_time;
 
+    process parallel_engine::global_comm_rank = MPI_PROC_NULL;
+
     std::vector<MPI_Datatype> parallel_engine::created_datatypes;
 
     parallel_engine::parallel_engine(int* argc, char*** argv)
@@ -25,6 +27,7 @@ namespace apl
         {
             MPI_Init(argc, argv);
             start_time = MPI_Wtime();
+            MPI_Comm_rank(MPI_COMM_WORLD, &global_comm_rank);
         }
     }
 
@@ -47,5 +50,8 @@ namespace apl
 
     double parallel_engine::get_start_time()
     { return start_time; }
+
+    process parallel_engine::global_rank()
+    { return global_comm_rank; }
 
 }

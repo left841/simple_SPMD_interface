@@ -5,6 +5,7 @@
 #include "message.h"
 #include "basic_task.h"
 #include "transfer.h"
+#include "task_graph.h"
 #include <array>
 #include <functional>
 
