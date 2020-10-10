@@ -54,15 +54,15 @@ namespace apl
 
         struct m_info
         {
-            message* m;
-            message_type type;
+            message* m = nullptr;
+            message_type type = MESSAGE_TYPE_UNDEFINED;
             std::vector<message*> info;
         };
 
         struct t_info
         {
-            task* t;
-            perform_type type;
+            task* t = nullptr;
+            perform_type type = PERFORM_TYPE_UNDEFINED;
             std::vector<message*> data;
         };
 
@@ -121,12 +121,16 @@ namespace apl
         return q;
     }
 
+    std::set<message_id>& memory_manager::get_unreferenced_messages()
+    { return messages_to_del; }
+
     message_id memory_manager::add_message_init(message* ptr, message_type type, std::vector<message*>& info)
     {
         std::vector<message_id> childs;
         size_t id = acquire_d_info();
         data_v[id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true, 0, std::numeric_limits<size_t>::max()};
         mes_map[base_mes_id] = id;
+        messages_to_del.insert(base_mes_id);
         return base_mes_id++;
     }
 
@@ -136,9 +140,10 @@ namespace apl
         size_t id = acquire_d_info();
         data_v[id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::CHILD, type, parent, childs, true, 0, std::numeric_limits<size_t>::max()};
         mes_map[base_mes_id] = id;
+        messages_to_del.insert(base_mes_id);
         if (message_contained(parent))
         {
-            ++resolve_mes_id(parent).refs_count;
+            inc_ref_count(parent);
             resolve_mes_id(parent).childs.push_back(base_mes_id);
         }
         return base_mes_id++;
@@ -149,18 +154,22 @@ namespace apl
         std::vector<perform_id> childs;
         size_t id = acquire_t_info();
         task_v[id] = {mes, type, PERFORM_ID_UNDEFINED, 0, 0, childs, data, const_data, std::numeric_limits<size_t>::max()};
+
+        inc_ref_count(mes);
+        for (message_id i: data)
+            inc_ref_count(i);
+
+        for (message_id i: const_data)
+            inc_ref_count(i);
+
         task_map[base_task_id] = id;
         return base_task_id++;
     }
 
     task_id memory_manager::add_task(task* ptr, task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info)
     {
-        std::vector<perform_id> childs;
         message_id m_id = add_message_init(ptr, type.mt, info);
-        size_t id = acquire_t_info();
-        task_v[id] = {m_id, type.pt, PERFORM_ID_UNDEFINED, 0, 0, childs, data, const_data, std::numeric_limits<size_t>::max()};
-        task_map[base_task_id] = id;
-        return {m_id, base_task_id++};
+        return {m_id, add_perform(m_id, type.pt, data, const_data)};
     }
 
     message_id memory_manager::create_message_init(message_type type, std::vector<message*>& info)
@@ -216,6 +225,7 @@ namespace apl
         size_t ac_id = acquire_d_info();
         data_v[ac_id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true, 0, std::numeric_limits<size_t>::max()};
         mes_map[id] = ac_id;
+        messages_to_del.insert(id);
     }
 
     void memory_manager::add_message_child_with_id(message* ptr, message_id id, message_type type, message_id parent, std::vector<message*>& info)
@@ -224,9 +234,10 @@ namespace apl
         size_t ac_id = acquire_d_info();
         data_v[ac_id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::CHILD, type, parent, childs, true, 0, std::numeric_limits<size_t>::max()};
         mes_map[id] = ac_id;
+        messages_to_del.insert(id);
         if (message_contained(parent))
         {
-            ++resolve_mes_id(parent).refs_count;
+            inc_ref_count(parent);
             resolve_mes_id(parent).childs.push_back(id);
         }
     }
@@ -309,6 +320,30 @@ namespace apl
         task_factory::perform(ti.type, get_task(ti.m_id), args, c_args);
     }
 
+    void memory_manager::inc_ref_count(message_id id)
+    {
+        d_info& di = resolve_mes_id(id);
+        if (di.refs_count == 0)
+        {
+            messages_to_del.erase(id);
+            if ((di.parent != MESSAGE_ID_UNDEFINED) && message_contained(di.parent))
+                inc_ref_count(di.parent);
+        }
+        ++di.refs_count;
+    }
+
+    void memory_manager::dec_ref_count(message_id id)
+    {
+        d_info& di = resolve_mes_id(id);
+        --di.refs_count;
+        if (di.refs_count == 0)
+        {
+            messages_to_del.insert(id);
+            if ((di.parent != MESSAGE_ID_UNDEFINED) && message_contained(di.parent))
+                dec_ref_count(di.parent);
+        }
+    }
+
     void memory_manager::delete_message(message_id id)
     {
         size_t data_v_id = mes_map.find(id)->second;
@@ -332,12 +367,21 @@ namespace apl
             di.next_empty = first_empty_message;
         first_empty_message = data_v_id;
         mes_map.erase(id);
+        messages_to_del.erase(id);
     }
 
     void memory_manager::delete_perform(perform_id id)
     {
         size_t task_v_id = task_map.find(id)->second;
         t_info& ti = task_v[task_v_id];
+
+        dec_ref_count(ti.m_id);
+        for (message_id i: ti.data)
+            dec_ref_count(i);
+
+        for (message_id i: ti.const_data)
+            dec_ref_count(i);
+
         ti.childs.clear();
         ti.data.clear();
         ti.const_data.clear();
@@ -349,8 +393,8 @@ namespace apl
 
     void memory_manager::delete_task(task_id id)
     {
-        delete_message(id.mi);
         delete_perform(id.pi);
+        delete_message(id.mi);
     }
 
     void memory_manager::clear()

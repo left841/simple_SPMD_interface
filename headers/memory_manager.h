@@ -16,25 +16,25 @@ namespace apl
     private:
         struct d_info
         {
-            message* d;
+            message* d = nullptr;
             std::vector<message*> info;
             size_t version;
             MESSAGE_FACTORY_TYPE f_type;
             message_type type;
             message_id parent;
             std::vector<message_id> childs;
-            bool created;
+            bool created = false;
             size_t refs_count;
             size_t next_empty = std::numeric_limits<size_t>::max();
         };
 
         struct t_info
         {
-            message_id m_id;
-            perform_type type;
-            perform_id parent;
-            size_t parents_count;
-            size_t created_childs;
+            message_id m_id = MESSAGE_ID_UNDEFINED;
+            perform_type type = PERFORM_TYPE_UNDEFINED;
+            perform_id parent = PERFORM_ID_UNDEFINED;
+            size_t parents_count = 0;
+            size_t created_childs = 0;
             std::vector<perform_id> childs;
             std::vector<message_id> data;
             std::vector<message_id> const_data;
@@ -50,13 +50,15 @@ namespace apl
         std::vector<t_info> task_v;
         std::vector<d_info> data_v;
 
-        std::vector<message_id> messages_to_del;
+        std::set<message_id> messages_to_del;
         std::vector<perform_id> tasks_to_del;
 
         d_info& resolve_mes_id(message_id id);
         t_info& resolve_task_id(perform_id id);
         size_t acquire_d_info();
         size_t acquire_t_info();
+        void inc_ref_count(message_id id);
+        void dec_ref_count(message_id id);
 
         message_id base_mes_id = 0;
         perform_id base_task_id = 0;
@@ -69,6 +71,7 @@ namespace apl
         void init(task_graph& _tg);
 
         std::queue<perform_id> get_ready_tasks();
+        std::set<message_id>& get_unreferenced_messages();
 
         message_id add_message_init(message* ptr, message_type type, std::vector<message*>& info);
         message_id add_message_child(message* ptr, message_type type, message_id parent, std::vector<message*>& info);

@@ -4,7 +4,6 @@
 #include <vector>
 #include <random>
 #include <algorithm>
-#include <thread>
 #include "parallel.h"
 using namespace apl;
 
@@ -207,7 +206,6 @@ bool pred_initialized = false;
 
 int main(int argc, char** argv)
 {
-    //std::this_thread::sleep_for(std::chrono::seconds(7));
     parallel_engine pe(&argc, &argv);
     size_t sz = 100000;
     for (int i = 1; i < argc; ++i)

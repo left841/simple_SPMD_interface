@@ -75,6 +75,22 @@ namespace apl
                     }
                 }
             }
+            while (memory.get_unreferenced_messages().size())
+            {
+                message_id i = *memory.get_unreferenced_messages().begin();
+                contained[0].erase(i);
+                versions[0].erase(i);
+                memory.delete_message(i);
+                for (process j = 1; j < comm.size(); ++j)
+                {
+                    if (contained[j].find(i) != contained[j].end())
+                    {
+                        contained[j].erase(i);
+                        versions[j].erase(i);
+                        ins[j].add_message_del(i);
+                    }
+                }
+            }
             tasks_to_del.clear();
 
             size_t px = sub + ((per != 0) ? 1: 0);
