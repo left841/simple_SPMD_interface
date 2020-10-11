@@ -3,7 +3,7 @@
 namespace apl
 {
 
-    const int parallelizer::main_proc = 0;
+    const process parallelizer::main_proc = 0;
 
     parallelizer::parallelizer(): comm(MPI_COMM_WORLD), instr_comm(comm)
     { }
@@ -625,13 +625,13 @@ namespace apl
             memory.add_dependence(parent, child);
         }
 
-        for (task_id i: tasks_id)
+        for (const task_id& i: tasks_id)
         {
             if (memory.get_task_parents_count(i) == 0)
                 ready_tasks.push(i.pi);
         }
 
-        for (task_id i: tasks_child_id)
+        for (const task_id& i: tasks_child_id)
         {
             if (memory.get_task_parents_count(i) == 0)
                 ready_tasks.push(i.pi);
@@ -1040,13 +1040,13 @@ namespace apl
             memory.add_dependence(parent, child);
         }
 
-        for (task_id i: tasks_id)
+        for (const task_id& i: tasks_id)
         {
             if (memory.get_task_parents_count(i) == 0)
                 ready_tasks.push(i.pi);
         }
 
-        for (task_id i: tasks_child_id)
+        for (const task_id& i: tasks_child_id)
         {
             if (memory.get_task_parents_count(i) == 0)
                 ready_tasks.push(i.pi);
