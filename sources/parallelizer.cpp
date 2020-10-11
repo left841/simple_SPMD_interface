@@ -649,11 +649,20 @@ namespace apl
         if (ins.command() != INSTRUCTION::TASK_RES)
             comm.abort(111);
         const instruction_task_result& result = dynamic_cast<const instruction_task_result&>(ins);
-        
         task_id tid = result.id();
-        task_environment env({{0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL});
+
+        std::vector<message_id> added_m_init, added_m_child;
+        const instruction_block& ins2 = *(++it);
+        if (ins2.command() != INSTRUCTION::ADD_RES_TO_MEMORY)
+            comm.abort(111);
+        const instruction_add_result_to_memory& res_to_mem = dynamic_cast<const instruction_add_result_to_memory&>(ins2);
+        added_m_init = res_to_mem.added_messages_init();
+        added_m_child = res_to_mem.added_messages_child();
+        size_t added_m_init_it = 0, added_m_child_it = 0;
+
         res_ins.clear();
 
+        task_environment env({{0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL});
         comm.recv(&env, proc);
         env.wait_requests();
 
@@ -709,7 +718,8 @@ namespace apl
                 case MESSAGE_SOURCE::INIT_A:
                 {
                     message_init_add_data& d = env.added_messages_init()[i.id];
-                    messages_init_add_id.push_back(memory.create_message_init(d.type, d.ii));
+                    messages_init_add_id.push_back(added_m_init[added_m_init_it++]);
+                    memory.create_message_init_with_id(messages_init_add_id.back(), d.type, d.ii);
                     comm.recv(memory.get_message(messages_init_add_id.back()), proc);
                     con[main_proc].insert(messages_init_add_id.back());
                     ver[main_proc].insert(messages_init_add_id.back());
@@ -802,7 +812,8 @@ namespace apl
                     }
                     for (process k = 1; k < comm.size(); ++k)
                         ver[k].erase(src);
-                    messages_childs_add_id.push_back(memory.create_message_child(d.type, src, d.pi));
+                    messages_childs_add_id.push_back(added_m_child[added_m_child_it++]);
+                    memory.create_message_child_with_id(messages_childs_add_id.back(), d.type, src, d.pi);
                     comm.recv(memory.get_message(messages_childs_add_id.back()), proc);
                     con[main_proc].insert(messages_childs_add_id.back());
                     ver[main_proc].insert(messages_childs_add_id.back());
@@ -1029,12 +1040,6 @@ namespace apl
             memory.add_dependence(parent, child);
         }
 
-        if (env.added_messages_child().size() + env.added_messages_init().size() > 0)
-        {
-            res_ins.add_add_result_to_memory(messages_init_add_id, messages_childs_add_id);
-            instr_comm.send(&res_ins, proc);
-        }
-
         for (task_id i: tasks_id)
         {
             if (memory.get_task_parents_count(i) == 0)
@@ -1170,8 +1175,36 @@ namespace apl
 
         memory.perform_task(id, env);
 
+        std::vector<message_id> added_m_init, added_m_child;
+        for (const local_message_id& i: env.result_message_ids())
+        {
+            switch (i.src)
+            {
+                case MESSAGE_SOURCE::INIT_A:
+                {
+                    message_init_add_data& d = env.added_messages_init()[i.id];
+                    added_m_init.push_back(memory.add_message_init(d.mes, d.type, d.ii));
+                    break;
+                }
+                case MESSAGE_SOURCE::CHILD_A:
+                {
+                    message_child_add_data& d = env.added_messages_child()[i.id];
+                    memory.add_message_child(d.mes, d.type, MESSAGE_ID_UNDEFINED, d.pi);
+                    break;
+                }
+                case MESSAGE_SOURCE::INIT:
+                case MESSAGE_SOURCE::CHILD:
+                {
+                    break;
+                }
+                default:
+                    comm.abort(765);
+            }
+        }
+
         instruction res;
         res.add_task_result(memory.get_task_id(id));
+        res.add_add_result_to_memory(added_m_init, added_m_child);
 
         instr_comm.send(&res, main_proc);
 
@@ -1195,25 +1228,6 @@ namespace apl
         }
         env.wait_requests();
 
-        std::vector<message_id> messages_init_add_id;
-        std::vector<message_id> messages_childs_add_id;
-
-        if (env.added_messages_child().size() + env.added_messages_init().size() > 0)
-        {
-            instruction add_ins;
-            instr_comm.recv(&add_ins, main_proc);
-
-            instruction::const_iterator it = add_ins.begin();
-
-            if ((*it).command() != INSTRUCTION::ADD_RES_TO_MEMORY)
-                comm.abort(532);
-
-            const instruction_add_result_to_memory& new_ins = dynamic_cast<const instruction_add_result_to_memory&>(*it);
-
-            messages_init_add_id = new_ins.added_messages_init();
-            messages_childs_add_id = new_ins.added_messages_child();
-        }
-
         for (const local_message_id& i: env.result_message_ids())
         {
             switch (i.src)
@@ -1228,12 +1242,6 @@ namespace apl
                     }
                     break;
                 }
-                case MESSAGE_SOURCE::INIT_A:
-                {
-                    message_init_add_data& d = env.added_messages_init()[i.id];
-                    memory.add_message_init_with_id(d.mes, messages_init_add_id[i.id], d.type, d.ii);
-                    break;
-                }
                 case MESSAGE_SOURCE::CHILD:
                 {
                     message_child_data& d = env.created_messages_child()[i.id];
@@ -1244,10 +1252,9 @@ namespace apl
                     }
                     break;
                 }
+                case MESSAGE_SOURCE::INIT_A:
                 case MESSAGE_SOURCE::CHILD_A:
                 {
-                    message_child_add_data& d = env.added_messages_child()[i.id];
-                    memory.add_message_child_with_id(d.mes, messages_childs_add_id[i.id], d.type, MESSAGE_ID_UNDEFINED, d.pi);
                     break;
                 }
                 default:
