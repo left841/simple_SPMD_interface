@@ -22,7 +22,6 @@ jobs:
            run: |
                cd build
                cmake --build .
-                   linux_build:
 
     linux-openmpi_build:
         runs-on: ubuntu-latest
