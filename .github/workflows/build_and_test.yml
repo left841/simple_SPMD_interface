@@ -1,0 +1,99 @@
+name: build and test
+
+on: [push, pull_request]
+
+jobs:
+    linux-mpich_build:
+        runs-on: ubuntu-latest
+
+        steps:
+         - name: Installing MPI
+           run: sudo apt-get install mpich libmpich-dev
+
+         - uses: actions/checkout@v2
+
+         - name: Configuring CMake
+           run: |
+               mkdir ./build
+               cd build
+               cmake ..
+
+         - name: Building
+           run: |
+               cd build
+               cmake --build .
+                   linux_build:
+
+    linux-openmpi_build:
+        runs-on: ubuntu-latest
+
+        steps:
+         - name: Installing MPI
+           run: |
+               sudo apt-get install openmpi-bin
+               sudo apt-get install libopenmpi-dev
+
+         - uses: actions/checkout@v2
+
+         - name: Configuring CMake
+           run: |
+               mkdir ./build
+               cd build
+               cmake ..
+
+         - name: Building
+           run: |
+               cd build
+               cmake --build .
+
+    macos_build:
+        runs-on: macos-latest
+        
+        steps:
+         - name: Installing MPI
+           run: brew install open-mpi
+
+         - uses: actions/checkout@v2
+
+         - name: Configuring CMake
+           run: |
+               mkdir ./build
+               cd build
+               cmake ..
+
+         - name: Building
+           run: |
+               cd build
+               cmake --build .
+
+    windows_build:
+        runs-on: windows-latest
+
+        steps:
+         - name: Downloading MPI
+           shell: powershell
+           run: |
+               $client = new-object System.Net.WebClient
+               $client.DownloadFile("https://github.com/Microsoft/Microsoft-MPI/releases/download/v10.0/msmpisetup.exe", "msmpisetup.exe")
+               $client.DownloadFile("https://github.com/Microsoft/Microsoft-MPI/releases/download/v10.0/msmpisdk.msi", "msmpisdk.msi")
+
+         - name: Installing MPI
+           shell: cmd
+           run: |
+               msmpisetup.exe -unattend
+               msmpisdk.msi /passive
+               del msmpisetup.exe
+               del msmpisdk.msi
+
+         - uses: actions/checkout@v2
+
+         - name: Configuring CMake
+           run: |
+               mkdir build
+               cd build
+               cmake .. -D MPI_C_INCLUDE_PATH:PATH="C:/Program Files (x86)/Microsoft SDKs/MPI/Include" -D MPI_C_LIBRARIES:PATH="C:/Program Files (x86)/Microsoft SDKs/MPI/Lib/x64/msmpi.lib" -D MPI_CXX_INCLUDE_PATH:PATH="C:/Program Files (x86)/Microsoft SDKs/MPI/Include" -D MPI_CXX_LIBRARIES:PATH="C:/Program Files (x86)/Microsoft SDKs/MPI/Lib/x64/msmpi.lib"
+
+         - name: Building
+           run: |
+               cd build
+               cmake --build .
