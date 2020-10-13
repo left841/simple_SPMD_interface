@@ -5,6 +5,9 @@ on: [push, pull_request]
 jobs:
     linux-mpich_build:
         runs-on: ubuntu-latest
+        env:
+            СС: mpicc
+            CXX: mpic++
 
         steps:
          - name: Installing MPI
