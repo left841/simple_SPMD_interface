@@ -140,7 +140,7 @@ public:
 int main(int argc, char** argv)
 {
     parallel_engine pe(&argc, &argv);
-
+    double t = MPI_Wtime();
     parallelizer pz;
 
     vector_sum_init vsi_task;
