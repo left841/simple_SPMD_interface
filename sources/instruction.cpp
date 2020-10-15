@@ -146,16 +146,20 @@ namespace apl
     { }
 
     size_t instruction_message_send::size() const
-    { return 3; }
+    { return 4; }
 
     message_id instruction_message_send::id() const
     { return {ins[1], static_cast<process>(ins[2])}; }
 
-    void instruction::add_message_sending(message_id id)
+    process instruction_message_send::proc() const
+    { return ins[3]; }
+
+    void instruction::add_message_sending(message_id id, process proc)
     {
         add_cmd(INSTRUCTION::MES_SEND);
         v.push_back(id.num);
         v.push_back(id.proc);
+        v.push_back(proc);
     }
 
     // MES_RECV
@@ -163,16 +167,20 @@ namespace apl
     { }
 
     size_t instruction_message_recv::size() const
-    { return 3; }
+    { return 4; }
 
     message_id instruction_message_recv::id() const
     { return {ins[1], static_cast<process>(ins[2])}; }
 
-    void instruction::add_message_receiving(message_id id)
+    process instruction_message_recv::proc() const
+    { return ins[3]; }
+
+    void instruction::add_message_receiving(message_id id, process proc)
     {
         add_cmd(INSTRUCTION::MES_RECV);
         v.push_back(id.num);
         v.push_back(id.proc);
+        v.push_back(proc);
     }
 
     // MES_CREATE

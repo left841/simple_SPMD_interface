@@ -71,6 +71,7 @@ namespace apl
 
         size_t size() const;
         message_id id() const;
+        process proc() const;
     };
 
     class instruction_message_recv: public instruction_block
@@ -80,6 +81,7 @@ namespace apl
 
         size_t size() const;
         message_id id() const;
+        process proc() const;
     };
 
     class instruction_message_create: public instruction_block
@@ -210,8 +212,8 @@ namespace apl
         void clear();
 
         void add_end();
-        void add_message_sending(message_id id);
-        void add_message_receiving(message_id id);
+        void add_message_sending(message_id id, process proc);
+        void add_message_receiving(message_id id, process proc);
         void add_message_creation(message_id id, message_type type);
         void add_message_part_creation(message_id id, message_type type, message_id source);
         void add_task_execution(task_id id);

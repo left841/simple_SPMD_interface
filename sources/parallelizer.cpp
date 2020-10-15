@@ -169,19 +169,19 @@ namespace apl
                 {
                     ins.add_message_part_creation(i, memory.get_message_type(i), memory.get_message_parent(i));
                     if ((con[proc].find(memory.get_message_parent(i)) == con[proc].end()) || (ver[proc].find(memory.get_message_parent(i)) == ver[proc].end()))
-                        ins.add_message_receiving(i);
+                        ins.add_message_receiving(i, main_proc);
                 }
                 else
                 {
                     ins.add_message_creation(i, memory.get_message_type(i));
-                    ins.add_message_receiving(i);
+                    ins.add_message_receiving(i, main_proc);
                 }
                 con[proc].insert(i);
                 ver[proc].insert(i);
             }
             else if (ver[proc].find(i) == ver[proc].end())
             {
-                ins.add_message_receiving(i);
+                ins.add_message_receiving(i, main_proc);
                 ver[proc].insert(i);
             }
         }
@@ -194,19 +194,19 @@ namespace apl
                 {
                     ins.add_message_part_creation(i, memory.get_message_type(i), memory.get_message_parent(i));
                     if ((con[proc].find(memory.get_message_parent(i)) == con[proc].end()) || (ver[proc].find(memory.get_message_parent(i)) == ver[proc].end()))
-                        ins.add_message_receiving(i);
+                        ins.add_message_receiving(i, main_proc);
                 }
                 else
                 {
                     ins.add_message_creation(i, memory.get_message_type(i));
-                    ins.add_message_receiving(i);
+                    ins.add_message_receiving(i, main_proc);
                 }
                 con[proc].insert(i);
                 ver[proc].insert(i);
             }
             else if (ver[proc].find(i) == ver[proc].end())
             {
-                ins.add_message_receiving(i);
+                ins.add_message_receiving(i, main_proc);
                 ver[proc].insert(i);
             }
         }
@@ -215,13 +215,13 @@ namespace apl
         if (con[proc].find(mid) == con[proc].end())
         {
             ins.add_message_creation(mid, memory.get_message_type(mid));
-            ins.add_message_receiving(mid);
+            ins.add_message_receiving(mid, main_proc);
             con[proc].insert(mid);
             ver[proc].insert(mid);
         }
         else if (ver[proc].find(mid) == ver[proc].end())
         {
-            ins.add_message_receiving(mid);
+            ins.add_message_receiving(mid, main_proc);
             ver[proc].insert(mid);
         }
     }
@@ -1102,7 +1102,7 @@ namespace apl
                 case INSTRUCTION::MES_RECV:
                 {
                     const instruction_message_recv& j = dynamic_cast<const instruction_message_recv&>(i);
-                    comm.recv(memory.get_message(j.id()), main_proc);
+                    comm.recv(memory.get_message(j.id()), j.proc());
                     break;
                 }
                 case INSTRUCTION::MES_CREATE:

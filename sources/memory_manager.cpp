@@ -168,24 +168,10 @@ namespace apl
     }
 
     message_id memory_manager::create_message_init(message_type type, std::vector<message*>& info)
-    {
-        for (message* i: info)
-            i->wait_requests();
-        message* mes = message_init_factory::get(type, info);
-        return add_message_init(mes, type, info);
-    }
+    { return add_message_init(nullptr, type, info); }
 
     message_id memory_manager::create_message_child(message_type type, message_id parent, std::vector<message*>& info)
-    {
-        message* mes;
-        for (message* i: info)
-            i->wait_requests();
-        if (message_contained(parent))
-            mes = message_child_factory::get(type, get_message(parent), info);
-        else
-            mes = message_child_factory::get(type, info);
-        return add_message_child(mes, type, parent, info);
-    }
+    { return add_message_child(nullptr, type, parent, info); }
 
     task_id memory_manager::create_task(task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info)
     {
@@ -196,11 +182,10 @@ namespace apl
     void memory_manager::include_child_to_parent(message_id child)
     {
         d_info& di = resolve_mes_id(child);
-        message* parent = resolve_mes_id(di.parent).d;
+        message* parent = get_message(di.parent);
         for (message* i: di.info)
             i->wait_requests();
         di.d->wait_requests();
-        parent->wait_requests();
         message_child_factory::include(di.type, parent, di.d, di.info);
     }
 
@@ -260,24 +245,10 @@ namespace apl
     }
 
     void memory_manager::create_message_init_with_id(message_id id, message_type type, std::vector<message*>& info)
-    {
-        for (message* i: info)
-            i->wait_requests();
-        message* mes = message_init_factory::get(type, info);
-        return add_message_init_with_id(mes, id, type, info);
-    }
+    { return add_message_init_with_id(nullptr, id, type, info); }
 
     void memory_manager::create_message_child_with_id(message_id id, message_type type, message_id parent, std::vector<message*>& info)
-    {
-        message* mes;
-        for (message* i: info)
-            i->wait_requests();
-        if (message_contained(parent))
-            mes = message_child_factory::get(type, get_message(parent), info);
-        else
-            mes = message_child_factory::get(type, info);
-        return add_message_child_with_id(mes, id, type, parent, info);
-    }
+    { return add_message_child_with_id(nullptr, id, type, parent, info); }
 
     void memory_manager::create_task_with_id(task_id id, task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info)
     {
@@ -353,8 +324,11 @@ namespace apl
         d_info& di = data_v[data_v_id];
         if (di.created)
         {
-            di.d->wait_requests();
-            delete di.d;
+            if (di.d != nullptr)
+            {
+                di.d->wait_requests();
+                delete di.d;
+            }
             for (message* i: di.info)
                 if (i != nullptr)
                 {
@@ -468,7 +442,24 @@ namespace apl
     message* memory_manager::get_message(message_id id)
     {
         d_info& di = resolve_mes_id(id);
-        di.d->wait_requests();
+        if (di.d == nullptr)
+        {
+            for (message* i: di.info)
+                i->wait_requests();
+            if (di.f_type == MESSAGE_FACTORY_TYPE::INIT)
+            {
+                di.d = message_init_factory::get(di.type, di.info);
+            }
+            else
+            {
+                if (message_contained(di.parent))
+                    di.d = message_child_factory::get(di.type, get_message(di.parent), di.info);
+                else
+                    di.d = message_child_factory::get(di.type, di.info);
+            }
+        }
+        else
+            di.d->wait_requests();
         return di.d;
     }
 
@@ -543,6 +534,9 @@ namespace apl
 
     bool memory_manager::message_contained(message_id id)
     { return mes_map.find(id) != mes_map.end(); }
+
+    bool memory_manager::message_created(message_id id)
+    { return resolve_mes_id(id).d != nullptr; }
 
     bool memory_manager::message_has_parent(message_id id)
     { return resolve_mes_id(id).parent != MESSAGE_ID_UNDEFINED; }

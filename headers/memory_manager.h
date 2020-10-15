@@ -152,6 +152,7 @@ namespace apl
         std::vector<message_id>& get_task_const_data(task_id id);
 
         bool message_contained(message_id id);
+        bool message_created(message_id id);
         bool message_has_parent(message_id id);
         bool perform_has_parent(perform_id id);
         bool task_has_parent(task_id id);
