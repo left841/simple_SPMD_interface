@@ -58,7 +58,7 @@ namespace apl
         for (auto it = _tg.d_map.begin(); it != _tg.d_map.end(); ++it)
         {
             add_message_init_with_id(it->first, it->second.id, it->second.type, it->second.info);
-            resolve_mes_id(it->second.id).created = false;
+            resolve_mes_id(it->second.id).c_type = CREATION_STATE::REFFERED;
             dmp[it->first] = it->second.id;
         }
 
@@ -118,28 +118,29 @@ namespace apl
 
     message_id memory_manager::add_message_init(message* ptr, message_type type, std::vector<message*>& info)
     {
-        std::vector<message_id> childs;
+        std::set<message_id> childs;
         size_t id = acquire_d_info();
-        data_v[id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true, 0, std::numeric_limits<size_t>::max()};
+        CREATION_STATE state = (ptr == nullptr) ? CREATION_STATE::WAITING: CREATION_STATE::CREATED;
+        data_v[id] = {ptr, info, 0, state, std::numeric_limits<size_t>::max()};
         message_id new_id = {base_mes_id++, parallel_engine::global_rank()};
         mes_map[new_id] = id;
+        mes_graph[new_id] = {type, MESSAGE_FACTORY_TYPE::INIT, MESSAGE_ID_UNDEFINED, childs, 0, CHILD_STATE::UNDEFINED};
         messages_to_del.insert(new_id);
         return new_id;
     }
 
     message_id memory_manager::add_message_child(message* ptr, message_type type, message_id parent, std::vector<message*>& info)
     {
-        std::vector<message_id> childs;
+        std::set<message_id> childs;
         size_t id = acquire_d_info();
-        data_v[id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::CHILD, type, parent, childs, true, 0, std::numeric_limits<size_t>::max()};
+        CREATION_STATE state = (ptr == nullptr) ? CREATION_STATE::WAITING: CREATION_STATE::CHILD;
+        data_v[id] = {ptr, info, 0, state, std::numeric_limits<size_t>::max()};
         message_id new_id = {base_mes_id++, parallel_engine::global_rank()};
         mes_map[new_id] = id;
+        mes_graph[new_id] = {type, MESSAGE_FACTORY_TYPE::CHILD, parent, childs, 0, CHILD_STATE::INCLUDED};
         messages_to_del.insert(new_id);
-        if (message_contained(parent))
-        {
-            inc_ref_count(parent);
-            resolve_mes_id(parent).childs.push_back(new_id);
-        }
+        if (mes_graph.find(parent) != mes_graph.end())
+            insert_message_child(parent, new_id);
         return new_id;
     }
 
@@ -179,20 +180,34 @@ namespace apl
         return {m_id, add_perform(m_id, type.pt, data, const_data)};
     }
 
+    void memory_manager::add_message_to_graph(message_id id, message_type type)
+    {
+        std::set<message_id> childs;
+        mes_graph[id] = {type, MESSAGE_FACTORY_TYPE::INIT, MESSAGE_ID_UNDEFINED, childs, 0, CHILD_STATE::UNDEFINED};
+        messages_to_del.insert(id);
+    }
+
+    void memory_manager::add_message_child_to_graph(message_id id, message_type type, message_id parent)
+    {
+        std::set<message_id> childs;
+        mes_graph[id] = {type, MESSAGE_FACTORY_TYPE::CHILD, parent, childs, 0, CHILD_STATE::INCLUDED};
+        messages_to_del.insert(id);
+    }
+
     void memory_manager::include_child_to_parent(message_id child)
     {
         d_info& di = resolve_mes_id(child);
-        message* parent = get_message(di.parent);
+        message* parent = get_message(mes_graph[child].parent);
         for (message* i: di.info)
             i->wait_requests();
         di.d->wait_requests();
-        message_child_factory::include(di.type, parent, di.d, di.info);
+        message_child_factory::include(mes_graph[child].type, parent, di.d, di.info);
     }
 
     void memory_manager::include_child_to_parent_recursive(message_id child)
     {
         message_id parent;
-        while ((parent = resolve_mes_id(child).parent) != MESSAGE_ID_UNDEFINED)
+        while (((parent = mes_graph[child].parent) != MESSAGE_ID_UNDEFINED) && message_contained(parent))
         {
             include_child_to_parent(child);
             child = parent;
@@ -201,24 +216,32 @@ namespace apl
 
     void memory_manager::add_message_init_with_id(message* ptr, message_id id, message_type type, std::vector<message*>& info)
     {
-        std::vector<message_id> childs;
         size_t ac_id = acquire_d_info();
-        data_v[ac_id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::INIT, type, MESSAGE_ID_UNDEFINED, childs, true, 0, std::numeric_limits<size_t>::max()};
+        CREATION_STATE state = (ptr == nullptr) ? CREATION_STATE::WAITING: CREATION_STATE::CREATED;
+        data_v[ac_id] = {ptr, info, 0, state, std::numeric_limits<size_t>::max()};
         mes_map[id] = ac_id;
-        messages_to_del.insert(id);
+        if (mes_graph.find(id) == mes_graph.end())
+        {
+            std::set<message_id> childs;
+            mes_graph[id] = {type, MESSAGE_FACTORY_TYPE::INIT, MESSAGE_ID_UNDEFINED, childs, 0, CHILD_STATE::UNDEFINED};
+            messages_to_del.insert(id);
+        }
     }
 
     void memory_manager::add_message_child_with_id(message* ptr, message_id id, message_type type, message_id parent, std::vector<message*>& info)
     {
-        std::vector<message_id> childs;
         size_t ac_id = acquire_d_info();
-        data_v[ac_id] = {ptr, info, 0, MESSAGE_FACTORY_TYPE::CHILD, type, parent, childs, true, 0, std::numeric_limits<size_t>::max()};
+        CREATION_STATE state = (ptr == nullptr) ? CREATION_STATE::WAITING: CREATION_STATE::CHILD;
+        data_v[ac_id] = {ptr, info, 0, state, std::numeric_limits<size_t>::max()};
         mes_map[id] = ac_id;
-        messages_to_del.insert(id);
-        if (message_contained(parent))
+        if (mes_graph.find(id) == mes_graph.end())
         {
-            inc_ref_count(parent);
-            resolve_mes_id(parent).childs.push_back(id);
+            std::set<message_id> childs;
+            mes_graph[id] = {type, MESSAGE_FACTORY_TYPE::CHILD, parent, childs, 0, CHILD_STATE::INCLUDED};
+            messages_to_del.insert(id);
+
+            if (mes_graph.find(parent) != mes_graph.end())
+                insert_message_child(parent, id);
         }
     }
 
@@ -296,55 +319,62 @@ namespace apl
 
     void memory_manager::inc_ref_count(message_id id)
     {
-        d_info& di = resolve_mes_id(id);
-        if (di.refs_count == 0)
-        {
+        auto& it = mes_graph[id];
+        if ((it.refs_count == 0) && (it.ch_state != CHILD_STATE::NEWER) && it.childs.empty())
             messages_to_del.erase(id);
-            if ((di.parent != MESSAGE_ID_UNDEFINED) && message_contained(di.parent))
-                inc_ref_count(di.parent);
-        }
-        ++di.refs_count;
+        ++it.refs_count;
     }
 
     void memory_manager::dec_ref_count(message_id id)
     {
-        d_info& di = resolve_mes_id(id);
-        --di.refs_count;
-        if (di.refs_count == 0)
-        {
+        auto it = mes_graph.find(id);
+        --it->second.refs_count;
+        if ((it->second.refs_count == 0) && (it->second.ch_state != CHILD_STATE::NEWER) && it->second.childs.empty())
             messages_to_del.insert(id);
-            if ((di.parent != MESSAGE_ID_UNDEFINED) && message_contained(di.parent))
-                dec_ref_count(di.parent);
+    }
+
+    void memory_manager::delete_message_from_graph(message_id id)
+    {
+        auto it = mes_graph.find(id);
+        if (it != mes_graph.end())
+        {
+            if ((it->second.parent != MESSAGE_ID_UNDEFINED) && (mes_graph.find(it->second.parent) != mes_graph.end()))
+                erase_message_child(it->second.parent, id);
+            mes_graph.erase(id);
+            messages_to_del.erase(id);
         }
     }
 
     void memory_manager::delete_message(message_id id)
     {
-        size_t data_v_id = mes_map.find(id)->second;
-        d_info& di = data_v[data_v_id];
-        if (di.created)
+        if (mes_map.find(id) != mes_map.end())
         {
-            if (di.d != nullptr)
+            size_t data_v_id = mes_map.find(id)->second;
+            d_info& di = data_v[data_v_id];
+            if (di.c_type != CREATION_STATE::REFFERED)
             {
-                di.d->wait_requests();
-                delete di.d;
-            }
-            for (message* i: di.info)
-                if (i != nullptr)
+                if (di.c_type != CREATION_STATE::WAITING)
                 {
-                    i->wait_requests();
-                    delete i;
+                    di.d->wait_requests();
+                    delete di.d;
                 }
-            di.created = false;
+                for (message* i: di.info)
+                    if (i != nullptr)
+                    {
+                        i->wait_requests();
+                        delete i;
+                    }
+                di.c_type = CREATION_STATE::UNDEFINED;
+            }
+            di.d = nullptr;
+            di.info.clear();
+
+            if (first_empty_message != std::numeric_limits<size_t>::max())
+                di.next_empty = first_empty_message;
+            first_empty_message = data_v_id;
+            mes_map.erase(id);
         }
-        di.d = nullptr;
-        di.info.clear();
-        di.childs.clear();
-        if (first_empty_message != std::numeric_limits<size_t>::max())
-            di.next_empty = first_empty_message;
-        first_empty_message = data_v_id;
-        mes_map.erase(id);
-        messages_to_del.erase(id);
+        delete_message_from_graph(id);
     }
 
     void memory_manager::delete_perform(perform_id id)
@@ -382,6 +412,7 @@ namespace apl
         data_v.clear();
         mes_map.clear();
         task_map.clear();
+        mes_graph.clear();
         messages_to_del.clear();
         tasks_to_del.clear();
         base_mes_id = base_task_id = 0;
@@ -392,23 +423,49 @@ namespace apl
     { resolve_mes_id(id).d = new_message; }
 
     void memory_manager::set_message_type(message_id id, message_type new_type)
-    { resolve_mes_id(id).type = new_type; }
+    { mes_graph[id].type = new_type; }
 
     void memory_manager::set_message_info(message_id id, std::vector<message*>& info)
     { resolve_mes_id(id).info = info; }
 
     void memory_manager::set_message_parent(message_id id, message_id new_parent)
-    { resolve_mes_id(id).parent = new_parent; }
+    { mes_graph[id].parent = new_parent; }
 
     void memory_manager::set_message_version(message_id id, size_t new_version)
     { resolve_mes_id(id).version = new_version; }
+
+    void memory_manager::set_message_child_state(message_id id, CHILD_STATE st)
+    {
+        auto& it = mes_graph[id];
+        if ((it.refs_count == 0) && (it.ch_state != CHILD_STATE::NEWER) && it.childs.empty() && (st == CHILD_STATE::NEWER))
+            messages_to_del.erase(id);
+        it.ch_state = st;
+        if ((it.refs_count == 0) && (it.ch_state != CHILD_STATE::NEWER) && it.childs.empty())
+            messages_to_del.insert(id);
+    }
+
+    void memory_manager::insert_message_child(message_id id, message_id child)
+    {
+        auto& it = mes_graph[id];
+        if ((it.refs_count == 0) && (it.ch_state != CHILD_STATE::NEWER) && it.childs.empty())
+            messages_to_del.erase(id);
+        it.childs.insert(child);
+    }
+
+    void memory_manager::erase_message_child(message_id id, message_id child)
+    {
+        auto& it = mes_graph[id];
+        it.childs.erase(child);
+        if ((it.refs_count == 0) && (it.ch_state != CHILD_STATE::NEWER) && it.childs.empty())
+            messages_to_del.insert(id);
+    }
 
     void memory_manager::set_task(task_id id, task* new_task)
     { resolve_mes_id(id.mi).d = new_task; }
 
     void memory_manager::set_task_type(task_id id, task_type new_type)
     {
-        resolve_mes_id(id.mi).type = new_type.mt;
+        mes_graph[id.mi].type = new_type.mt;
         resolve_task_id(id.pi).type = new_type.pt;
     }
 
@@ -442,20 +499,27 @@ namespace apl
     message* memory_manager::get_message(message_id id)
     {
         d_info& di = resolve_mes_id(id);
-        if (di.d == nullptr)
+        if (di.c_type == CREATION_STATE::WAITING)
         {
             for (message* i: di.info)
                 i->wait_requests();
-            if (di.f_type == MESSAGE_FACTORY_TYPE::INIT)
+            if (mes_graph[id].f_type == MESSAGE_FACTORY_TYPE::INIT)
             {
-                di.d = message_init_factory::get(di.type, di.info);
+                di.d = message_init_factory::get(mes_graph[id].type, di.info);
+                di.c_type = CREATION_STATE::CREATED;
             }
             else
             {
-                if (message_contained(di.parent))
-                    di.d = message_child_factory::get(di.type, get_message(di.parent), di.info);
+                if (message_contained(mes_graph[id].parent))
+                {
+                    di.d = message_child_factory::get(mes_graph[id].type, get_message(mes_graph[id].parent), di.info);
+                    di.c_type = CREATION_STATE::CHILD;
+                }
                 else
-                    di.d = message_child_factory::get(di.type, di.info);
+                {
+                    di.d = message_child_factory::get(mes_graph[id].type, di.info);
+                    di.c_type = CREATION_STATE::CREATED;
+                }
             }
         }
         else
@@ -464,19 +528,25 @@ namespace apl
     }
 
     MESSAGE_FACTORY_TYPE memory_manager::get_message_factory_type(message_id id)
-    { return resolve_mes_id(id).f_type; }
+    { return mes_graph[id].f_type; }
 
     message_type memory_manager::get_message_type(message_id id)
-    { return resolve_mes_id(id).type; }
+    { return mes_graph[id].type; }
 
     std::vector<message*>& memory_manager::get_message_info(message_id id)
     { return resolve_mes_id(id).info; }
 
     message_id memory_manager::get_message_parent(message_id id)
-    { return resolve_mes_id(id).parent; }
+    { return mes_graph[id].parent; }
 
     size_t memory_manager::get_message_version(message_id id)
     { return resolve_mes_id(id).version; }
+
+    CHILD_STATE memory_manager::get_message_child_state(message_id id)
+    { return mes_graph[id].ch_state; }
+
+    std::set<message_id>& memory_manager::get_message_childs(message_id id)
+    { return mes_graph[id].childs; }
 
     size_t memory_manager::task_count()
     { return task_map.size(); }
@@ -494,7 +564,7 @@ namespace apl
     { return resolve_task_id(id).type; }
 
     task_type memory_manager::get_task_type(task_id id)
-    { return {resolve_mes_id(id.mi).type, resolve_task_id(id.pi).type}; }
+    { return { mes_graph[id.mi].type, resolve_task_id(id.pi).type}; }
 
     perform_id memory_manager::get_perform_parent(perform_id id)
     { return resolve_task_id(id).parent; }
@@ -539,7 +609,7 @@ namespace apl
     { return resolve_mes_id(id).d != nullptr; }
 
     bool memory_manager::message_has_parent(message_id id)
-    { return resolve_mes_id(id).parent != MESSAGE_ID_UNDEFINED; }
+    { return mes_graph[id].parent != MESSAGE_ID_UNDEFINED; }
 
     bool memory_manager::perform_has_parent(perform_id id)
     { return resolve_task_id(id).parent != PERFORM_ID_UNDEFINED; }

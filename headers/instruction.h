@@ -14,8 +14,8 @@ namespace apl
 
     enum class INSTRUCTION: size_t
     {
-        UNDEFINED, END, MES_SEND, MES_RECV, MES_CREATE,
-        MES_P_CREATE, TASK_EXE, TASK_CREATE, TASK_RES, ADD_RES_TO_MEMORY,
+        UNDEFINED, END, MES_SEND, MES_RECV, MES_INFO_SEND, MES_CREATE,
+        MES_P_CREATE, INCLUDE_MES_CHILD, TASK_EXE, TASK_CREATE, TASK_RES, ADD_RES_TO_MEMORY,
         MES_DEL, TASK_DEL
     };
 
@@ -84,6 +84,16 @@ namespace apl
         process proc() const;
     };
 
+    class instruction_message_info_send: public instruction_block
+    {
+    public:
+        instruction_message_info_send(const size_t* const p);
+
+        size_t size() const;
+        message_id id() const;
+        process proc() const;
+    };
+
     class instruction_message_create: public instruction_block
     {
     public:
@@ -92,6 +102,7 @@ namespace apl
         size_t size() const;
         message_id id() const;
         message_type type() const;
+        process proc() const;
     };
 
     class instruction_message_part_create: public instruction_block
@@ -103,6 +114,17 @@ namespace apl
         message_id id() const;
         message_type type() const;
         message_id source() const;
+        process proc() const;
+    };
+
+    class instruction_message_include_child_to_parent: public instruction_block
+    {
+    public:
+        instruction_message_include_child_to_parent(const size_t* const p);
+
+        size_t size() const;
+        message_id parent() const;
+        message_id child() const;
     };
 
     class instruction_task_execute: public instruction_block
@@ -121,7 +143,7 @@ namespace apl
 
         size_t size() const;
         task_id id() const;
-        task_type type() const;
+        perform_type type() const;
         std::vector<message_id> data() const;
         std::vector<message_id> const_data() const;
     };
@@ -144,7 +166,7 @@ namespace apl
 
         size_t size() const;
         std::vector<message_id> added_messages_init() const;
-        std::vector<message_id> added_messages_child() const;
+        std::vector<std::pair<message_id, message_id>> added_messages_child() const;
     };
 
     class instruction_message_delete: public instruction_block
@@ -214,12 +236,14 @@ namespace apl
         void add_end();
         void add_message_sending(message_id id, process proc);
         void add_message_receiving(message_id id, process proc);
-        void add_message_creation(message_id id, message_type type);
-        void add_message_part_creation(message_id id, message_type type, message_id source);
+        void add_message_info_sending(message_id id, process proc);
+        void add_message_creation(message_id id, message_type type, process proc);
+        void add_message_part_creation(message_id id, message_type type, message_id source, process proc);
+        void add_include_child_to_parent(message_id parent, message_id child);
         void add_task_execution(task_id id);
-        void add_task_creation(task_id id, task_type type, std::vector<message_id> data, std::vector<message_id> c_data);
+        void add_task_creation(task_id id, perform_type type, std::vector<message_id> data, std::vector<message_id> c_data);
         void add_task_result(task_id id);
-        void add_add_result_to_memory(const std::vector<message_id>& mes, const std::vector<message_id>& mes_c);
+        void add_add_result_to_memory(const std::vector<message_id>& mes, const std::vector<std::pair<message_id, message_id>>& mes_c);
         void add_message_del(message_id id);
         void add_task_del(perform_id id);
 

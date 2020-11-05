@@ -27,14 +27,16 @@ namespace apl
 
         std::queue<perform_id> ready_tasks;
         std::vector<perform_id> tasks_to_del;
+        std::vector<size_t> comm_workload;
         memory_manager memory;
 
         void master();
         void worker();
 
-        void send_task_data(perform_id tid, process proc, instruction& ins, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con);
+        void send_task_data(perform_id tid, process proc, instruction* inss, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con);
+        void send_message(message_id id, process proc, instruction* inss, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con);
         void assign_task(task_id tid, process proc, instruction& ins, std::vector<std::set<perform_id>>& com);
-        void send_instruction(process proc, instruction& ins);
+        void send_instruction(instruction& ins);
         void end_main_task(perform_id tid, task_environment& te, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<perform_id>>& con_t);
         void wait_task(process proc, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<perform_id>>& con_t);
 

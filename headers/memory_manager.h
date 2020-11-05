@@ -15,6 +15,22 @@ namespace apl
     constexpr const perform_id PERFORM_ID_UNDEFINED = {std::numeric_limits<size_t>::max(), MPI_PROC_NULL};
     constexpr const task_id TASK_ID_UNDEFINED = {MESSAGE_ID_UNDEFINED, PERFORM_ID_UNDEFINED};
 
+    enum class CREATION_STATE: size_t
+    {
+        UNDEFINED,
+        REFFERED,
+        WAITING,
+        CREATED,
+        CHILD
+    };
+
+    enum class CHILD_STATE: size_t
+    {
+        UNDEFINED,
+        INCLUDED,
+        NEWER
+    };
+
     class memory_manager
     {
     private:
@@ -23,12 +39,7 @@ namespace apl
             message* d = nullptr;
             std::vector<message*> info;
             size_t version;
-            MESSAGE_FACTORY_TYPE f_type;
-            message_type type;
-            message_id parent;
-            std::vector<message_id> childs;
-            bool created = false;
-            size_t refs_count;
+            CREATION_STATE c_type;
             size_t next_empty = std::numeric_limits<size_t>::max();
         };
 
@@ -45,11 +56,22 @@ namespace apl
             size_t next_empty = std::numeric_limits<size_t>::max();
         };
 
+        struct message_graph
+        {
+            message_type type = MESSAGE_TYPE_UNDEFINED;
+            MESSAGE_FACTORY_TYPE f_type = MESSAGE_FACTORY_TYPE::UNDEFINED;
+            message_id parent = MESSAGE_ID_UNDEFINED;
+            std::set<message_id> childs;
+            size_t refs_count = 0;
+            CHILD_STATE ch_state;
+        };
+
         size_t first_empty_message = std::numeric_limits<size_t>::max();
         size_t first_empty_task = std::numeric_limits<size_t>::max();
 
         std::map<message_id, size_t> mes_map;
         std::map<perform_id, size_t> task_map;
+        std::map<message_id, message_graph> mes_graph;
 
         std::vector<t_info> task_v;
         std::vector<d_info> data_v;
@@ -99,6 +121,9 @@ namespace apl
         void create_message_child_with_id(message_id id, message_type type, message_id parent, std::vector<message*>& info);
         void create_task_with_id(task_id id, task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info);
 
+        void add_message_to_graph(message_id id, message_type type);
+        void add_message_child_to_graph(message_id id, message_type type, message_id parent);
+
         void update_message_versions(perform_id id);
         void update_version(message_id id, size_t new_version);
 
@@ -112,6 +137,9 @@ namespace apl
         void set_message_info(message_id id, std::vector<message*>& info);
         void set_message_parent(message_id id, message_id new_parent);
         void set_message_version(message_id id, size_t new_version);
+        void set_message_child_state(message_id id, CHILD_STATE st);
+        void insert_message_child(message_id id, message_id child);
+        void erase_message_child(message_id id, message_id child);
 
         void set_task(task_id id, task* new_task);
         void set_task_type(task_id id, task_type new_type);
@@ -131,6 +159,8 @@ namespace apl
         std::vector<message*>& get_message_info(message_id id);
         message_id get_message_parent(message_id id);
         size_t get_message_version(message_id id);
+        CHILD_STATE get_message_child_state(message_id id);
+        std::set<message_id>& get_message_childs(message_id id);
 
         size_t task_count();
         task_id get_task_id(perform_id id);
@@ -158,10 +188,9 @@ namespace apl
         bool task_has_parent(task_id id);
 
         void delete_message(message_id id);
+        void delete_message_from_graph(message_id id);
         void delete_perform(perform_id id);
         void delete_task(task_id id);
-        void delete_message_recursive(task_id id);
-        void delete_task_recursive(task_id id);
 
         void clear();
     };

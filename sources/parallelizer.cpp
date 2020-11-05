@@ -77,10 +77,9 @@ namespace apl
             while (memory.get_unreferenced_messages().size())
             {
                 message_id i = *memory.get_unreferenced_messages().begin();
-                contained[0].erase(i);
-                versions[0].erase(i);
-                memory.delete_message(i);
-                for (process j = 1; j < comm.size(); ++j)
+                memory.delete_message_from_graph(i);
+
+                for (process j = 0; j < comm.size(); ++j)
                 {
                     if (contained[j].find(i) != contained[j].end())
                     {
@@ -92,25 +91,19 @@ namespace apl
             }
             tasks_to_del.clear();
 
-            size_t px = sub + ((per != 0) ? 1: 0);
-            for (size_t j = 0; j < px; ++j)
+            comm_workload.resize(comm.size());
+            for (process i = 0; i < comm.size(); ++i)
             {
-                assigned[0].push_back(ready_tasks.front());
-                ready_tasks.pop();
-                ++all_assigned;
-            }
-
-            for (process i = 1; i < comm.size(); ++i)
-            {
-                px = sub + ((i < per) ? 1: 0);
+                size_t px = sub + ((i < per) ? 1: 0);
                 for (size_t j = 0; j < px; ++j)
                 {
-                    send_task_data(ready_tasks.front(), i, ins[i], versions, contained);
+                    send_task_data(ready_tasks.front(), i, ins.data(), versions, contained);
                     assigned[i].push_back(ready_tasks.front());
                     ready_tasks.pop();
                     ++all_assigned;
                 }
             }
+            comm_workload.clear();
 
             for (process i = 1; i < comm.size(); ++i)
                 for (perform_id j: assigned[i])
@@ -118,9 +111,11 @@ namespace apl
 
             for (process i = 1; i < comm.size(); ++i)
             {
-                send_instruction(i, ins[i]);
+                instr_comm.send(&ins[i], i);
                 ins[i].clear();
             }
+            send_instruction(ins[0]);
+            ins[0].clear();
 
             while (all_assigned > 0)
             {
@@ -159,70 +154,85 @@ namespace apl
             instr_comm.send(&end, i);
     }
 
-    void parallelizer::send_task_data(perform_id tid, process proc, instruction& ins, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con)
+    void parallelizer::send_task_data(perform_id tid, process proc, instruction* inss, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con)
     {
         for (message_id i: memory.get_perform_data(tid))
-        {
-            if (con[proc].find(i) == con[proc].end())
-            {
-                if (memory.get_message_factory_type(i) == MESSAGE_FACTORY_TYPE::CHILD)
-                {
-                    ins.add_message_part_creation(i, memory.get_message_type(i), memory.get_message_parent(i));
-                    if ((con[proc].find(memory.get_message_parent(i)) == con[proc].end()) || (ver[proc].find(memory.get_message_parent(i)) == ver[proc].end()))
-                        ins.add_message_receiving(i, main_proc);
-                }
-                else
-                {
-                    ins.add_message_creation(i, memory.get_message_type(i));
-                    ins.add_message_receiving(i, main_proc);
-                }
-                con[proc].insert(i);
-                ver[proc].insert(i);
-            }
-            else if (ver[proc].find(i) == ver[proc].end())
-            {
-                ins.add_message_receiving(i, main_proc);
-                ver[proc].insert(i);
-            }
-        }
+            send_message(i, proc, inss, ver, con);
 
         for (message_id i: memory.get_perform_const_data(tid))
-        {
-            if (con[proc].find(i) == con[proc].end())
-            {
-                if (memory.get_message_factory_type(i) == MESSAGE_FACTORY_TYPE::CHILD)
-                {
-                    ins.add_message_part_creation(i, memory.get_message_type(i), memory.get_message_parent(i));
-                    if ((con[proc].find(memory.get_message_parent(i)) == con[proc].end()) || (ver[proc].find(memory.get_message_parent(i)) == ver[proc].end()))
-                        ins.add_message_receiving(i, main_proc);
-                }
-                else
-                {
-                    ins.add_message_creation(i, memory.get_message_type(i));
-                    ins.add_message_receiving(i, main_proc);
-                }
-                con[proc].insert(i);
-                ver[proc].insert(i);
-            }
-            else if (ver[proc].find(i) == ver[proc].end())
-            {
-                ins.add_message_receiving(i, main_proc);
-                ver[proc].insert(i);
-            }
-        }
+            send_message(i, proc, inss, ver, con);
 
-        message_id mid = memory.get_task_id(tid).mi;
-        if (con[proc].find(mid) == con[proc].end())
+        message_id m_tid = memory.get_task_id(tid).mi;
+        send_message(m_tid, proc, inss, ver, con);
+    }
+
+    void parallelizer::send_message(message_id id, process proc, instruction* inss, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con)
+    {
+        std::function<process(std::vector<std::set<message_id>>&)> get_proc = [&](std::vector<std::set<message_id>>& search_sets)->process
         {
-            ins.add_message_creation(mid, memory.get_message_type(mid));
-            ins.add_message_receiving(mid, main_proc);
-            con[proc].insert(mid);
-            ver[proc].insert(mid);
+            std::set<process, std::function<bool(process, process)>> r_ver([&](process a, process b)->bool
+            {
+                if (comm_workload[a] != comm_workload[b])
+                    return comm_workload[a] < comm_workload[b];
+                return a < b;
+            });
+
+            for (process i = 0; i < comm.size(); ++i)
+            {
+                if (search_sets[i].find(id) != search_sets[i].end())
+                {
+                    r_ver.insert(i);
+                }
+            }
+            if (r_ver.size())
+                return *r_ver.begin();
+            return MPI_PROC_NULL;
+        };
+        process sender_proc = MPI_PROC_NULL;
+
+        if (con[proc].find(id) == con[proc].end())
+        {
+            sender_proc = get_proc(con);
+            if (sender_proc == MPI_PROC_NULL)
+                comm.abort(432);
+
+            if (memory.get_message_factory_type(id) == MESSAGE_FACTORY_TYPE::CHILD)
+                inss[proc].add_message_part_creation(id, memory.get_message_type(id), memory.get_message_parent(id), sender_proc);
+            else
+                inss[proc].add_message_creation(id, memory.get_message_type(id), sender_proc);
+            con[proc].insert(id);
+            inss[sender_proc].add_message_info_sending(id, proc);
+
+            ++comm_workload[proc];
+            ++comm_workload[sender_proc];
         }
-        else if (ver[proc].find(mid) == ver[proc].end())
+        if (ver[proc].find(id) == ver[proc].end())
         {
-            ins.add_message_receiving(mid, main_proc);
-            ver[proc].insert(mid);
+            sender_proc = get_proc(ver);
+            if (sender_proc == MPI_PROC_NULL)
+            {
+                std::set<message_id>& ch = memory.get_message_childs(id);
+                if (ch.size() == 0)
+                    comm.abort(432);
+                for (message_id i: ch)
+                {
+                    send_message(i, proc, inss, ver, con);
+                    inss[proc].add_include_child_to_parent(id, i);
+                    memory.set_message_child_state(i, CHILD_STATE::INCLUDED);
+                }
+            }
+            else
+            {
+                if ((con[proc].find(memory.get_message_parent(id)) == con[proc].end()) || (ver[proc].find(memory.get_message_parent(id)) == ver[proc].end()))
+                {
+                    inss[proc].add_message_receiving(id, sender_proc);
+                    inss[sender_proc].add_message_sending(id, proc);
+
+                    ++comm_workload[proc];
+                    ++comm_workload[sender_proc];
+                }
+            }
+            ver[proc].insert(id);
         }
     }
 
@@ -230,43 +240,69 @@ namespace apl
     {
         if (com[proc].find(tid.pi) == com[proc].end())
         {
-            ins.add_task_creation(tid, memory.get_task_type(tid), memory.get_task_data(tid), memory.get_task_const_data(tid));
+            ins.add_task_creation(tid, memory.get_perform_type(tid.pi), memory.get_task_data(tid), memory.get_task_const_data(tid));
             com[proc].insert(tid.pi);
         }
         ins.add_task_execution(tid);
     }
 
-    void parallelizer::send_instruction(process proc, instruction& ins)
+    void parallelizer::send_instruction(instruction& ins)
     {
-        instr_comm.send(&ins, proc);
-
         for (const instruction_block& i: ins)
         {
             switch (i.command())
             {
+            case INSTRUCTION::MES_SEND:
+            {
+                const instruction_message_send& j = dynamic_cast<const instruction_message_send&>(i);
+                comm.send(memory.get_message(j.id()), j.proc());
+                break;
+            }
+            case INSTRUCTION::MES_INFO_SEND:
+            {
+                const instruction_message_info_send& j = dynamic_cast<const instruction_message_info_send&>(i);
+                for (message* p: memory.get_message_info(j.id()))
+                    comm.send(p, j.proc());
+                break;
+            }
             case INSTRUCTION::MES_RECV:
             {
                 const instruction_message_recv& j = dynamic_cast<const instruction_message_recv&>(i);
-                comm.send(memory.get_message(j.id()), proc);
+                comm.recv(memory.get_message(j.id()), j.proc());
                 break;
             }
             case INSTRUCTION::MES_CREATE:
             {
                 const instruction_message_create& j = dynamic_cast<const instruction_message_create&>(i);
-                for (message* p: memory.get_message_info(j.id()))
-                    instr_comm.send(p, proc);
+                std::vector<message*> iib = message_init_factory::get_info(j.type());
+                for (message* p: iib)
+                    comm.recv(p, j.proc());
+                memory.create_message_init_with_id(j.id(), j.type(), iib);
                 break;
             }
             case INSTRUCTION::MES_P_CREATE:
             {
                 const instruction_message_part_create& j = dynamic_cast<const instruction_message_part_create&>(i);
-                for (message* p: memory.get_message_info(j.id()))
-                    instr_comm.send(p, proc);
+                std::vector<message*> pib = message_child_factory::get_info(j.type());
+                for (message* p: pib)
+                    comm.recv(p, j.proc());
+                memory.create_message_child_with_id(j.id(), j.type(), j.source(), pib);
+                break;
+            }
+            case INSTRUCTION::INCLUDE_MES_CHILD:
+            {
+                const instruction_message_include_child_to_parent& j = dynamic_cast<const instruction_message_include_child_to_parent&>(i);
+                memory.include_child_to_parent(j.child());
+                break;
+            }
+            case INSTRUCTION::MES_DEL:
+            {
+                const instruction_message_delete& j = dynamic_cast<const instruction_message_delete&>(i);
+                memory.delete_message(j.id());
                 break;
             }
             case INSTRUCTION::TASK_CREATE:
             case INSTRUCTION::TASK_EXE:
-            case INSTRUCTION::MES_DEL:
             case INSTRUCTION::TASK_DEL:
 
                 break;
@@ -292,7 +328,15 @@ namespace apl
             for (process k = 0; k < comm.size(); ++k)
                 ver[k].erase(i);
             ver[main_proc].insert(i);
-            memory.update_version(i, memory.get_message_version(i) + 1);
+            message_id j = i;
+            while (memory.message_has_parent(j))
+            {
+                if (memory.get_message_factory_type(j) == MESSAGE_FACTORY_TYPE::CHILD)
+                    memory.set_message_child_state(j, CHILD_STATE::NEWER);
+                j = memory.get_message_parent(j);
+                for (process k = 0; k < comm.size(); ++k)
+                    ver[k].erase(j);
+            }
         }
 
         message_id t_mes_id = memory.get_task_id(tid).mi;
@@ -300,19 +344,6 @@ namespace apl
         for (process k = 0; k < comm.size(); ++k)
             ver[k].erase(t_mes_id);
         ver[main_proc].insert(t_mes_id);
-        memory.update_version(t_mes_id, memory.get_message_version(t_mes_id) + 1);
-
-        for (message_id i: memory.get_perform_data(tid))
-        {
-            memory.include_child_to_parent_recursive(i);
-            message_id j = i;
-            while (memory.message_has_parent(j))
-            {
-                for (process k = 1; k < comm.size(); ++k)
-                    ver[k].erase(memory.get_message_parent(j));
-                j = memory.get_message_parent(j);
-            }
-        }
 
         for (const local_message_id& i: env.result_message_ids())
         {
@@ -651,14 +682,24 @@ namespace apl
         const instruction_task_result& result = dynamic_cast<const instruction_task_result&>(ins);
         task_id tid = result.id();
 
-        std::vector<message_id> added_m_init, added_m_child;
+        std::vector<message_id> messages_init_id;
+        std::vector<message_id> messages_init_add_id;
+        std::vector<std::pair<message_id, message_id>> messages_childs_id;
+        std::vector<std::pair<message_id, message_id>> messages_childs_add_id;
+
         const instruction_block& ins2 = *(++it);
         if (ins2.command() != INSTRUCTION::ADD_RES_TO_MEMORY)
             comm.abort(111);
         const instruction_add_result_to_memory& res_to_mem = dynamic_cast<const instruction_add_result_to_memory&>(ins2);
-        added_m_init = res_to_mem.added_messages_init();
-        added_m_child = res_to_mem.added_messages_child();
-        size_t added_m_init_it = 0, added_m_child_it = 0;
+        messages_init_add_id = res_to_mem.added_messages_init();
+        messages_childs_add_id = res_to_mem.added_messages_child();
+
+        const instruction_block& ins3 = *(++it);
+        if (ins2.command() != INSTRUCTION::ADD_RES_TO_MEMORY)
+            comm.abort(111);
+        const instruction_add_result_to_memory& res_to_mem2 = dynamic_cast<const instruction_add_result_to_memory&>(ins3);
+        messages_init_id = res_to_mem2.added_messages_init();
+        messages_childs_id = res_to_mem2.added_messages_child();
 
         res_ins.clear();
 
@@ -666,165 +707,91 @@ namespace apl
         comm.recv(&env, proc);
         env.wait_requests();
 
-        std::vector<message_id> messages_init_id;
-        std::vector<message_id> messages_init_add_id;
-        std::vector<message_id> messages_childs_id;
-        std::vector<message_id> messages_childs_add_id;
-
         std::vector<task_id> tasks_id;
         std::vector<task_id> tasks_child_id;
 
         for (message_id i: memory.get_task_data(tid))
         {
-            comm.recv(memory.get_message(i), proc);
             for (process k = 0; k < comm.size(); ++k)
                 ver[k].erase(i);
-            ver[main_proc].insert(i);
             ver[proc].insert(i);
-            memory.update_version(i, memory.get_message_version(i) + 1);
-        }
-
-        comm.recv(memory.get_message(tid.mi), proc);
-        for (process k = 0; k < comm.size(); ++k)
-            ver[k].erase(tid.mi);
-        ver[main_proc].insert(tid.mi);
-        ver[proc].insert(tid.mi);
-        memory.update_version(tid.mi, memory.get_message_version(tid.mi) + 1);
-
-        for (message_id i: memory.get_task_data(tid))
-        {
-            memory.include_child_to_parent_recursive(i);
             message_id j = i;
             while (memory.message_has_parent(j))
             {
-                for (process k = 1; k < comm.size(); ++k)
-                    ver[k].erase(memory.get_message_parent(j));
+                if (memory.get_message_factory_type(j) == MESSAGE_FACTORY_TYPE::CHILD)
+                    memory.set_message_child_state(j, CHILD_STATE::NEWER);
                 j = memory.get_message_parent(j);
+                for (process k = 0; k < comm.size(); ++k)
+                    ver[k].erase(j);
             }
         }
 
-        for (const local_message_id& i: env.result_message_ids())
+        for (process k = 0; k < comm.size(); ++k)
+            ver[k].erase(tid.mi);
+        ver[proc].insert(tid.mi);
+
+        std::vector<message_type> messages_init_id_type;
+        std::vector<message_type> messages_init_add_id_type;
+        std::vector<message_type> messages_childs_id_type;
+        std::vector<message_type> messages_childs_add_id_type;
+
+        for (local_message_id i: env.result_message_ids())
         {
             switch (i.src)
             {
-                case MESSAGE_SOURCE::INIT:
-                {
-                    message_init_data& d = env.created_messages_init()[i.id];
-                    messages_init_id.push_back(memory.create_message_init(d.type, d.ii));
-                    con[main_proc].insert(messages_init_id.back());
-                    ver[main_proc].insert(messages_init_id.back());
-                    break;
-                }
                 case MESSAGE_SOURCE::INIT_A:
                 {
-                    message_init_add_data& d = env.added_messages_init()[i.id];
-                    messages_init_add_id.push_back(added_m_init[added_m_init_it++]);
-                    memory.create_message_init_with_id(messages_init_add_id.back(), d.type, d.ii);
-                    comm.recv(memory.get_message(messages_init_add_id.back()), proc);
-                    con[main_proc].insert(messages_init_add_id.back());
-                    ver[main_proc].insert(messages_init_add_id.back());
-                    con[proc].insert(messages_init_add_id.back());
-                    ver[proc].insert(messages_init_add_id.back());
-                    break;
-                }
-                case MESSAGE_SOURCE::CHILD:
-                {
-                    message_child_data& d = env.created_messages_child()[i.id];
-                    message_id src;
-                    switch (d.sourse.src)
-                    {
-                        case MESSAGE_SOURCE::TASK_ARG:
-                        {
-                            src = memory.get_perform_data(tid.pi)[d.sourse.id];
-                            break;
-                        }
-                        case MESSAGE_SOURCE::TASK_ARG_C:
-                        {
-                            src = memory.get_perform_const_data(tid.pi)[d.sourse.id];
-                            break;
-                        }
-                        case MESSAGE_SOURCE::INIT:
-                        {
-                            src = messages_init_id[d.sourse.id];
-                            break;
-                        }
-                        case MESSAGE_SOURCE::INIT_A:
-                        {
-                            src = messages_init_add_id[d.sourse.id];
-                            break;
-                        }
-                        case MESSAGE_SOURCE::CHILD:
-                        {
-                            src = messages_childs_id[d.sourse.id];
-                            break;
-                        }
-                        case MESSAGE_SOURCE::CHILD_A:
-                        {
-                            src = messages_childs_add_id[d.sourse.id];
-                            break;
-                        }
-                        default:
-                            comm.abort(765);
-                    }
-                    messages_childs_id.push_back(memory.create_message_child(d.type, src, d.pi));
-                    con[main_proc].insert(messages_childs_id.back());
-                    ver[main_proc].insert(messages_childs_id.back());
+                    messages_init_add_id_type.push_back(env.added_messages_init()[i.id].type);
                     break;
                 }
                 case MESSAGE_SOURCE::CHILD_A:
                 {
-                    message_child_add_data& d = env.added_messages_child()[i.id];
-                    message_id src;
-                    switch (d.sourse.src)
-                    {
-                        case MESSAGE_SOURCE::TASK_ARG:
-                        {
-                            src = memory.get_perform_data(tid.pi)[d.sourse.id];
-                            break;
-                        }
-                        case MESSAGE_SOURCE::TASK_ARG_C:
-                        {
-                            src = memory.get_perform_const_data(tid.pi)[d.sourse.id];
-                            break;
-                        }
-                        case MESSAGE_SOURCE::INIT:
-                        {
-                            src = messages_init_id[d.sourse.id];
-                            break;
-                        }
-                        case MESSAGE_SOURCE::INIT_A:
-                        {
-                            src = messages_init_add_id[d.sourse.id];
-                            break;
-                        }
-                        case MESSAGE_SOURCE::CHILD:
-                        {
-                            src = messages_childs_id[d.sourse.id];
-                            break;
-                        }
-                        case MESSAGE_SOURCE::CHILD_A:
-                        {
-                            src = messages_childs_add_id[d.sourse.id];
-                            break;
-                        }
-                        default:
-                            comm.abort(765);
-                    }
-                    for (process k = 1; k < comm.size(); ++k)
-                        ver[k].erase(src);
-                    messages_childs_add_id.push_back(added_m_child[added_m_child_it++]);
-                    memory.create_message_child_with_id(messages_childs_add_id.back(), d.type, src, d.pi);
-                    comm.recv(memory.get_message(messages_childs_add_id.back()), proc);
-                    con[main_proc].insert(messages_childs_add_id.back());
-                    ver[main_proc].insert(messages_childs_add_id.back());
-                    con[proc].insert(messages_childs_add_id.back());
-                    ver[proc].insert(messages_childs_add_id.back());
+                    messages_childs_id_type.push_back(env.added_messages_child()[i.id].type);
                     break;
                 }
-                default:
-                    comm.abort(765);
+                case MESSAGE_SOURCE::INIT:
+                {
+                    messages_init_id_type.push_back(env.created_messages_init()[i.id].type);
+                    break;
+                }
+                case MESSAGE_SOURCE::CHILD:
+                {
+                    messages_childs_id_type.push_back(env.created_messages_child()[i.id].type);
+                    break;
+                }
             }
         }
+
+        for (size_t i = 0; i < messages_init_id.size(); ++i)
+        {
+            con[proc].insert(messages_init_id[i]);
+            ver[proc].insert(messages_init_id[i]);
+            memory.add_message_to_graph(messages_init_id[i], messages_init_id_type[i]);
+        }
+
+        for (size_t i = 0; i < messages_init_add_id.size(); ++i)
+        {
+            con[proc].insert(messages_init_add_id[i]);
+            ver[proc].insert(messages_init_add_id[i]);
+            memory.add_message_to_graph(messages_init_add_id[i], messages_init_add_id_type[i]);
+        }
+
+        for (size_t i = 0; i < messages_childs_id.size(); ++i)
+        {
+            con[proc].insert(messages_childs_id[i].second);
+            ver[proc].insert(messages_childs_id[i].second);
+            memory.add_message_child_to_graph(messages_childs_id[i].second, messages_childs_id_type[i], messages_childs_id[i].first);
+            memory.insert_message_child(messages_childs_id[i].first, messages_childs_id[i].second);
+        }
+
+        for (size_t i = 0; i < messages_childs_add_id.size(); ++i)
+        {
+            con[proc].insert(messages_childs_add_id[i].second);
+            ver[proc].insert(messages_childs_add_id[i].second);
+            memory.add_message_child_to_graph(messages_childs_add_id[i].second, messages_childs_add_id_type[i], messages_childs_add_id[i].first);
+            memory.insert_message_child(messages_childs_add_id[i].first, messages_childs_add_id[i].second);
+        }
+
         size_t tid_childs = 0;
         for (const local_task_id& i: env.result_task_ids())
         {
@@ -875,12 +842,12 @@ namespace apl
                 }
                 case MESSAGE_SOURCE::CHILD:
                 {
-                    mes_t_id = messages_childs_id[i.mes.id];
+                    mes_t_id = messages_childs_id[i.mes.id].second;
                     break;
                 }
                 case MESSAGE_SOURCE::CHILD_A:
                 {
-                    mes_t_id = messages_childs_add_id[i.mes.id];
+                    mes_t_id = messages_childs_add_id[i.mes.id].second;
                     break;
                 }
             }
@@ -913,12 +880,12 @@ namespace apl
                     }
                     case MESSAGE_SOURCE::CHILD:
                     {
-                        data_id.push_back(messages_childs_id[k.id]);
+                        data_id.push_back(messages_childs_id[k.id].second);
                         break;
                     }
                     case MESSAGE_SOURCE::CHILD_A:
                     {
-                        data_id.push_back(messages_childs_add_id[k.id]);
+                        data_id.push_back(messages_childs_add_id[k.id].second);
                         break;
                     }
                     default:
@@ -954,12 +921,12 @@ namespace apl
                     }
                     case MESSAGE_SOURCE::CHILD:
                     {
-                        const_data_id.push_back(messages_childs_id[k.id]);
+                        const_data_id.push_back(messages_childs_id[k.id].second);
                         break;
                     }
                     case MESSAGE_SOURCE::CHILD_A:
                     {
-                        const_data_id.push_back(messages_childs_add_id[k.id]);
+                        const_data_id.push_back(messages_childs_add_id[k.id].second);
                         break;
                     }
                     default:
@@ -1096,7 +1063,7 @@ namespace apl
                 case INSTRUCTION::MES_SEND:
                 {
                     const instruction_message_send& j = dynamic_cast<const instruction_message_send&>(i);
-                    comm.send(memory.get_message(j.id()), main_proc);
+                    comm.send(memory.get_message(j.id()), j.proc());
                     break;
                 }
                 case INSTRUCTION::MES_RECV:
@@ -1105,12 +1072,19 @@ namespace apl
                     comm.recv(memory.get_message(j.id()), j.proc());
                     break;
                 }
+                case INSTRUCTION::MES_INFO_SEND:
+                {
+                    const instruction_message_info_send& j = dynamic_cast<const instruction_message_info_send&>(i);
+                    for (message* p: memory.get_message_info(j.id()))
+                        comm.send(p, j.proc());
+                    break;
+                }
                 case INSTRUCTION::MES_CREATE:
                 {
                     const instruction_message_create& j = dynamic_cast<const instruction_message_create&>(i);
                     std::vector<message*> iib = message_init_factory::get_info(j.type());
                     for (message* p: iib)
-                        instr_comm.recv(p, main_proc);
+                        comm.recv(p, j.proc());
                     memory.create_message_init_with_id(j.id(), j.type(), iib);
                     break;
                 }
@@ -1119,14 +1093,20 @@ namespace apl
                     const instruction_message_part_create& j = dynamic_cast<const instruction_message_part_create&>(i);
                     std::vector<message*> pib = message_child_factory::get_info(j.type());
                     for (message* p: pib)
-                        instr_comm.recv(p, main_proc);
+                        comm.recv(p, j.proc());
                     memory.create_message_child_with_id(j.id(), j.type(), j.source(), pib);
+                    break;
+                }
+                case INSTRUCTION::INCLUDE_MES_CHILD:
+                {
+                    const instruction_message_include_child_to_parent& j = dynamic_cast<const instruction_message_include_child_to_parent&>(i);
+                    memory.include_child_to_parent(j.child());
                     break;
                 }
                 case INSTRUCTION::TASK_CREATE:
                 {
                     const instruction_task_create& j = dynamic_cast<const instruction_task_create&>(i);
-                    memory.add_perform_with_id(j.id(), j.type().pt, j.data(), j.const_data());
+                    memory.add_perform_with_id(j.id(), j.type(), j.data(), j.const_data());
                     break;
                 }
                 case INSTRUCTION::TASK_EXE:
@@ -1175,7 +1155,8 @@ namespace apl
 
         memory.perform_task(id, env);
 
-        std::vector<message_id> added_m_init, added_m_child;
+        std::vector<message_id> added_m_init, messages_init_id;
+        std::vector<std::pair<message_id, message_id>> added_m_child, messages_childs_id;
         for (const local_message_id& i: env.result_message_ids())
         {
             switch (i.src)
@@ -1189,12 +1170,93 @@ namespace apl
                 case MESSAGE_SOURCE::CHILD_A:
                 {
                     message_child_add_data& d = env.added_messages_child()[i.id];
-                    memory.add_message_child(d.mes, d.type, MESSAGE_ID_UNDEFINED, d.pi);
+
+                    message_id src = MESSAGE_ID_UNDEFINED;
+                    switch (d.sourse.src)
+                    {
+                        case MESSAGE_SOURCE::TASK_ARG:
+                        {
+                            src = memory.get_perform_data(id)[d.sourse.id];
+                            break;
+                        }
+                        case MESSAGE_SOURCE::TASK_ARG_C:
+                        {
+                            src = memory.get_perform_const_data(id)[d.sourse.id];
+                            break;
+                        }
+                        case MESSAGE_SOURCE::INIT:
+                        {
+                            src = messages_init_id[d.sourse.id];
+                            break;
+                        }
+                        case MESSAGE_SOURCE::INIT_A:
+                        {
+                            src = added_m_init[d.sourse.id];
+                            break;
+                        }
+                        case MESSAGE_SOURCE::CHILD:
+                        {
+                            src = messages_childs_id[d.sourse.id].second;
+                            break;
+                        }
+                        case MESSAGE_SOURCE::CHILD_A:
+                        {
+                            src = added_m_child[d.sourse.id].second;
+                            break;
+                        }
+                        default:
+                            comm.abort(765);
+                    }
+                    added_m_child.push_back({src, memory.add_message_child(d.mes, d.type, src, d.pi)});
                     break;
                 }
                 case MESSAGE_SOURCE::INIT:
+                {
+                    message_init_data& d = env.created_messages_init()[i.id];
+                    messages_init_id.push_back(memory.create_message_init(d.type, d.ii));
+                    break;
+                }
                 case MESSAGE_SOURCE::CHILD:
                 {
+                    message_child_data& d = env.created_messages_child()[i.id];
+
+                    message_id src = MESSAGE_ID_UNDEFINED;
+                    switch (d.sourse.src)
+                    {
+                        case MESSAGE_SOURCE::TASK_ARG:
+                        {
+                            src = memory.get_perform_data(id)[d.sourse.id];
+                            break;
+                        }
+                        case MESSAGE_SOURCE::TASK_ARG_C:
+                        {
+                            src = memory.get_perform_const_data(id)[d.sourse.id];
+                            break;
+                        }
+                        case MESSAGE_SOURCE::INIT:
+                        {
+                            src = messages_init_id[d.sourse.id];
+                            break;
+                        }
+                        case MESSAGE_SOURCE::INIT_A:
+                        {
+                            src = added_m_init[d.sourse.id];
+                            break;
+                        }
+                        case MESSAGE_SOURCE::CHILD:
+                        {
+                            src = messages_childs_id[d.sourse.id].second;
+                            break;
+                        }
+                        case MESSAGE_SOURCE::CHILD_A:
+                        {
+                            src = added_m_child[d.sourse.id].second;
+                            break;
+                        }
+                        default:
+                            comm.abort(765);
+                    }
+                    messages_childs_id.push_back({src, memory.create_message_child(d.type, src, d.pi)});
                     break;
                 }
                 default:
@@ -1205,62 +1267,11 @@ namespace apl
         instruction res;
         res.add_task_result(memory.get_task_id(id));
         res.add_add_result_to_memory(added_m_init, added_m_child);
+        res.add_add_result_to_memory(messages_init_id, messages_childs_id);
 
         instr_comm.send(&res, main_proc);
-
-        std::vector<local_message_id> result_message_ids(env.result_message_ids());
-        std::vector<message_init_add_data> added_messages_init(env.added_messages_init());
-        std::vector<message_child_add_data> added_messages_child(env.added_messages_child());
-
         comm.send(&env, main_proc);
-
-        for (message_id i: memory.get_perform_data(id))
-            comm.send(memory.get_message(i), main_proc);
-
-        comm.send(memory.get_message(memory.get_task_id(id).mi), main_proc);
-
-        for (const local_message_id& i: result_message_ids)
-        {
-            if (i.src == MESSAGE_SOURCE::INIT_A)
-                comm.send(added_messages_init[i.id].mes, main_proc);
-            else if (i.src == MESSAGE_SOURCE::CHILD_A)
-                comm.send(added_messages_child[i.id].mes, main_proc);
-        }
         env.wait_requests();
-
-        for (const local_message_id& i: env.result_message_ids())
-        {
-            switch (i.src)
-            {
-                case MESSAGE_SOURCE::INIT:
-                {
-                    message_init_data& d = env.created_messages_init()[i.id];
-                    for (message* p: d.ii)
-                    {
-                        p->wait_requests();
-                        delete p;
-                    }
-                    break;
-                }
-                case MESSAGE_SOURCE::CHILD:
-                {
-                    message_child_data& d = env.created_messages_child()[i.id];
-                    for (message* p: d.pi)
-                    {
-                        p->wait_requests();
-                        delete p;
-                    }
-                    break;
-                }
-                case MESSAGE_SOURCE::INIT_A:
-                case MESSAGE_SOURCE::CHILD_A:
-                {
-                    break;
-                }
-                default:
-                    comm.abort(765);
-            }
-        }
     }
 
     int parallelizer::get_current_proc()
