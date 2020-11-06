@@ -64,9 +64,6 @@ public:
 class vector_sum: public task
 {
 public:
-    vector_sum(): task()
-    { }
-
     void operator()(const my_vector& first, const my_vector& second, my_vector& output)
     {
         for (size_t i = 0; i < output.size(); ++i)
@@ -77,9 +74,6 @@ public:
 class end_task: public task
 {
 public:
-    end_task(): task()
-    { }
-
     void operator()(const my_vector& first, const my_vector& second, const my_vector& output)
     {
         my_vector check(output.size());
@@ -100,9 +94,6 @@ public:
 class vector_sum_init: public task
 {
 public:
-    vector_sum_init(): task()
-    { }
-
     void operator()(size_t size)
     {
         my_vector& first = *new my_vector(size);
@@ -143,7 +134,8 @@ int main(int argc, char** argv)
 
     parallelizer pz;
 
+    size_t size = 10000000;
     vector_sum_init vsi_task;
 
-    pz.execution(&vsi_task, std::make_tuple(), const_cast<const size_t*>(new size_t(10000000)));
+    pz.execution(&vsi_task, std::make_tuple(), const_cast<const size_t*>(&size));
 }

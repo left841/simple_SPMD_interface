@@ -129,7 +129,8 @@ int main(int argc, char** argv)
 
     parallelizer pz;
 
+    int t_count = average_task_count, m_count = average_message_count;
+    long long gen = time(0);
     random_task it;
-    pz.execution(&it, std::make_tuple(), const_cast<const int*>(new int(average_task_count)), new int(average_message_count),
-        const_cast<const long long*>(new long long(time(0))));
+    pz.execution(&it, std::make_tuple(), const_cast<const int*>(&t_count), &m_count, const_cast<const long long*>(&gen));
 }

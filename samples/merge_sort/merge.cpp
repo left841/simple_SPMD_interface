@@ -129,11 +129,18 @@ int main(int argc, char** argv)
 
     int* p1 = new int[size];
     int* p2 = new int[size];
-    int* p3 = new int[size];
+    int* p3;
     std::mt19937 mt(static_cast<unsigned>(time(0)));
     std::uniform_int_distribution<int> uid(0, 10000);
     for (size_t i = 0; i < size; ++i)
-        p1[i] = p3[i] = uid(mt);
+        p1[i] = uid(mt);
+
+    if (checks)
+    {
+        p3 = new int[size];
+        for (size_t i = 0; i < size; ++i)
+            p3[i] = p1[i];
+    }
     
     double true_start_time = MPI_Wtime();
     parallelizer pz;

@@ -24,7 +24,8 @@ namespace apl
 
     enum class MESSAGE_SOURCE: size_t
     {
-        GLOBAL, TASK_ARG, TASK_ARG_C,
+        UNDEFINED, GLOBAL,
+        TASK_ARG, TASK_ARG_C,
         REFERENCE,
         INIT, CHILD,
         INIT_A, CHILD_A
@@ -32,7 +33,8 @@ namespace apl
 
     enum class TASK_SOURCE: size_t
     {
-        GLOBAL, INIT, REFERENCE,
+        UNDEFINED, GLOBAL,
+        INIT, REFERENCE,
         CHILD
     };
 
@@ -57,12 +59,17 @@ namespace apl
 
         typedef Type type;
 
+        mes_id();
         mes_id(local_message_id id);
         mes_id(const mes_id<Type>& id);
 
         mes_id<const Type> as_const();
         operator local_message_id();
     };
+
+    template<typename Type>
+    mes_id<Type>::mes_id(): id(std::numeric_limits<size_t>::max()), src(MESSAGE_SOURCE::UNDEFINED)
+    { }
 
     template<typename Type>
     mes_id<Type>::mes_id(local_message_id id): id(id.id), src(id.src)

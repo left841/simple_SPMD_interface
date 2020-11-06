@@ -62,6 +62,9 @@ public:
     { re.irecv(p, static_cast<int>(size)); }
 };
 
+bool checking = false;
+bool pred_initialized = false;
+
 class quick_task: public task
 {
 private:
@@ -99,9 +102,6 @@ private:
 
 public:
     static size_t pred;
-
-    quick_task(): task()
-    { }
 
     void operator()(array& a)
     {
@@ -153,57 +153,58 @@ class check_task;
 class init_task: public task
 {
 public:
-
-    init_task(): task()
-    { }
-
     void operator()(size_t size, double& t)
     {
         std::mt19937 mt(static_cast<unsigned>(time(0)));
         std::uniform_int_distribution<int> uid(0, 10000);
+
         array& a1 = *new array(size);
-        array& a2 = *new array(size);
+        mes_id<array> a1_id = add_message(&a1, new size_t(size));
         for (size_t i = 0; i < a1.size; ++i)
-            a1[i] = a2[i] = uid(mt);
+            a1[i] = uid(mt);
+
+        mes_id<array> a2_id;
+        if (checking)
+        {
+            array& a2 = *new array(size);
+            a2_id = add_message(&a2, new size_t(size));
+            for (size_t i = 0; i < a1.size; ++i)
+                a2[i] = a1[i];
+        }
         t = MPI_Wtime();
 
-        mes_id<array> a1_id = add_message(&a1, new size_t(size));
-        mes_id<array> a2_id = add_message(&a2, new size_t(size));
-
         create_child_task<quick_task>(a1_id);
-        add_dependence(this_task_id<init_task>(), create_task<check_task>(a1_id.as_const(), a2_id, arg_id<1, double>().as_const()));
+
+        if (checking)
+            add_dependence(this_task_id<init_task>(), create_task<check_task>(a1_id.as_const(), a2_id, arg_id<1, double>().as_const()));
+        else
+            add_dependence(this_task_id<init_task>(), create_task<check_task>(arg_id<1, double>().as_const()));
     }
 };
 
 class check_task: public task
 {
 public:
-    static bool checking;
-
-    check_task(): task()
-    { }
-
     void operator()(const array& a1, array& a2, double t)
     {
         double tm1 = MPI_Wtime();
-        if (checking)
-        {
-            std::sort(a2.p, a2.p + a2.size);
-            for (size_t i = 0; i < a1.size; ++i)
-                if (a1.p[i] != a2.p[i])
-                {
-                    std::cout << "wrong\n";
-                    goto gh;
-                }
-            std::cout << "correct\n";
-        }
+        std::sort(a2.p, a2.p + a2.size);
+        for (size_t i = 0; i < a1.size; ++i)
+            if (a1.p[i] != a2.p[i])
+            {
+                std::cout << "wrong\n";
+                goto gh;
+            }
+        std::cout << "correct\n";
         gh:
         std::cout << tm1 - t << std::endl;
     }
-};
 
-bool check_task::checking = false;
-bool pred_initialized = false;
+    void operator()(double t)
+    {
+        std::cout << MPI_Wtime() - t << std::endl;
+    }
+};
 
 int main(int argc, char** argv)
 {
@@ -222,7 +223,7 @@ int main(int argc, char** argv)
         }
         else if (strcmp(argv[i], "-check") == 0)
         {
-            check_task::checking = true;
+            checking = true;
         }
     }
 
@@ -232,6 +233,7 @@ int main(int argc, char** argv)
     if (!pred_initialized)
         quick_task::pred = sz / (3 * comm_size / 2);
 
+    double time = 0;
     init_task it;
-    pz.execution(&it, std::make_tuple(), const_cast<const size_t*>(new size_t(sz)), new double(0));
+    pz.execution(&it, std::make_tuple(), const_cast<const size_t*>(&sz), &time);
 }

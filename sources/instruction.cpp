@@ -158,7 +158,7 @@ namespace apl
     { return {ins[1], static_cast<process>(ins[2])}; }
 
     process instruction_message_send::proc() const
-    { return ins[3]; }
+    { return static_cast<process>(ins[3]); }
 
     void instruction::add_message_sending(message_id id, process proc)
     {
@@ -179,7 +179,7 @@ namespace apl
     { return {ins[1], static_cast<process>(ins[2])}; }
 
     process instruction_message_recv::proc() const
-    { return ins[3]; }
+    { return static_cast<process>(ins[3]); }
 
     void instruction::add_message_receiving(message_id id, process proc)
     {
@@ -200,7 +200,7 @@ namespace apl
     { return {ins[1], static_cast<process>(ins[2])}; }
 
     process instruction_message_info_send::proc() const
-    { return ins[3]; }
+    { return static_cast<process>(ins[3]); }
 
     void instruction::add_message_info_sending(message_id id, process proc)
     {
@@ -224,7 +224,7 @@ namespace apl
     { return ins[3]; }
 
     process instruction_message_create::proc() const
-    { return ins[4]; }
+    { return static_cast<process>(ins[4]); }
 
     void instruction::add_message_creation(message_id id, message_type type, process proc)
     {
@@ -252,7 +252,7 @@ namespace apl
     { return {ins[4], static_cast<process>(ins[5])}; }
 
     process instruction_message_part_create::proc() const
-    { return ins[6]; }
+    { return static_cast<process>(ins[6]); }
 
     void instruction::add_message_part_creation(message_id id, message_type type, message_id source, process proc)
     {

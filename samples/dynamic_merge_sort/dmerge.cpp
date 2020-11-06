@@ -66,12 +66,11 @@ public:
     { return size_; }
 };
 
+bool checking = false;
+
 class merge_all_task: public task
 {
 public:
-
-    merge_all_task(): task()
-    { }
     void operator()(array& s1, array& s2)
     {
         for (size_t i = 0; i < s1.size(); ++i)
@@ -107,10 +106,6 @@ public:
 class merge_task: public task
 {
 public:
-
-    merge_task(): task()
-    { }
-
     void operator()(const array& src, array& out)
     {
         size_t h_size = src.size() / 2;
@@ -163,58 +158,58 @@ public:
 class check_task: public task
 {
 public:
-    static bool checking;
-
-    check_task(): task()
-    { }
-
     void operator()(array& a1, array& a2, double t)
     {
         double tm1 = MPI_Wtime();
-        if (checking)
-        {
-            std::sort(&a2[0], &a2[0] + a2.size());
-            for (size_t i = 0; i < a1.size(); ++i)
-                if (a1[i] != a2[i])
-                {
-                    std::cout << "wrong\n";
-                    goto gh;
-                }
-            std::cout << "correct\n";
-        }
+        std::sort(&a2[0], &a2[0] + a2.size());
+        for (size_t i = 0; i < a1.size(); ++i)
+            if (a1[i] != a2[i])
+            {
+                std::cout << "wrong\n";
+                goto gh;
+            }
+        std::cout << "correct\n";
         gh:
         std::cout << tm1 - t << std::endl;
     }
-};
 
-bool check_task::checking = false;
+    void operator()(double t)
+    {
+        std::cout << MPI_Wtime() - t << std::endl;
+    }
+};
 
 class init_task: public task
 {
 public:
-
-    init_task(): task()
-    { }
-
     void operator()(double& t, size_t size)
     {
         std::mt19937 mt(static_cast<int>(time(0)));
         std::uniform_int_distribution<int> uid(0, 10000);
 
         array& a1 = *new array(size);
-        array& a2 = *new array(size);
+        mes_id<array> m_id1 = add_message(&a1, new size_t(size));
         array& a3 = *new array(size);
-
+        mes_id<array> m_id3 = add_message(&a3, new size_t(size));
         for (size_t i = 0; i < a1.size(); ++i)
-            a1[i] = a2[i] = a3[i] = uid(mt);
+            a1[i] = a3[i] = uid(mt);
+
+        mes_id<array> m_id2;
+        if (checking)
+        {
+            array& a2 = *new array(size);
+            m_id2 = add_message(&a2, new size_t(size));
+            for (size_t i = 0; i < a1.size(); ++i)
+                a2[i] = a1[i];
+        }
         t = MPI_Wtime();
 
-        mes_id<array> m_id1 = add_message(&a1, new size_t(size));
-        mes_id<array> m_id2 = add_message(&a2, new size_t(size));
-        mes_id<array> m_id3 = add_message(&a3, new size_t(size));
-
         local_task_id merge = create_task<merge_organizer>(std::make_tuple(m_id1.as_const(), m_id3.as_const()), new size_t(1));
-        local_task_id check = create_task<check_task>(m_id3, m_id2, arg_id<0, double>().as_const());
+        local_task_id check;
+        if (checking)
+            check = create_task<check_task>(m_id3, m_id2, arg_id<0, double>().as_const());
+        else
+            check = create_task<check_task>(arg_id<0, double>().as_const());
 
         add_dependence(merge, check);
     }
@@ -232,11 +227,14 @@ int main(int argc, char** argv)
         }
         else if (strcmp(argv[i], "-check") == 0)
         {
-            check_task::checking = true;
+            checking = true;
         }
     }
 
     parallelizer pz;
 
-    pz.execution(new init_task(), std::make_tuple(), new double(0), const_cast<const size_t*>(new size_t(size)));
+    double time = 0;
+    init_task ti;
+
+    pz.execution(&ti, std::make_tuple(), &time, const_cast<const size_t*>(&size));
 }
