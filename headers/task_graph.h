@@ -72,31 +72,36 @@ namespace apl
         task_graph& operator=(const task_graph& _tg);
 
         void add_task(task* t, task_type type, const std::vector<message*>& data, const std::vector<message*>& info);
-        //void add_task(task& t);
-        void add_data(message* m, message_type type, const std::vector<message*>& info);
-        //void add_data(message& m);
+        template<typename Type, typename... Args>
+        void add_task(task* t, const std::vector<message*>& data);
+
+        void add_message(message* m, message_type type, const std::vector<message*>& info);
+        template<typename Type, typename... InfoTypes>
+        void add_message(message* m, const std::vector<message*>& info);
+
         void add_dependence(task* parent, task* child);
-        //void add_dependence(task& parent, task& child);
 
         void del_task(task* t);
-        //void del_task(task& t);
-        void del_data(message* m);
-        //void del_data(message& m);
+        void del_message(message* m);
         void del_dependence(task* parent, task* child);
-        //void del_dependence(task& parent, task& child);
 
         bool contain_task(task* t);
-        //bool contain_task(task& t);
         bool contain_data(message* m);
-        //bool contain_data(message& m);
         bool contain_dependence(task* parent, task* child);
-        //bool contain_dependence(task& parent, task& child);
 
         void clear();
 
         friend class parallelizer;
         friend class memory_manager;
     };
+
+    template<typename Type, typename... Args>
+    void task_graph::add_task(task* t, const std::vector<message*>& data)
+    { add_task(t, {message_init_factory::get_type<Type>(), task_factory::get_type<Type, Args...>()}, data, {}); }
+
+    template<typename Type, typename... InfoTypes>
+    void task_graph::add_message(message* m, const std::vector<message*>& info)
+    { add_message(m, message_init_factory::get_type<Type, InfoTypes...>(), info); }
 
 }
 

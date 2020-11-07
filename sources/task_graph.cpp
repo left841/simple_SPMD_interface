@@ -64,7 +64,7 @@ namespace apl
         t_map.insert({t, {{base_perform_id++, MPI_PROC_NULL}, type.pt, data, childs, parents}});
     }
 
-    void task_graph::add_data(message* m, message_type type, const std::vector<message*>& info)
+    void task_graph::add_message(message* m, message_type type, const std::vector<message*>& info)
     { d_map.insert({m, {{base_message_id++, MPI_PROC_NULL}, type, 1, info}}); }
 
     void task_graph::add_dependence(task* parent, task* child)
@@ -95,7 +95,7 @@ namespace apl
         t_map.erase(t);
     }
 
-    void task_graph::del_data(message* m)
+    void task_graph::del_message(message* m)
     {
         if (d_map.find(m) == d_map.end())
             return;

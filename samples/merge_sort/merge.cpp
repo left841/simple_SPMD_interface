@@ -26,11 +26,13 @@ public:
         else
             res = false;
     }
+
     ~array()
     {
         if (res)
             delete[] p;
     }
+
     void send(const sender& se) const
     { se.isend(p, size_); }
 
@@ -172,7 +174,7 @@ int main(int argc, char** argv)
         v2.push_back(new merge_task());
         args.push_back({arr1, arr2, arr_p1});
 
-        tg.add_task(v2.back(), {message_init_factory::get_type<merge_task>(), task_factory::get_type<merge_task, const array, const array, array>()}, args.back(), {});
+        tg.add_task<merge_task, const array, const array, array>(v2.back(), args.back());
 
         fin.push_back(arr_p1);
         for (size_t i = 1; i < layers; ++i)
@@ -200,7 +202,7 @@ int main(int argc, char** argv)
 
                 v1[j] = new merge_task();
                 args2[j] = {arr1, arr2, arr_p1};
-                tg.add_task(v1[j], {message_init_factory::get_type<merge_task>(), task_factory::get_type<merge_task, const array, const array, array>()}, args2[j], {});
+                tg.add_task<merge_task, const array, const array, array>(v1[j], args2[j]);
 
                 tg.add_dependence(v1[j], v2[j/2]);
             }
@@ -213,13 +215,13 @@ int main(int argc, char** argv)
             arr1 = new array(((array*)args[i][0])->size(), ((array*)args[i][2])->data());
             arr2 = ((array*)args[i][0]);
             task* tt = new merge_all_task();
-            tg.add_task(tt, {message_init_factory::get_type<merge_all_task>(), task_factory::get_type<merge_all_task, array, array>()}, {arr1, arr2}, {});
+            tg.add_task<merge_all_task, array, array>(tt, {arr1, arr2});
             tg.add_dependence(tt, v2[i]);
 
             arr1 = new array(((array*)args[i][1])->size(), ((array*)args[i][2])->data() + ((array*)args[i][0])->size());
             arr2 = ((array*)args[i][1]);
             tt = new merge_all_task();
-            tg.add_task(tt, {message_init_factory::get_type<merge_all_task>(), task_factory::get_type<merge_all_task, array, array>()}, {arr1, arr2}, {});
+            tg.add_task<merge_all_task, array, array>(tt, {arr1, arr2});
             tg.add_dependence(tt, v2[i]);
         }
     }
@@ -227,7 +229,7 @@ int main(int argc, char** argv)
     {
         array* arr1 = new array(size, p1);
         array* arr2 = new array(size, p2);
-        tg.add_task(new merge_all_task(), {message_init_factory::get_type<merge_all_task>(), task_factory::get_type<merge_all_task, array, array>()}, {arr1, arr2}, {});
+        tg.add_task<merge_all_task, array, array>(new merge_all_task(), {arr1, arr2});
         std::swap(p1, p2);
         fin.push_back(arr1);
         fin.push_back(arr2);
