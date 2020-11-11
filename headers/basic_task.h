@@ -189,8 +189,6 @@ namespace apl
         template<size_t Index, class Type>
         mes_id<Type> arg_id();
 
-
-        //task_data this_task_data();
         template<class Type>
         new_task_id<Type> this_task_id();
 
@@ -250,7 +248,6 @@ namespace apl
     { return env->get_this_task_id(); }
 
 
-    // new task factory
     class task_factory
     {
     private:
