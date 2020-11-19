@@ -13,30 +13,30 @@ namespace apl
 
     struct message_init_data
     {
-        message_type type;
+        message_type type = MESSAGE_TYPE_UNDEFINED;
         std::vector<message*> ii;
     };
 
     struct message_init_add_data
     {
-        message_type type;
+        message_type type = MESSAGE_TYPE_UNDEFINED;
         std::vector<message*> ii;
-        message* mes;
+        message* mes = nullptr;
     };
 
     struct message_child_data
     {
-        message_type type;
+        message_type type = MESSAGE_TYPE_UNDEFINED;
         local_message_id sourse;
         std::vector<message*> pi;
     };
 
     struct message_child_add_data
     {
-        message_type type;
+        message_type type = MESSAGE_TYPE_UNDEFINED;
         local_message_id sourse;
         std::vector<message*> pi;
-        message* mes;
+        message* mes = nullptr;
     };
 
     struct task_data

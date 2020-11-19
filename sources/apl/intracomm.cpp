@@ -1,4 +1,4 @@
-#include "intracomm.h"
+#include "apl/intracomm.h"
 
 namespace apl
 {

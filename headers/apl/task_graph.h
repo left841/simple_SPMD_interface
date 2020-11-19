@@ -2,7 +2,7 @@
 #define __TASK_GRAPH_H__
 
 #include "parallel_defs.h"
-#include "basic_task.h"
+#include "task.h"
 #include <vector>
 #include <map>
 #include <set>

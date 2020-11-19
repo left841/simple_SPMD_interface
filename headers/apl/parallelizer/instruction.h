@@ -1,11 +1,11 @@
 #ifndef __INSTRUCTION_H__
 #define __INSTRUCTION_H__
 
-#include "parallel_defs.h"
-#include "message.h"
-#include "basic_task.h"
-#include "transfer.h"
-#include "task_graph.h"
+#include "apl/parallel_defs.h"
+#include "apl/message.h"
+#include "apl/task.h"
+#include "apl/transfer.h"
+#include "apl/task_graph.h"
 #include <array>
 #include <functional>
 

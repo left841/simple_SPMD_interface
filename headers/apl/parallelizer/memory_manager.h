@@ -2,11 +2,12 @@
 #define __MEMORY_MANAGER_H__
 
 #include <vector>
-#include "parallel_defs.h"
-#include "message.h"
-#include "basic_task.h"
-#include "task_graph.h"
-#include "it_queue.h"
+#include "apl/parallel_defs.h"
+#include "apl/message.h"
+#include "apl/task.h"
+#include "apl/task_graph.h"
+#include "apl/containers/it_queue.h"
+#include "apl/containers/vector_map.h"
 
 namespace apl
 {
@@ -40,7 +41,6 @@ namespace apl
             std::vector<message*> info;
             size_t version;
             CREATION_STATE c_type;
-            size_t next_empty = std::numeric_limits<size_t>::max();
         };
 
         struct t_info
@@ -53,7 +53,6 @@ namespace apl
             std::vector<perform_id> childs;
             std::vector<message_id> data;
             std::vector<message_id> const_data;
-            size_t next_empty = std::numeric_limits<size_t>::max();
         };
 
         struct message_graph
@@ -66,23 +65,13 @@ namespace apl
             CHILD_STATE ch_state;
         };
 
-        size_t first_empty_message = std::numeric_limits<size_t>::max();
-        size_t first_empty_task = std::numeric_limits<size_t>::max();
-
-        std::map<message_id, size_t> mes_map;
-        std::map<perform_id, size_t> task_map;
-        std::map<message_id, message_graph> mes_graph;
-
-        std::vector<t_info> task_v;
-        std::vector<d_info> data_v;
+        vector_map<message_id, d_info> mes_map;
+        vector_map<perform_id, t_info> task_map;
+        vector_map<message_id, message_graph> mes_graph;
 
         std::set<message_id> messages_to_del;
         std::vector<perform_id> tasks_to_del;
 
-        d_info& resolve_mes_id(message_id id);
-        t_info& resolve_task_id(perform_id id);
-        size_t acquire_d_info();
-        size_t acquire_t_info();
         void inc_ref_count(message_id id);
         void dec_ref_count(message_id id);
 

@@ -7,13 +7,13 @@
 #include <set>
 #include <limits>
 #include "mpi.h"
-#include "parallel_defs.h"
-#include "parallel_core.h"
+#include "apl/parallel_defs.h"
+#include "apl/parallel_core.h"
 #include "instruction.h"
 #include "memory_manager.h"
-#include "task_graph.h"
-#include "intracomm.h"
-#include "it_queue.h"
+#include "apl/task_graph.h"
+#include "apl/intracomm.h"
+#include "apl/containers/it_queue.h"
 
 namespace apl
 {
