@@ -2,14 +2,14 @@
 #define __INTRACOMM_H__
 
 #include "mpi.h"
-#include "parallel_defs.h"
-#include "communicator.h"
-#include "transfer.h"
-#include "standard_transfer.h"
-#include "buffer_transfer.h"
-#include "synchronous_transfer.h"
-#include "ready_transfer.h"
-#include "message.h"
+#include "apl/parallel_defs.h"
+#include "apl/communicator.h"
+#include "apl/transfer.h"
+#include "apl/standard_transfer.h"
+#include "apl/buffer_transfer.h"
+#include "apl/synchronous_transfer.h"
+#include "apl/ready_transfer.h"
+#include "apl/message.h"
 
 namespace apl
 {
@@ -24,12 +24,12 @@ namespace apl
         intracomm(const intracomm& c, int color, int key);
         ~intracomm();
 
-        void send(message* mes, process proc);
-        void bsend(message* mes, process proc);
-        void ssend(message* mes, process proc);
-        void rsend(message* mes, process proc);
-        void recv(message* mes, process proc);
-        void bcast(message* mes, process proc);
+        void send(message* mes, process proc, request_block& req);
+        void bsend(message* mes, process proc, request_block& req);
+        void ssend(message* mes, process proc, request_block& req);
+        void rsend(message* mes, process proc, request_block& req);
+        void recv(message* mes, process proc, request_block& req);
+        void bcast(message* mes, process proc, request_block& req);
 
         void barrier();
         void abort(int err);

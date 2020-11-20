@@ -2,7 +2,7 @@
 #define __COMMUNICATOR_H__
 
 #include "mpi.h"
-#include "parallel_defs.h"
+#include "apl/parallel_defs.h"
 
 namespace apl
 {

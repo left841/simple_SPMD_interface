@@ -12,7 +12,7 @@ private:
     struct node
     {
         Data data;
-        size_t next;
+        size_t next = 0;
     };
 
     MapType m;
@@ -70,7 +70,7 @@ public:
 };
 
 template<typename Key, typename Data, typename MapType>
-vector_map<Key, Data, MapType>::iterator::iterator()
+vector_map<Key, Data, MapType>::iterator::iterator(): vec(nullptr)
 { }
 
 template<typename Key, typename Data, typename MapType>

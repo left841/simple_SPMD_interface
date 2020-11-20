@@ -32,7 +32,10 @@ namespace apl
         return d;
     }
 
-    sender::sender()
+    sender::sender(): global_req(nullptr)
+    { }
+
+    sender::sender(request_block& req): global_req(&req)
     { }
 
     sender::~sender()
@@ -54,7 +57,7 @@ namespace apl
         send_impl(buf, size, type, TAG::MAIN);
     }
 
-    void sender::isend(const void* buf, size_t size, simple_datatype type) const
+    void sender::isend(const void* buf, size_t size, simple_datatype type, request_block& req) const
     {
         if (size * type.size_in_bytes > INT_MAX)
         {
@@ -62,22 +65,32 @@ namespace apl
             size_t part = INT_MAX / type.size_in_bytes;
             while (size * type.size_in_bytes > INT_MAX)
             {
-                store_request(isend_impl(buf, part, type, TAG::MAIN));
+                req.store(isend_impl(buf, part, type, TAG::MAIN));
                 buf = reinterpret_cast<void*>(reinterpret_cast<size_t>(buf) + part * type.size_in_bytes);
                 size -= part;
             }
         }
-        store_request(isend_impl(buf, size, type, TAG::MAIN));
+        req.store(isend_impl(buf, size, type, TAG::MAIN));
     }
+
+    void sender::isend(const void* buf, size_t size, simple_datatype type) const
+    { isend(buf, size, type, *global_req); }
 
     void sender::send_bytes(const void* buf, size_t count) const
     { send(buf, count, byte_datatype()); }
 
-    void sender::isend_bytes(const void* buf, size_t count) const
-    { isend(buf, count, byte_datatype()); }
+    void sender::isend_bytes(const void* buf, size_t count, request_block& req) const
+    { isend(buf, count, byte_datatype(), req); }
 
-    receiver::receiver(): probe_flag(false)
+    void sender::isend_bytes(const void* buf, size_t count) const
+    { isend_bytes(buf, count, *global_req); }
+
+    receiver::receiver(): probe_flag(false), global_req(nullptr)
     { }
+
+    receiver::receiver(request_block & req): probe_flag(false), global_req(&req)
+    {
+    }
 
     receiver::~receiver()
     { }
@@ -102,7 +115,7 @@ namespace apl
         (void)recv_impl(buf, size, type, TAG::MAIN);
     }
 
-    void receiver::irecv(void* buf, size_t size, simple_datatype type) const
+    void receiver::irecv(void* buf, size_t size, simple_datatype type, request_block& req) const
     {
         if (size * type.size_in_bytes > INT_MAX)
         {
@@ -114,22 +127,25 @@ namespace apl
             size_t part = INT_MAX / type.size_in_bytes;
             while (size * sizeof(int) > INT_MAX)
             {
-                store_request(irecv_impl(buf, part, type, TAG::MAIN));
+                req.store(irecv_impl(buf, part, type, TAG::MAIN));
                 buf = reinterpret_cast<void*>(reinterpret_cast<size_t>(buf) + part * type.size_in_bytes);
                 size -= part;
             }
         }
-        store_request(irecv_impl(buf, size, type, TAG::MAIN));
+        req.store(irecv_impl(buf, size, type, TAG::MAIN));
     }
+
+    void receiver::irecv(void* buf, size_t size, simple_datatype type) const
+    { irecv(buf, size, type, *global_req); }
 
     size_t receiver::probe(simple_datatype type) const
     {
-        size_t size;
+        size_t size = 0;
         MPI_Status status = probe_impl();
         if (status.MPI_TAG == 0)
         {
-            int sz;
-            MPI_Get_count(&status, type.type, &sz);
+            int sz = 0;
+            apl_MPI_CHECKER(MPI_Get_count(&status, type.type, &sz));
             size = sz;
         }
         else
@@ -143,8 +159,11 @@ namespace apl
     void receiver::recv_bytes(void* buf, size_t count) const
     { recv(buf, count, byte_datatype()); }
 
+    void receiver::irecv_bytes(void* buf, size_t count, request_block & req) const
+    { irecv(buf, count, byte_datatype(), req); }
+
     void receiver::irecv_bytes(void* buf, size_t count) const
-    { irecv(buf, count, byte_datatype()); }
+    { irecv_bytes(buf, count, *global_req); }
 
     size_t receiver::probe_bytes() const
     { return probe(byte_datatype()); }
@@ -163,16 +182,16 @@ namespace apl
     { send(buf, size, datatype<char>()); }
 
     template<>
-    void sender::isend<char>(const char* buf, size_t size) const
-    { isend(buf, size, datatype<char>()); }
+    void sender::isend<char>(const char* buf, size_t size, request_block& req) const
+    { isend(buf, size, datatype<char>(), req); }
 
     template<>
     void receiver::recv<char>(char* buf, size_t size) const
     { recv(buf, size, datatype<char>()); }
 
     template<>
-    void receiver::irecv<char>(char* buf, size_t size) const
-    { irecv(buf, size, datatype<char>()); }
+    void receiver::irecv<char>(char* buf, size_t size, request_block& req) const
+    { irecv(buf, size, datatype<char>(), req); }
 
     template<>
     size_t receiver::probe<char>() const
@@ -191,16 +210,16 @@ namespace apl
     { send(buf, size, datatype<unsigned char>()); }
 
     template<>
-    void sender::isend<unsigned char>(const unsigned char* buf, size_t size) const
-    { isend(buf, size, datatype<unsigned char>()); }
+    void sender::isend<unsigned char>(const unsigned char* buf, size_t size, request_block& req) const
+    { isend(buf, size, datatype<unsigned char>(), req); }
 
     template<>
     void receiver::recv<unsigned char>(unsigned char* buf, size_t size) const
     { recv(buf, size, datatype<unsigned char>()); }
 
     template<>
-    void receiver::irecv<unsigned char>(unsigned char* buf, size_t size) const
-    { irecv(buf, size, datatype<unsigned char>()); }
+    void receiver::irecv<unsigned char>(unsigned char* buf, size_t size, request_block& req) const
+    { irecv(buf, size, datatype<unsigned char>(), req); }
 
     template<>
     size_t receiver::probe<unsigned char>() const
@@ -219,16 +238,16 @@ namespace apl
     { send(buf, size, datatype<short>()); }
 
     template<>
-    void sender::isend<short>(const short* buf, size_t size) const
-    { isend(buf, size, datatype<short>()); }
+    void sender::isend<short>(const short* buf, size_t size, request_block& req) const
+    { isend(buf, size, datatype<short>(), req); }
 
     template<>
     void receiver::recv<short>(short* buf, size_t size) const
     { recv(buf, size, datatype<short>()); }
 
     template<>
-    void receiver::irecv<short>(short* buf, size_t size) const
-    { irecv(buf, size, datatype<short>()); }
+    void receiver::irecv<short>(short* buf, size_t size, request_block& req) const
+    { irecv(buf, size, datatype<short>(), req); }
 
     template<>
     size_t receiver::probe<short>() const
@@ -247,16 +266,16 @@ namespace apl
     { send(buf, size, datatype<unsigned short>()); }
 
     template<>
-    void sender::isend<unsigned short>(const unsigned short* buf, size_t size) const
-    { isend(buf, size, datatype<unsigned short>()); }
+    void sender::isend<unsigned short>(const unsigned short* buf, size_t size, request_block& req) const
+    { isend(buf, size, datatype<unsigned short>(), req); }
 
     template<>
     void receiver::recv<unsigned short>(unsigned short* buf, size_t size) const
     { recv(buf, size, datatype<unsigned short>()); }
 
     template<>
-    void receiver::irecv<unsigned short>(unsigned short* buf, size_t size) const
-    { irecv(buf, size, datatype<unsigned short>()); }
+    void receiver::irecv<unsigned short>(unsigned short* buf, size_t size, request_block& req) const
+    { irecv(buf, size, datatype<unsigned short>(), req); }
 
     template<>
     size_t receiver::probe<unsigned short>() const
@@ -275,16 +294,16 @@ namespace apl
     { send(buf, size, datatype<int>()); }
 
     template<>
-    void sender::isend<int>(const int* buf, size_t size) const
-    { isend(buf, size, datatype<int>()); }
+    void sender::isend<int>(const int* buf, size_t size, request_block& req) const
+    { isend(buf, size, datatype<int>(), req); }
 
     template<>
     void receiver::recv<int>(int* buf, size_t size) const
     { recv(buf, size, datatype<int>()); }
 
     template<>
-    void receiver::irecv<int>(int* buf, size_t size) const
-    { irecv(buf, size, datatype<int>()); }
+    void receiver::irecv<int>(int* buf, size_t size, request_block& req) const
+    { irecv(buf, size, datatype<int>(), req); }
 
     template<>
     size_t receiver::probe<int>() const
@@ -303,16 +322,16 @@ namespace apl
     { send(buf, size, datatype<unsigned>()); }
 
     template<>
-    void sender::isend<unsigned>(const unsigned* buf, size_t size) const
-    { isend(buf, size, datatype<unsigned>()); }
+    void sender::isend<unsigned>(const unsigned* buf, size_t size, request_block& req) const
+    { isend(buf, size, datatype<unsigned>(), req); }
 
     template<>
     void receiver::recv<unsigned>(unsigned* buf, size_t size) const
     { recv(buf, size, datatype<unsigned>()); }
 
     template<>
-    void receiver::irecv<unsigned>(unsigned* buf, size_t size) const
-    { irecv(buf, size, datatype<unsigned>()); }
+    void receiver::irecv<unsigned>(unsigned* buf, size_t size, request_block& req) const
+    { irecv(buf, size, datatype<unsigned>(), req); }
 
     template<>
     size_t receiver::probe<unsigned>() const
@@ -331,16 +350,16 @@ namespace apl
     { send(buf, size, datatype<long>()); }
 
     template<>
-    void sender::isend<long>(const long* buf, size_t size) const
-    { isend(buf, size, datatype<long>()); }
+    void sender::isend<long>(const long* buf, size_t size, request_block& req) const
+    { isend(buf, size, datatype<long>(), req); }
 
     template<>
     void receiver::recv<long>(long* buf, size_t size) const
     { recv(buf, size, datatype<long>()); }
 
     template<>
-    void receiver::irecv<long>(long* buf, size_t size) const
-    { irecv(buf, size, datatype<long>()); }
+    void receiver::irecv<long>(long* buf, size_t size, request_block& req) const
+    { irecv(buf, size, datatype<long>(), req); }
 
     template<>
     size_t receiver::probe<long>() const
@@ -359,16 +378,16 @@ namespace apl
     { send(buf, size, datatype<unsigned long>()); }
 
     template<>
-    void sender::isend<unsigned long>(const unsigned long* buf, size_t size) const
-    { isend(buf, size, datatype<unsigned long>()); }
+    void sender::isend<unsigned long>(const unsigned long* buf, size_t size, request_block& req) const
+    { isend(buf, size, datatype<unsigned long>(), req); }
 
     template<>
     void receiver::recv<unsigned long>(unsigned long* buf, size_t size) const
     { recv(buf, size, datatype<unsigned long>()); }
 
     template<>
-    void receiver::irecv<unsigned long>(unsigned long* buf, size_t size) const
-    { irecv(buf, size, datatype<unsigned long>()); }
+    void receiver::irecv<unsigned long>(unsigned long* buf, size_t size, request_block& req) const
+    { irecv(buf, size, datatype<unsigned long>(), req); }
 
     template<>
     size_t receiver::probe<unsigned long>() const
@@ -387,16 +406,16 @@ namespace apl
     { send(buf, size, datatype<long long>()); }
 
     template<>
-    void sender::isend<long long>(const long long* buf, size_t size) const
-    { isend(buf, size, datatype<long long>()); }
+    void sender::isend<long long>(const long long* buf, size_t size, request_block& req) const
+    { isend(buf, size, datatype<long long>(), req); }
 
     template<>
     void receiver::recv<long long>(long long* buf, size_t size) const
     { recv(buf, size, datatype<long long>()); }
 
     template<>
-    void receiver::irecv<long long>(long long* buf, size_t size) const
-    { irecv(buf, size, datatype<long long>()); }
+    void receiver::irecv<long long>(long long* buf, size_t size, request_block& req) const
+    { irecv(buf, size, datatype<long long>(), req); }
 
     template<>
     size_t receiver::probe<long long>() const
@@ -415,16 +434,16 @@ namespace apl
     { send(buf, size, datatype<unsigned long long>()); }
 
     template<>
-    void sender::isend<unsigned long long>(const unsigned long long* buf, size_t size) const
-    { isend(buf, size, datatype<unsigned long long>()); }
+    void sender::isend<unsigned long long>(const unsigned long long* buf, size_t size, request_block& req) const
+    { isend(buf, size, datatype<unsigned long long>(), req); }
 
     template<>
     void receiver::recv<unsigned long long>(unsigned long long* buf, size_t size) const
     { recv(buf, size, datatype<unsigned long long>()); }
 
     template<>
-    void receiver::irecv<unsigned long long>(unsigned long long* buf, size_t size) const
-    { irecv(buf, size, datatype<unsigned long long>()); }
+    void receiver::irecv<unsigned long long>(unsigned long long* buf, size_t size, request_block& req) const
+    { irecv(buf, size, datatype<unsigned long long>(), req); }
 
     template<>
     size_t receiver::probe<unsigned long long>() const
@@ -443,16 +462,16 @@ namespace apl
     { send(buf, size, datatype<float>()); }
 
     template<>
-    void sender::isend<float>(const float* buf, size_t size) const
-    { isend(buf, size, datatype<float>()); }
+    void sender::isend<float>(const float* buf, size_t size, request_block& req) const
+    { isend(buf, size, datatype<float>(), req); }
 
     template<>
     void receiver::recv<float>(float* buf, size_t size) const
     { recv(buf, size, datatype<float>()); }
 
     template<>
-    void receiver::irecv<float>(float* buf, size_t size) const
-    { irecv(buf, size, datatype<float>()); }
+    void receiver::irecv<float>(float* buf, size_t size, request_block& req) const
+    { irecv(buf, size, datatype<float>(), req); }
 
     template<>
     size_t receiver::probe<float>() const
@@ -471,16 +490,16 @@ namespace apl
     { send(buf, size, datatype<double>()); }
 
     template<>
-    void sender::isend<double>(const double* buf, size_t size) const
-    { isend(buf, size, datatype<double>()); }
+    void sender::isend<double>(const double* buf, size_t size, request_block& req) const
+    { isend(buf, size, datatype<double>(), req); }
 
     template<>
     void receiver::recv<double>(double* buf, size_t size) const
     { recv(buf, size, datatype<double>()); }
 
     template<>
-    void receiver::irecv<double>(double* buf, size_t size) const
-    { irecv(buf, size, datatype<double>()); }
+    void receiver::irecv<double>(double* buf, size_t size, request_block& req) const
+    { irecv(buf, size, datatype<double>(), req); }
 
     template<>
     size_t receiver::probe<double>() const
@@ -499,16 +518,16 @@ namespace apl
     { send(buf, size, datatype<long double>()); }
 
     template<>
-    void sender::isend<long double>(const long double* buf, size_t size) const
-    { isend(buf, size, datatype<long double>()); }
+    void sender::isend<long double>(const long double* buf, size_t size, request_block& req) const
+    { isend(buf, size, datatype<long double>(), req); }
 
     template<>
     void receiver::recv<long double>(long double* buf, size_t size) const
     { recv(buf, size, datatype<long double>()); }
 
     template<>
-    void receiver::irecv<long double>(long double* buf, size_t size) const
-    { irecv(buf, size, datatype<long double>()); }
+    void receiver::irecv<long double>(long double* buf, size_t size, request_block& req) const
+    { irecv(buf, size, datatype<long double>(), req); }
 
     template<>
     size_t receiver::probe<long double>() const
@@ -527,16 +546,16 @@ namespace apl
     { send(buf, size, datatype<wchar_t>()); }
 
     template<>
-    void sender::isend<wchar_t>(const wchar_t* buf, size_t size) const
-    { isend(buf, size, datatype<wchar_t>()); }
+    void sender::isend<wchar_t>(const wchar_t* buf, size_t size, request_block& req) const
+    { isend(buf, size, datatype<wchar_t>(), req); }
 
     template<>
     void receiver::recv<wchar_t>(wchar_t* buf, size_t size) const
     { recv(buf, size, datatype<wchar_t>()); }
 
     template<>
-    void receiver::irecv<wchar_t>(wchar_t* buf, size_t size) const
-    { irecv(buf, size, datatype<wchar_t>()); }
+    void receiver::irecv<wchar_t>(wchar_t* buf, size_t size, request_block& req) const
+    { irecv(buf, size, datatype<wchar_t>(), req); }
 
     template<>
     size_t receiver::probe<wchar_t>() const
@@ -555,16 +574,16 @@ namespace apl
     { send(buf, size, datatype<local_message_id>()); }
 
     template<>
-    void sender::isend<local_message_id>(const local_message_id* buf, size_t size) const
-    { isend(buf, size, datatype<local_message_id>()); }
+    void sender::isend<local_message_id>(const local_message_id* buf, size_t size, request_block& req) const
+    { isend(buf, size, datatype<local_message_id>(), req); }
 
     template<>
     void receiver::recv<local_message_id>(local_message_id* buf, size_t size) const
     { recv(buf, size, datatype<local_message_id>()); }
 
     template<>
-    void receiver::irecv<local_message_id>(local_message_id* buf, size_t size) const
-    { irecv(buf, size, datatype<local_message_id>()); }
+    void receiver::irecv<local_message_id>(local_message_id* buf, size_t size, request_block& req) const
+    { irecv(buf, size, datatype<local_message_id>(), req); }
 
     template<>
     size_t receiver::probe<local_message_id>() const
@@ -584,16 +603,16 @@ namespace apl
     { send(buf, size, datatype<local_task_id>()); }
 
     template<>
-    void sender::isend<local_task_id>(const local_task_id* buf, size_t size) const
-    { isend(buf, size, datatype<local_task_id>()); }
+    void sender::isend<local_task_id>(const local_task_id* buf, size_t size, request_block& req) const
+    { isend(buf, size, datatype<local_task_id>(), req); }
 
     template<>
     void receiver::recv<local_task_id>(local_task_id* buf, size_t size) const
     { recv(buf, size, datatype<local_task_id>()); }
 
     template<>
-    void receiver::irecv<local_task_id>(local_task_id* buf, size_t size) const
-    { irecv(buf, size, datatype<local_task_id>()); }
+    void receiver::irecv<local_task_id>(local_task_id* buf, size_t size, request_block& req) const
+    { irecv(buf, size, datatype<local_task_id>(), req); }
 
     template<>
     size_t receiver::probe<local_task_id>() const
@@ -613,16 +632,16 @@ namespace apl
     { send(buf, size, datatype<task_dependence>()); }
 
     template<>
-    void sender::isend<task_dependence>(const task_dependence* buf, size_t size) const
-    { isend(buf, size, datatype<task_dependence>()); }
+    void sender::isend<task_dependence>(const task_dependence* buf, size_t size, request_block& req) const
+    { isend(buf, size, datatype<task_dependence>(), req); }
 
     template<>
     void receiver::recv<task_dependence>(task_dependence* buf, size_t size) const
     { recv(buf, size, datatype<task_dependence>()); }
 
     template<>
-    void receiver::irecv<task_dependence>(task_dependence* buf, size_t size) const
-    { irecv(buf, size, datatype<task_dependence>()); }
+    void receiver::irecv<task_dependence>(task_dependence* buf, size_t size, request_block& req) const
+    { irecv(buf, size, datatype<task_dependence>(), req); }
 
     template<>
     size_t receiver::probe<task_dependence>() const

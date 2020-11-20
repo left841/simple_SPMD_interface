@@ -1,13 +1,14 @@
 #ifndef __TRANSFER_H__
 #define __TRANSFER_H__
 
-#include <queue>
-#include <climits>
-#include <cassert>
 #include <cstddef>
+#include <cassert>
+#include <climits>
+#include <queue>
 #include "mpi.h"
-#include "parallel_defs.h"
-#include "parallel_core.h"
+#include "apl/parallel_defs.h"
+#include "apl/parallel_core.h"
+#include "apl/request_container.h"
 
 namespace apl
 {
@@ -51,34 +52,43 @@ namespace apl
     {
     protected:
 
+        request_block* global_req;
         virtual void send_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg = TAG::UNDEFINED) const = 0;
         virtual MPI_Request isend_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg = TAG::UNDEFINED) const = 0;
 
     public:
 
         sender();
+        sender(request_block& req);
         virtual ~sender();
 
         void send(const void* buf, size_t size, simple_datatype type) const;
+        void isend(const void* buf, size_t size, simple_datatype type, request_block& req) const;
         void isend(const void* buf, size_t size, simple_datatype type) const;
 
         void send_bytes(const void* buf, size_t count) const;
+        void isend_bytes(const void* buf, size_t count, request_block& req) const;
         void isend_bytes(const void* buf, size_t count) const;
 
         template<class T>
         void send(const T* buf, size_t size = 1) const;
         template<class T>
+        void isend(const T* buf, size_t size, request_block& req) const;
+        template<class T>
         void isend(const T* buf, size_t size = 1) const;
 
-        virtual void store_request(MPI_Request req) const = 0;
-
     };
+
+    template<class T>
+    void sender::isend(const T* buf, size_t size) const
+    { isend(buf, size, *global_req); }
 
     class receiver
     {
     protected:
 
         mutable bool probe_flag;
+        request_block* global_req;
 
         virtual MPI_Status recv_impl(void* buf, size_t size, const simple_datatype& type, TAG tg = TAG::UNDEFINED) const = 0;
         virtual MPI_Request irecv_impl(void* buf, size_t size, const simple_datatype& type, TAG tg = TAG::UNDEFINED) const = 0;
@@ -87,26 +97,33 @@ namespace apl
     public:
 
         receiver();
+        receiver(request_block& req);
         virtual ~receiver();
 
-        virtual void recv(void* buf, size_t size, simple_datatype type) const;
-        virtual void irecv(void* buf, size_t size, simple_datatype type) const;
-        virtual size_t probe(simple_datatype type) const;
+        void recv(void* buf, size_t size, simple_datatype type) const;
+        void irecv(void* buf, size_t size, simple_datatype type, request_block& req) const;
+        void irecv(void* buf, size_t size, simple_datatype type) const;
+        size_t probe(simple_datatype type) const;
 
         void recv_bytes(void* buf, size_t count) const;
+        void irecv_bytes(void* buf, size_t count, request_block& req) const;
         void irecv_bytes(void* buf, size_t count) const;
         size_t probe_bytes() const;
 
         template<class T>
         void recv(T* buf, size_t size = 1) const;
         template<class T>
+        void irecv(T* buf, size_t size, request_block& req) const;
+        template<class T>
         void irecv(T* buf, size_t size = 1) const;
         template<class T>
         size_t probe() const;
 
-        virtual void store_request(MPI_Request req) const = 0;
-
     };
+
+    template<class T>
+    void receiver::irecv(T* buf, size_t size) const
+    { irecv(buf, size, *global_req); }
 
     //send-recv specifications
     // char
@@ -117,13 +134,13 @@ namespace apl
     void sender::send<char>(const char* buf, size_t size) const;
 
     template<>
-    void sender::isend<char>(const char* buf, size_t size) const;
+    void sender::isend<char>(const char* buf, size_t size, request_block& req) const;
 
     template<>
     void receiver::recv<char>(char* buf, size_t size) const;
 
     template<>
-    void receiver::irecv<char>(char* buf, size_t size) const;
+    void receiver::irecv<char>(char* buf, size_t size, request_block& req) const;
 
     template<>
     size_t receiver::probe<char>() const;
@@ -136,13 +153,13 @@ namespace apl
     void sender::send<unsigned char>(const unsigned char* buf, size_t size) const;
 
     template<>
-    void sender::isend<unsigned char>(const unsigned char* buf, size_t size) const;
+    void sender::isend<unsigned char>(const unsigned char* buf, size_t size, request_block& req) const;
 
     template<>
     void receiver::recv<unsigned char>(unsigned char* buf, size_t size) const;
 
     template<>
-    void receiver::irecv<unsigned char>(unsigned char* buf, size_t size) const;
+    void receiver::irecv<unsigned char>(unsigned char* buf, size_t size, request_block& req) const;
 
     template<>
     size_t receiver::probe<unsigned char>() const;
@@ -155,13 +172,13 @@ namespace apl
     void sender::send<short>(const short* buf, size_t size) const;
 
     template<>
-    void sender::isend<short>(const short* buf, size_t size) const;
+    void sender::isend<short>(const short* buf, size_t size, request_block& req) const;
 
     template<>
     void receiver::recv<short>(short* buf, size_t size) const;
 
     template<>
-    void receiver::irecv<short>(short* buf, size_t size) const;
+    void receiver::irecv<short>(short* buf, size_t size, request_block& req) const;
 
     template<>
     size_t receiver::probe<short>() const;
@@ -174,13 +191,13 @@ namespace apl
     void sender::send<unsigned short>(const unsigned short* buf, size_t size) const;
 
     template<>
-    void sender::isend<unsigned short>(const unsigned short* buf, size_t size) const;
+    void sender::isend<unsigned short>(const unsigned short* buf, size_t size, request_block& req) const;
 
     template<>
     void receiver::recv<unsigned short>(unsigned short* buf, size_t size) const;
 
     template<>
-    void receiver::irecv<unsigned short>(unsigned short* buf, size_t size) const;
+    void receiver::irecv<unsigned short>(unsigned short* buf, size_t size, request_block& req) const;
 
     template<>
     size_t receiver::probe<unsigned short>() const;
@@ -193,13 +210,13 @@ namespace apl
     void sender::send<int>(const int* buf, size_t size) const;
 
     template<>
-    void sender::isend<int>(const int* buf, size_t size) const;
+    void sender::isend<int>(const int* buf, size_t size, request_block& req) const;
 
     template<>
     void receiver::recv<int>(int* buf, size_t size) const;
 
     template<>
-    void receiver::irecv<int>(int* buf, size_t size) const;
+    void receiver::irecv<int>(int* buf, size_t size, request_block& req) const;
 
     template<>
     size_t receiver::probe<int>() const;
@@ -212,13 +229,13 @@ namespace apl
     void sender::send<unsigned>(const unsigned* buf, size_t size) const;
 
     template<>
-    void sender::isend<unsigned>(const unsigned* buf, size_t size) const;
+    void sender::isend<unsigned>(const unsigned* buf, size_t size, request_block& req) const;
 
     template<>
     void receiver::recv<unsigned>(unsigned* buf, size_t size) const;
 
     template<>
-    void receiver::irecv<unsigned>(unsigned* buf, size_t size) const;
+    void receiver::irecv<unsigned>(unsigned* buf, size_t size, request_block& req) const;
 
     template<>
     size_t receiver::probe<unsigned>() const;
@@ -231,13 +248,13 @@ namespace apl
     void sender::send<long>(const long* buf, size_t size) const;
 
     template<>
-    void sender::isend<long>(const long* buf, size_t size) const;
+    void sender::isend<long>(const long* buf, size_t size, request_block& req) const;
 
     template<>
     void receiver::recv<long>(long* buf, size_t size) const;
 
     template<>
-    void receiver::irecv<long>(long* buf, size_t size) const;
+    void receiver::irecv<long>(long* buf, size_t size, request_block& req) const;
 
     template<>
     size_t receiver::probe<long>() const;
@@ -250,13 +267,13 @@ namespace apl
     void sender::send<unsigned long>(const unsigned long* buf, size_t size) const;
 
     template<>
-    void sender::isend<unsigned long>(const unsigned long* buf, size_t size) const;
+    void sender::isend<unsigned long>(const unsigned long* buf, size_t size, request_block& req) const;
 
     template<>
     void receiver::recv<unsigned long>(unsigned long* buf, size_t size) const;
 
     template<>
-    void receiver::irecv<unsigned long>(unsigned long* buf, size_t size) const;
+    void receiver::irecv<unsigned long>(unsigned long* buf, size_t size, request_block& req) const;
 
     template<>
     size_t receiver::probe<unsigned long>() const;
@@ -269,13 +286,13 @@ namespace apl
     void sender::send<long long>(const long long* buf, size_t size) const;
 
     template<>
-    void sender::isend<long long>(const long long* buf, size_t size) const;
+    void sender::isend<long long>(const long long* buf, size_t size, request_block& req) const;
 
     template<>
     void receiver::recv<long long>(long long* buf, size_t size) const;
 
     template<>
-    void receiver::irecv<long long>(long long* buf, size_t size) const;
+    void receiver::irecv<long long>(long long* buf, size_t size, request_block& req) const;
 
     template<>
     size_t receiver::probe<long long>() const;
@@ -288,13 +305,13 @@ namespace apl
     void sender::send<unsigned long long>(const unsigned long long* buf, size_t size) const;
 
     template<>
-    void sender::isend<unsigned long long>(const unsigned long long* buf, size_t size) const;
+    void sender::isend<unsigned long long>(const unsigned long long* buf, size_t size, request_block& req) const;
 
     template<>
     void receiver::recv<unsigned long long>(unsigned long long* buf, size_t size) const;
 
     template<>
-    void receiver::irecv<unsigned long long>(unsigned long long* buf, size_t size) const;
+    void receiver::irecv<unsigned long long>(unsigned long long* buf, size_t size, request_block& req) const;
 
     template<>
     size_t receiver::probe<unsigned long long>() const;
@@ -307,13 +324,13 @@ namespace apl
     void sender::send<float>(const float* buf, size_t size) const;
 
     template<>
-    void sender::isend<float>(const float* buf, size_t size) const;
+    void sender::isend<float>(const float* buf, size_t size, request_block& req) const;
 
     template<>
     void receiver::recv<float>(float* buf, size_t size) const;
 
     template<>
-    void receiver::irecv<float>(float* buf, size_t size) const;
+    void receiver::irecv<float>(float* buf, size_t size, request_block& req) const;
 
     template<>
     size_t receiver::probe<float>() const;
@@ -326,13 +343,13 @@ namespace apl
     void sender::send<double>(const double* buf, size_t size) const;
 
     template<>
-    void sender::isend<double>(const double* buf, size_t size) const;
+    void sender::isend<double>(const double* buf, size_t size, request_block& req) const;
 
     template<>
     void receiver::recv<double>(double* buf, size_t size) const;
 
     template<>
-    void receiver::irecv<double>(double* buf, size_t size) const;
+    void receiver::irecv<double>(double* buf, size_t size, request_block& req) const;
 
     template<>
     size_t receiver::probe<double>() const;
@@ -345,13 +362,13 @@ namespace apl
     void sender::send<long double>(const long double* buf, size_t size) const;
 
     template<>
-    void sender::isend<long double>(const long double* buf, size_t size) const;
+    void sender::isend<long double>(const long double* buf, size_t size, request_block& req) const;
 
     template<>
     void receiver::recv<long double>(long double* buf, size_t size) const;
 
     template<>
-    void receiver::irecv<long double>(long double* buf, size_t size) const;
+    void receiver::irecv<long double>(long double* buf, size_t size, request_block& req) const;
 
     template<>
     size_t receiver::probe<long double>() const;
@@ -364,13 +381,13 @@ namespace apl
     void sender::send<wchar_t>(const wchar_t* buf, size_t size) const;
 
     template<>
-    void sender::isend<wchar_t>(const wchar_t* buf, size_t size) const;
+    void sender::isend<wchar_t>(const wchar_t* buf, size_t size, request_block& req) const;
 
     template<>
     void receiver::recv<wchar_t>(wchar_t* buf, size_t size) const;
 
     template<>
-    void receiver::irecv<wchar_t>(wchar_t* buf, size_t size) const;
+    void receiver::irecv<wchar_t>(wchar_t* buf, size_t size, request_block& req) const;
 
     template<>
     size_t receiver::probe<wchar_t>() const;
@@ -383,13 +400,13 @@ namespace apl
     void sender::send<local_message_id>(const local_message_id* buf, size_t size) const;
 
     template<>
-    void sender::isend<local_message_id>(const local_message_id* buf, size_t size) const;
+    void sender::isend<local_message_id>(const local_message_id* buf, size_t size, request_block& req) const;
 
     template<>
     void receiver::recv<local_message_id>(local_message_id* buf, size_t size) const;
 
     template<>
-    void receiver::irecv<local_message_id>(local_message_id* buf, size_t size) const;
+    void receiver::irecv<local_message_id>(local_message_id* buf, size_t size, request_block& req) const;
 
     template<>
     size_t receiver::probe<local_message_id>() const;
@@ -402,13 +419,13 @@ namespace apl
     void sender::send<local_task_id>(const local_task_id* buf, size_t size) const;
 
     template<>
-    void sender::isend<local_task_id>(const local_task_id* buf, size_t size) const;
+    void sender::isend<local_task_id>(const local_task_id* buf, size_t size, request_block& req) const;
 
     template<>
     void receiver::recv<local_task_id>(local_task_id* buf, size_t size) const;
 
     template<>
-    void receiver::irecv<local_task_id>(local_task_id* buf, size_t size) const;
+    void receiver::irecv<local_task_id>(local_task_id* buf, size_t size, request_block& req) const;
 
     template<>
     size_t receiver::probe<local_task_id>() const;
@@ -421,13 +438,13 @@ namespace apl
     void sender::send<task_dependence>(const task_dependence* buf, size_t size) const;
 
     template<>
-    void sender::isend<task_dependence>(const task_dependence* buf, size_t size) const;
+    void sender::isend<task_dependence>(const task_dependence* buf, size_t size, request_block& req) const;
 
     template<>
     void receiver::recv<task_dependence>(task_dependence* buf, size_t size) const;
 
     template<>
-    void receiver::irecv<task_dependence>(task_dependence* buf, size_t size) const;
+    void receiver::irecv<task_dependence>(task_dependence* buf, size_t size, request_block& req) const;
 
     template<>
     size_t receiver::probe<task_dependence>() const;

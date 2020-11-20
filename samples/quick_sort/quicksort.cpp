@@ -56,10 +56,10 @@ public:
     { return p[n]; }
 
     void send(const sender& se) const
-    { se.isend(p, static_cast<int>(size)); }
+    { se.isend(p, size); }
 
     void recv(const receiver& re)
-    { re.irecv(p, static_cast<int>(size)); }
+    { re.irecv(p, size); }
 };
 
 bool checking = false;
@@ -209,6 +209,7 @@ public:
 int main(int argc, char** argv)
 {
     parallel_engine pe(&argc, &argv);
+
     size_t sz = 100000;
     for (int i = 1; i < argc; ++i)
     {
@@ -235,5 +236,6 @@ int main(int argc, char** argv)
 
     double time = 0;
     init_task it;
+
     pz.execution(&it, std::make_tuple(), const_cast<const size_t*>(&sz), &time);
 }

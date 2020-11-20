@@ -85,7 +85,11 @@ namespace apl
         std::set<message_id> childs;
         CREATION_STATE state = (ptr == nullptr) ? CREATION_STATE::WAITING: CREATION_STATE::CREATED;
         message_id new_id = {base_mes_id++, parallel_engine::global_rank()};
-        mes_map[new_id] = {ptr, info, 0, state};
+        d_info& d = mes_map[new_id];
+        d.d = ptr;
+        d.info = info;
+        d.version = 0;
+        d.c_type = state;
         mes_graph[new_id] = {type, MESSAGE_FACTORY_TYPE::INIT, MESSAGE_ID_UNDEFINED, childs, 0, CHILD_STATE::UNDEFINED};
         messages_to_del.insert(new_id);
         return new_id;
@@ -96,7 +100,11 @@ namespace apl
         std::set<message_id> childs;
         CREATION_STATE state = (ptr == nullptr) ? CREATION_STATE::WAITING: CREATION_STATE::CHILD;
         message_id new_id = {base_mes_id++, parallel_engine::global_rank()};
-        mes_map[new_id] = {ptr, info, 0, state};
+        d_info& d = mes_map[new_id];
+        d.d = ptr;
+        d.info = info;
+        d.version = 0;
+        d.c_type = state;
         mes_graph[new_id] = {type, MESSAGE_FACTORY_TYPE::CHILD, parent, childs, 0, CHILD_STATE::INCLUDED};
         messages_to_del.insert(new_id);
         if (mes_graph.contains(parent))
@@ -156,9 +164,8 @@ namespace apl
     {
         d_info& di = mes_map[child];
         message* parent = get_message(mes_graph[child].parent);
-        for (message* i: di.info)
-            i->wait_requests();
-        di.d->wait_requests();
+        di.info_req.wait_all();
+        di.d_req.wait_all();
         message_child_factory::include(mes_graph[child].type, parent, di.d, di.info);
     }
 
@@ -175,7 +182,11 @@ namespace apl
     void memory_manager::add_message_init_with_id(message* ptr, message_id id, message_type type, std::vector<message*>& info)
     {
         CREATION_STATE state = (ptr == nullptr) ? CREATION_STATE::WAITING: CREATION_STATE::CREATED;
-        mes_map[id] = {ptr, info, 0, state};
+        d_info& d = mes_map[id];
+        d.d = ptr;
+        d.info = info;
+        d.version = 0;
+        d.c_type = state;
         if (!mes_graph.contains(id))
         {
             std::set<message_id> childs;
@@ -187,7 +198,11 @@ namespace apl
     void memory_manager::add_message_child_with_id(message* ptr, message_id id, message_type type, message_id parent, std::vector<message*>& info)
     {
         CREATION_STATE state = (ptr == nullptr) ? CREATION_STATE::WAITING: CREATION_STATE::CHILD;
-        mes_map[id] = {ptr, info, 0, state};
+        d_info& d = mes_map[id];
+        d.d = ptr;
+        d.info = info;
+        d.version = 0;
+        d.c_type = state;
         if (!mes_graph.contains(id))
         {
             std::set<message_id> childs;
@@ -305,17 +320,17 @@ namespace apl
             {
                 if (di.c_type != CREATION_STATE::WAITING)
                 {
-                    di.d->wait_requests();
+                    di.d_req.wait_all();
                     delete di.d;
                 }
+                di.info_req.wait_all();
                 for (message* i: di.info)
                     if (i != nullptr)
-                    {
-                        i->wait_requests();
                         delete i;
-                    }
                 di.c_type = CREATION_STATE::UNDEFINED;
             }
+            else
+                di.d_req.wait_all();
             di.d = nullptr;
             di.info.clear();
 
@@ -441,8 +456,7 @@ namespace apl
         d_info& di = mes_map[id];
         if (di.c_type == CREATION_STATE::WAITING)
         {
-            for (message* i: di.info)
-                i->wait_requests();
+            di.info_req.wait_all();
             if (mes_graph[id].f_type == MESSAGE_FACTORY_TYPE::INIT)
             {
                 di.d = message_init_factory::get(mes_graph[id].type, di.info);
@@ -463,7 +477,7 @@ namespace apl
             }
         }
         else
-            di.d->wait_requests();
+            di.d_req.wait_all();
         return di.d;
     }
 
@@ -474,7 +488,10 @@ namespace apl
     { return mes_graph[id].type; }
 
     std::vector<message*>& memory_manager::get_message_info(message_id id)
-    { return mes_map[id].info; }
+    {
+        mes_map[id].info_req.wait_all();
+        return mes_map[id].info;
+    }
 
     message_id memory_manager::get_message_parent(message_id id)
     { return mes_graph[id].parent; }
@@ -487,6 +504,12 @@ namespace apl
 
     std::set<message_id>& memory_manager::get_message_childs(message_id id)
     { return mes_graph[id].childs; }
+
+    request_block& memory_manager::get_message_request_block(message_id id)
+    { return mes_map[id].d_req; }
+
+    request_block& memory_manager::get_message_info_request_block(message_id id)
+    { return mes_map[id].info_req; }
 
     size_t memory_manager::task_count()
     { return task_map.size(); }

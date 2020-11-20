@@ -38,9 +38,11 @@ namespace apl
         struct d_info
         {
             message* d = nullptr;
+            request_block d_req;
             std::vector<message*> info;
-            size_t version;
-            CREATION_STATE c_type;
+            request_block info_req;
+            size_t version = 0;
+            CREATION_STATE c_type = CREATION_STATE::UNDEFINED;
         };
 
         struct t_info
@@ -62,7 +64,7 @@ namespace apl
             message_id parent = MESSAGE_ID_UNDEFINED;
             std::set<message_id> childs;
             size_t refs_count = 0;
-            CHILD_STATE ch_state;
+            CHILD_STATE ch_state = CHILD_STATE::UNDEFINED;
         };
 
         vector_map<message_id, d_info> mes_map;
@@ -150,6 +152,8 @@ namespace apl
         size_t get_message_version(message_id id);
         CHILD_STATE get_message_child_state(message_id id);
         std::set<message_id>& get_message_childs(message_id id);
+        request_block& get_message_request_block(message_id id);
+        request_block& get_message_info_request_block(message_id id);
 
         size_t task_count();
         task_id get_task_id(perform_id id);

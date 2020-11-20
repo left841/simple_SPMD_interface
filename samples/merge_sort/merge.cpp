@@ -241,8 +241,6 @@ int main(int argc, char** argv)
 
     if (pz.get_current_proc() == parallelizer::main_proc)
     {
-        for (message* i: fin)
-            i->wait_requests();
         double dt = MPI_Wtime();
         if (checks)
         {

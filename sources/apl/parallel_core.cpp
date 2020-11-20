@@ -22,24 +22,24 @@ namespace apl
     void parallel_engine::init_library(int* argc, char*** argv)
     {
         int flag;
-        MPI_Initialized(&flag);
+        apl_MPI_CHECKER(MPI_Initialized(&flag));
         if (!flag)
         {
-            MPI_Init(argc, argv);
+            apl_MPI_CHECKER(MPI_Init(argc, argv));
             start_time = MPI_Wtime();
-            MPI_Comm_rank(MPI_COMM_WORLD, &global_comm_rank);
+            apl_MPI_CHECKER(MPI_Comm_rank(MPI_COMM_WORLD, &global_comm_rank));
         }
     }
 
     void parallel_engine::finalize_library()
     {
         int flag;
-        MPI_Initialized(&flag);
+        apl_MPI_CHECKER(MPI_Initialized(&flag));
         if (flag)
         {
             for (MPI_Datatype& t: created_datatypes)
-                MPI_Type_free(&t);
-            MPI_Finalize();
+                apl_MPI_CHECKER(MPI_Type_free(&t));
+            apl_MPI_CHECKER(MPI_Finalize());
         }
     }
 

@@ -3,18 +3,14 @@
 
 #include <vector>
 #include "mpi.h"
-#include "parallel_defs.h"
-#include "transfer.h"
+#include "apl/parallel_defs.h"
+#include "apl/transfer.h"
 
 namespace apl
 {
 
     class message
     {
-    private:
-
-        std::vector<MPI_Request> req_v;
-
     public:
 
         message();
@@ -22,10 +18,6 @@ namespace apl
 
         virtual void send(const sender& se) const = 0;
         virtual void recv(const receiver& re) = 0;
-
-        void wait_requests();
-
-        friend class intracomm;
     };
 
     template<>

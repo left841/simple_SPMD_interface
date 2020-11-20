@@ -9,8 +9,8 @@
 #include "mpi.h"
 #include "apl/parallel_defs.h"
 #include "apl/parallel_core.h"
-#include "instruction.h"
-#include "memory_manager.h"
+#include "apl/parallelizer/instruction.h"
+#include "apl/parallelizer/memory_manager.h"
 #include "apl/task_graph.h"
 #include "apl/intracomm.h"
 #include "apl/containers/it_queue.h"
@@ -71,8 +71,8 @@ namespace apl
     {
         task_graph tg;
         std::vector<message*> info_v, args_v;
-        tuple_processers<sizeof...(InfoTypes), InfoTypes...>::create_vector_from_pointers(info_v, info);
-        tuple_processers<sizeof...(ArgTypes), typename std::remove_const<ArgTypes>::type...>::create_vector_from_pointers(args_v, std::make_tuple(const_cast<typename std::remove_const<ArgTypes>::type*>(args)...));
+        tuple_processors<sizeof...(InfoTypes), InfoTypes...>::create_vector_from_pointers(info_v, info);
+        tuple_processors<sizeof...(ArgTypes), typename std::remove_const<ArgTypes>::type...>::create_vector_from_pointers(args_v, std::make_tuple(const_cast<typename std::remove_const<ArgTypes>::type*>(args)...));
         tg.add_task(root, {message_init_factory::get_type<TaskType, InfoTypes...>(), task_factory::get_type<TaskType, ArgTypes...>()}, args_v, info_v);
         execution(tg);
     }

@@ -9,15 +9,6 @@ namespace apl
     message::~message()
     { }
 
-    void message::wait_requests()
-    {
-        if (req_v.size())
-        {
-            MPI_Waitall(static_cast<int>(req_v.size()), req_v.data(), MPI_STATUSES_IGNORE);
-            req_v.clear();
-        }
-    }
-
     template<>
     void sender::send<message>(const message* buf, size_t size) const
     {

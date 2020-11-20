@@ -1,9 +1,9 @@
 #ifndef __MESSAGE_FACTORY_H__
 #define __MESSAGE_FACTORY_H__
 
-#include "message.h"
 #include <tuple>
 #include <memory>
+#include "apl/message.h"
 
 namespace apl
 {
@@ -139,7 +139,7 @@ namespace apl
     { return false; }
 
     template<size_t Pos, typename... Args>
-    class tuple_processers
+    class tuple_processors
     {
     private:
         typedef std::tuple_element_t<sizeof...(Args) - Pos, std::tuple<Args...>> arg_type;
@@ -149,42 +149,42 @@ namespace apl
         {
             arg_type* t = new arg_type();
             v.push_back(transform_to_message(t));
-            tuple_processers<Pos - 1, Args...>::create_vector_of_args(v);
+            tuple_processors<Pos - 1, Args...>::create_vector_of_args(v);
         }
 
         static void vector_to_ref_tuple(const std::vector<message*>& v, std::tuple<empty_ref_wrapper<Args>...>& t)
         {
             std::get<sizeof...(Args) - Pos>(t).set(*transform_from_message<arg_type>(v.at(sizeof...(Args) - Pos)));
-            tuple_processers<Pos - 1, Args...>::vector_to_ref_tuple(v, t);
+            tuple_processors<Pos - 1, Args...>::vector_to_ref_tuple(v, t);
         }
 
         static void two_vectors_to_ref_tuple(const std::vector<message*>& v, const std::vector<const message*>& cv, size_t& v_pos, size_t& cv_pos, std::tuple<empty_ref_wrapper<Args>...>& t)
         {
             std::get<sizeof...(Args) - Pos>(t).set(*choose_vector<arg_type>(v, cv, v_pos, cv_pos));
-            tuple_processers<Pos - 1, Args...>::two_vectors_to_ref_tuple(v, cv, v_pos, cv_pos, t);
+            tuple_processors<Pos - 1, Args...>::two_vectors_to_ref_tuple(v, cv, v_pos, cv_pos, t);
         }
 
         static void create_vector_from_pointers(std::vector<message*>& v, const std::tuple<Args*...>& t)
         {
             v.push_back(transform_to_message(std::get<sizeof...(Args) - Pos>(t)));
-            tuple_processers<Pos - 1, Args...>::create_vector_from_pointers(v, t);
+            tuple_processors<Pos - 1, Args...>::create_vector_from_pointers(v, t);
         }
 
         static void ids_to_two_vectors(std::vector<local_message_id>& v, std::vector<local_message_id>& cv, const std::tuple<mes_id<Args>...>& t)
         {
             choose_vector_to_push<arg_type>(std::get<sizeof...(Args) - Pos>(t), v, cv);
-            tuple_processers<Pos - 1, Args...>::ids_to_two_vectors(v, cv, t);
+            tuple_processors<Pos - 1, Args...>::ids_to_two_vectors(v, cv, t);
         }
 
         static void get_const_map_impl(std::vector<bool>& v)
         {
             v.at(sizeof...(Args) - Pos) = mark_const_as_bool<arg_type>();
-            tuple_processers<Pos - 1, Args...>::get_const_map_impl(v);
+            tuple_processors<Pos - 1, Args...>::get_const_map_impl(v);
         }
     };
 
     template<typename... Args>
-    class tuple_processers<0, Args...>
+    class tuple_processors<0, Args...>
     {
     public:
         static void create_vector_of_args(std::vector<message*>& v)
@@ -210,7 +210,7 @@ namespace apl
     std::vector<bool> get_const_map()
     {
         std::vector<bool> v(sizeof...(Args));
-        tuple_processers<sizeof...(Args), Args...>::get_const_map_impl(v);
+        tuple_processors<sizeof...(Args), Args...>::get_const_map_impl(v);
         return v;
     }
 
@@ -295,7 +295,7 @@ namespace apl
     {
         message* p;
         std::tuple<empty_ref_wrapper<InfoTypes>...> tp;
-        tuple_processers<sizeof...(InfoTypes), InfoTypes...>::vector_to_ref_tuple(info, tp);
+        tuple_processors<sizeof...(InfoTypes), InfoTypes...>::vector_to_ref_tuple(info, tp);
         apply([&p](empty_ref_wrapper<InfoTypes>... args)->void
         {
             p = transform_to_message(new Type(static_cast<InfoTypes>(args)...));
@@ -307,7 +307,7 @@ namespace apl
     std::vector<message*> message_init_factory::creator<Type, InfoTypes...>::get_info()
     {
         std::vector<message*> v;
-        tuple_processers<sizeof...(InfoTypes), InfoTypes...>::create_vector_of_args(v);
+        tuple_processors<sizeof...(InfoTypes), InfoTypes...>::create_vector_of_args(v);
         return v;
     }
 
@@ -413,7 +413,7 @@ namespace apl
     {
         message* p;
         std::tuple<empty_ref_wrapper<InfoTypes>...> tp;
-        tuple_processers<sizeof...(InfoTypes), InfoTypes...>::vector_to_ref_tuple(info, tp);
+        tuple_processors<sizeof...(InfoTypes), InfoTypes...>::vector_to_ref_tuple(info, tp);
         apply([&p, &parent](empty_ref_wrapper<InfoTypes>... args)->void
         {
             p = transform_to_message(new Type(*transform_from_message<ParentType>(parent), static_cast<InfoTypes&>(args)...));
@@ -426,7 +426,7 @@ namespace apl
     {
         message* p;
         std::tuple<empty_ref_wrapper<InfoTypes>...> tp;
-        tuple_processers<sizeof...(InfoTypes), InfoTypes...>::vector_to_ref_tuple(info, tp);
+        tuple_processors<sizeof...(InfoTypes), InfoTypes...>::vector_to_ref_tuple(info, tp);
         apply([&p](empty_ref_wrapper<InfoTypes>... args)->void
         {
             p = transform_to_message(new Type(static_cast<InfoTypes>(args)...));
@@ -438,7 +438,7 @@ namespace apl
     std::vector<message*> message_child_factory::creator<Type, ParentType, InfoTypes...>::get_info()
     {
         std::vector<message*> v;
-        tuple_processers<sizeof...(InfoTypes), InfoTypes...>::create_vector_of_args(v);
+        tuple_processors<sizeof...(InfoTypes), InfoTypes...>::create_vector_of_args(v);
         return v;
     }
 
@@ -446,7 +446,7 @@ namespace apl
     void message_child_factory::creator<Type, ParentType, InfoTypes...>::include(message* parent, const message* child, const std::vector<message*>& info)
     {
         std::tuple<empty_ref_wrapper<InfoTypes>...> tp;
-        tuple_processers<sizeof...(InfoTypes), InfoTypes...>::vector_to_ref_tuple(info, tp);
+        tuple_processors<sizeof...(InfoTypes), InfoTypes...>::vector_to_ref_tuple(info, tp);
         apply([&parent, &child](empty_ref_wrapper<InfoTypes>... args)->void
         {
                 (*transform_from_message<ParentType>(parent)).include(*transform_from_message<Type>(child), static_cast<InfoTypes>(args)...);

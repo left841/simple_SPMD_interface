@@ -1,12 +1,12 @@
 #ifndef __TASK_GRAPH_H__
 #define __TASK_GRAPH_H__
 
-#include "parallel_defs.h"
-#include "task.h"
 #include <vector>
 #include <map>
 #include <set>
 #include <algorithm>
+#include "apl/parallel_defs.h"
+#include "apl/task.h"
 
 namespace apl
 {

@@ -1,13 +1,13 @@
 #ifndef __INSTRUCTION_H__
 #define __INSTRUCTION_H__
 
+#include <array>
+#include <functional>
 #include "apl/parallel_defs.h"
 #include "apl/message.h"
 #include "apl/task.h"
 #include "apl/transfer.h"
 #include "apl/task_graph.h"
-#include <array>
-#include <functional>
 
 namespace apl
 {

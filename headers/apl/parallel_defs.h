@@ -1,8 +1,18 @@
 #ifndef __PARALLEL_DEFS_H__
 #define __PARALLEL_DEFS_H__
 
-#include "mpi.h"
+#include <cassert>
 #include <limits>
+#include "mpi.h"
+
+#define apl_MPI_CHECKER(func) \
+do \
+{ \
+    int ret = MPI_SUCCESS; \
+    ret = func; \
+    assert(ret == MPI_SUCCESS); \
+} \
+while(0)
 
 namespace apl
 {
