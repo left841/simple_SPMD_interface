@@ -3,6 +3,7 @@
 
 #include <map>
 #include <vector>
+#include <limits>
 
 template<typename Key, typename Data, typename MapType = std::map<const Key, size_t>>
 class vector_map
@@ -176,6 +177,7 @@ void vector_map<Key, Data, MapType>::erase(const Key& val)
 template<typename Key, typename Data, typename MapType>
 void vector_map<Key, Data, MapType>::destroy(const Key& val)
 {
+    auto it = m.find(val);
     if (it != m.end())
     {
         free_node(it->second);
