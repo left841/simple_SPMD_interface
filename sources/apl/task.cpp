@@ -165,6 +165,8 @@ namespace apl
                         p->send(se);
                     break;
                 }
+                default:
+                    abort();
             }
         }
         se.send<local_task_id>(created_tasks_v.data(), created_tasks_v.size());
@@ -186,6 +188,8 @@ namespace apl
                     se.isend(tasks_child_v[i.id].c_data.data(), tasks_child_v[i.id].c_data.size());
                     break;
                 }
+                default:
+                    abort();
             }
         }
         se.isend(dependence_v.data(), dependence_v.size());
@@ -243,6 +247,8 @@ namespace apl
                     messages_childs_add_v.push_back(d);
                     break;
                 }
+                default:
+                    abort();
             }
         }
         created_tasks_v.resize(re.probe<local_task_id>());
@@ -273,6 +279,8 @@ namespace apl
                     tasks_child_v.push_back(d);
                     break;
                 }
+                default:
+                    abort();
             }
         }
         dependence_v.resize(re.probe<task_dependence>());

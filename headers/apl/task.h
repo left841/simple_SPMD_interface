@@ -27,21 +27,21 @@ namespace apl
     struct message_child_data
     {
         message_type type = MESSAGE_TYPE_UNDEFINED;
-        local_message_id sourse;
+        local_message_id sourse {};
         std::vector<message*> pi;
     };
 
     struct message_child_add_data
     {
         message_type type = MESSAGE_TYPE_UNDEFINED;
-        local_message_id sourse;
+        local_message_id sourse {};
         std::vector<message*> pi;
         message* mes = nullptr;
     };
 
     struct task_data
     {
-        perform_type type;
+        perform_type type = PERFORM_TYPE_UNDEFINED;
         std::vector<local_message_id> data, c_data;
     };
 

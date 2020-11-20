@@ -97,7 +97,7 @@ public:
         size_t second = size1;
         for (size_t i = 0; i < size2; ++i)
         {
-            if ((first == size1))
+            if (first == size1)
                 out[i] = s[second++];
             else if ((second < size2) && (s[second] < s[first]))
                 out[i] = s[second++];

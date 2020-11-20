@@ -8,17 +8,14 @@ namespace apl
     parallelizer::parallelizer(): comm(MPI_COMM_WORLD), instr_comm(comm)
     { }
 
-    parallelizer::parallelizer(task_graph& _tg): comm(MPI_COMM_WORLD), instr_comm(comm), memory(_tg), ready_tasks(memory.get_ready_tasks())
+    parallelizer::parallelizer(task_graph& _tg): comm(MPI_COMM_WORLD), instr_comm(comm), memory(_tg)
     { }
 
     parallelizer::~parallelizer()
     { }
 
     void parallelizer::init(task_graph& _tg)
-    {
-        memory.init(_tg);
-        ready_tasks = std::move(memory.get_ready_tasks());
-    }
+    { memory.init(_tg); }
 
     void parallelizer::execution()
     {
@@ -56,6 +53,8 @@ namespace apl
         request_block ins_req;
         std::vector<std::vector<perform_id>> assigned(comm.size());
         size_t all_assigned = 0;
+
+        ready_tasks = std::move(memory.get_ready_tasks());
 
         while (ready_tasks.size())
         {
@@ -379,7 +378,7 @@ namespace apl
                 case MESSAGE_SOURCE::CHILD:
                 {
                     message_child_data& d = env.created_messages_child()[i.id];
-                    message_id src;
+                    message_id src {};
                     switch (d.sourse.src)
                     {
                         case MESSAGE_SOURCE::TASK_ARG:
@@ -412,6 +411,8 @@ namespace apl
                             src = messages_childs_add_id[d.sourse.id];
                             break;
                         }
+                        default:
+                            comm.abort(767);
                     }
                     messages_childs_id.push_back(memory.create_message_child(d.type, src, d.pi));
                     con[main_proc].insert(messages_childs_id.back());
@@ -421,7 +422,7 @@ namespace apl
                 case MESSAGE_SOURCE::CHILD_A:
                 {
                     message_child_add_data& d = env.added_messages_child()[i.id];
-                    message_id src;
+                    message_id src {};
                     switch (d.sourse.src)
                     {
                         case MESSAGE_SOURCE::TASK_ARG:
@@ -454,6 +455,8 @@ namespace apl
                             src = messages_childs_add_id[d.sourse.id];
                             break;
                         }
+                        default:
+                            comm.abort(767);
                     }
                     for (process k = 1; k < comm.size(); ++k)
                         ver[k].erase(src);
@@ -462,13 +465,15 @@ namespace apl
                     ver[main_proc].insert(messages_childs_add_id.back());
                     break;
                 }
+                default:
+                    comm.abort(767);
             }
         }
 
         size_t tid_childs = 0;
         for (const local_task_id& i: env.result_task_ids())
         {
-            message_id mes_t_id;
+            message_id mes_t_id {};
             std::vector<local_message_id> local_data, local_c_data;
             switch (i.src)
             {
@@ -487,6 +492,8 @@ namespace apl
                     ++tid_childs;
                     break;
                 }
+                default:
+                    comm.abort(767);
             }
 
             switch (i.mes.src)
@@ -521,6 +528,8 @@ namespace apl
                     mes_t_id = messages_childs_add_id[i.mes.id];
                     break;
                 }
+                default:
+                    comm.abort(767);
             }
 
             std::vector<message_id> data_id;
@@ -559,6 +568,8 @@ namespace apl
                         data_id.push_back(messages_childs_add_id[k.id]);
                         break;
                     }
+                    default:
+                        comm.abort(767);
                 }
             }
 
@@ -598,6 +609,8 @@ namespace apl
                         const_data_id.push_back(messages_childs_add_id[k.id]);
                         break;
                     }
+                    default:
+                        comm.abort(767);
                 }
             }
 
@@ -620,14 +633,16 @@ namespace apl
                     con_t[main_proc].insert(id);
                     break;
                 }
+                default:
+                    comm.abort(767);
             }
         }
         memory.set_perform_created_childs(tid, memory.get_perform_created_childs(tid) + tid_childs);
 
         for (const task_dependence& i: env.created_dependences())
         {
-            perform_id parent;
-            perform_id child;
+            perform_id parent {};
+            perform_id child {};
             switch (i.parent.src)
             {
                 case TASK_SOURCE::INIT:
@@ -645,6 +660,8 @@ namespace apl
                     parent = tid;
                     break;
                 }
+                default:
+                    comm.abort(767);
             }
             switch (i.child.src)
             {
@@ -663,6 +680,8 @@ namespace apl
                     child = tid;
                     break;
                 }
+                default:
+                    comm.abort(767);
             }
             memory.add_dependence(parent, child);
         }
@@ -775,6 +794,8 @@ namespace apl
                     messages_childs_id_type.push_back(env.created_messages_child()[i.id].type);
                     break;
                 }
+                default:
+                    comm.abort(767);
             }
         }
 
@@ -811,7 +832,7 @@ namespace apl
         size_t tid_childs = 0;
         for (const local_task_id& i: env.result_task_ids())
         {
-            message_id mes_t_id;
+            message_id mes_t_id {};
             std::vector<local_message_id> local_data, local_c_data;
             switch (i.src)
             {
@@ -831,7 +852,7 @@ namespace apl
                     break;
                 }
                 default:
-                    comm.abort(765);
+                    comm.abort(767);
             }
 
             switch (i.mes.src)
@@ -866,6 +887,8 @@ namespace apl
                     mes_t_id = messages_childs_add_id[i.mes.id].second;
                     break;
                 }
+                default:
+                    comm.abort(767);
             }
 
             std::vector<message_id> data_id;
@@ -905,7 +928,7 @@ namespace apl
                         break;
                     }
                     default:
-                        comm.abort(765);
+                        comm.abort(767);
                 }
             }
 
@@ -946,7 +969,7 @@ namespace apl
                         break;
                     }
                     default:
-                        comm.abort(765);
+                        comm.abort(767);
                 }
             }
 
@@ -969,15 +992,15 @@ namespace apl
                     break;
                 }
                 default:
-                    comm.abort(765);
+                    comm.abort(767);
             }
         }
         memory.set_task_created_childs(tid, memory.get_task_created_childs(tid) + tid_childs);
 
         for (const task_dependence& i: env.created_dependences())
         {
-            task_id parent;
-            task_id child;
+            task_id parent {};
+            task_id child {};
 
             switch (i.parent.src)
             {
@@ -997,7 +1020,7 @@ namespace apl
                     break;
                 }
                 default:
-                    comm.abort(765);
+                    comm.abort(767);
             }
             switch (i.child.src)
             {
@@ -1017,7 +1040,7 @@ namespace apl
                     break;
                 }
                 default:
-                    comm.abort(765);
+                    comm.abort(767);
             }
 
             memory.add_dependence(parent, child);
@@ -1228,7 +1251,7 @@ namespace apl
                             break;
                         }
                         default:
-                            comm.abort(765);
+                            comm.abort(767);
                     }
                     added_m_child.push_back({src, memory.add_message_child(d.mes, d.type, src, d.pi)});
                     break;
@@ -1277,13 +1300,13 @@ namespace apl
                             break;
                         }
                         default:
-                            comm.abort(765);
+                            comm.abort(767);
                     }
                     messages_childs_id.push_back({src, memory.create_message_child(d.type, src, d.pi)});
                     break;
                 }
                 default:
-                    comm.abort(765);
+                    comm.abort(767);
             }
         }
 
@@ -1299,18 +1322,13 @@ namespace apl
         req1.wait_all();
     }
 
-    int parallelizer::get_current_proc()
+    process parallelizer::get_current_proc()
     { return comm.rank(); }
 
     int parallelizer::get_proc_count()
     { return comm.size(); }
 
     void parallelizer::clear()
-    {
-        while (ready_tasks.size())
-            ready_tasks.pop();
-
-        memory.clear();
-    }
+    { memory.clear(); }
 
 }
