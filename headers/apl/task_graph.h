@@ -85,13 +85,12 @@ namespace apl
         void del_message(message* m);
         void del_dependence(task* parent, task* child);
 
-        bool contain_task(task* t);
-        bool contain_data(message* m);
-        bool contain_dependence(task* parent, task* child);
+        bool contain_task(task* t) const;
+        bool contain_data(message* m) const;
+        bool contain_dependence(task* parent, task* child) const;
 
         void clear();
 
-        friend class parallelizer;
         friend class memory_manager;
     };
 

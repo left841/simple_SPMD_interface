@@ -19,7 +19,6 @@ namespace apl
     public:
 
         ready_sender(MPI_Comm _comm, process _proc);
-        ready_sender(MPI_Comm _comm, process _proc, request_block& _req);
 
     };
 

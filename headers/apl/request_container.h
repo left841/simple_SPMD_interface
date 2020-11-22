@@ -21,9 +21,9 @@ namespace apl
 
         request_block(const request_block& r) = delete;
         request_block& operator=(const request_block& r) = delete;
-        request_block(request_block&& r) noexcept;
-        request_block& operator=(request_block&& r) noexcept;
-        
+        request_block(request_block&& r) noexcept = default;
+        request_block& operator=(request_block&& r) noexcept = default;
+
         void store(MPI_Request req);
         void store(request_block& req);
         bool test_all();
@@ -34,8 +34,7 @@ namespace apl
         size_t size() const;
         MPI_Request* data();
         const MPI_Request* data() const;
-
-        friend class request_container;
+        void clear();
     };
 
 
@@ -51,8 +50,8 @@ namespace apl
 
         request_container(const request_container& r) = delete;
         request_container& operator=(const request_container& r) = delete;
-        request_container(request_container&& r) noexcept;
-        request_container& operator=(request_container&& r) noexcept;
+        request_container(request_container&& r) noexcept = default;
+        request_container& operator=(request_container&& r) noexcept = default;
         
         void store(MPI_Request req);
         void store(request_block& req);

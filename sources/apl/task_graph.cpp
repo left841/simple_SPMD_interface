@@ -110,17 +110,17 @@ namespace apl
             t_map[child].parents.erase(parent);
     }
 
-    bool task_graph::contain_task(task* t)
+    bool task_graph::contain_task(task* t) const
     { return t_map.find(t) != t_map.end(); }
 
-    bool task_graph::contain_data(message* m)
+    bool task_graph::contain_data(message* m) const
     { return d_map.find(m) != d_map.end(); }
 
-    bool task_graph::contain_dependence(task* parent, task* child)
+    bool task_graph::contain_dependence(task* parent, task* child) const
     {
         if (t_map.find(parent) == t_map.end())
             return false;
-        return t_map[parent].childs.find(child) != t_map[parent].childs.end();
+        return t_map.find(parent)->second.childs.find(child) != t_map.find(parent)->second.childs.end();
     }
 
     void task_graph::clear()

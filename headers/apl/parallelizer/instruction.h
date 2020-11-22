@@ -223,8 +223,10 @@ namespace apl
         instruction();
         ~instruction();
 
-        void send(const sender& se) const;
-        void recv(const receiver& re);
+        void send(const sender& se) const override;
+        void recv(const receiver& re) override;
+        void isend(const sender& se, request_block& req) const override;
+        void irecv(const receiver& re, request_block& req) override;
 
         size_t& operator[](size_t n);
         const size_t& operator[](size_t n) const;

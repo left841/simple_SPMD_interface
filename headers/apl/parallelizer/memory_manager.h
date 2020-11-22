@@ -3,6 +3,7 @@
 
 #include <vector>
 #include "apl/parallel_defs.h"
+#include "apl/parallel_core.h"
 #include "apl/message.h"
 #include "apl/task.h"
 #include "apl/task_graph.h"

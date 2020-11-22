@@ -6,7 +6,7 @@ namespace apl
     simple_datatype::simple_datatype(MPI_Datatype t): type(t)
     {
         MPI_Aint lb, extent;
-        MPI_Type_get_extent(t, &lb, &extent);
+        apl_MPI_CHECKER(MPI_Type_get_extent(t, &lb, &extent));
         size_in_bytes = extent - lb;
     }
 
@@ -18,13 +18,18 @@ namespace apl
         std::vector<MPI_Aint> mpi_offsets(offsets.size());
         for (size_t i = 0; i < offsets.size(); ++i)
             mpi_offsets[i] = offsets[i];
-        MPI_Type_create_struct(static_cast<int>(types.size()), block_legth.data(), mpi_offsets.data(), types.data(), &type);
-        MPI_Type_commit(&type);
+        apl_MPI_CHECKER(MPI_Type_create_struct(static_cast<int>(types.size()), block_legth.data(), mpi_offsets.data(), types.data(), &type));
+        apl_MPI_CHECKER(MPI_Type_commit(&type));
         MPI_Aint lb, extent;
-        MPI_Type_get_extent(type, &lb, &extent);
+        apl_MPI_CHECKER(MPI_Type_get_extent(type, &lb, &extent));
         size_in_bytes = extent - lb;
-        parallel_engine::add_datatype(type);
+        add_datatype(type);
     }
+
+    std::vector<MPI_Datatype> simple_datatype::created_datatypes;
+
+    void simple_datatype::add_datatype(MPI_Datatype dt)
+    { created_datatypes.push_back(dt); }
 
     const simple_datatype& byte_datatype()
     {
@@ -32,10 +37,7 @@ namespace apl
         return d;
     }
 
-    sender::sender(): global_req(nullptr)
-    { }
-
-    sender::sender(request_block& req): global_req(&req)
+    sender::sender()
     { }
 
     sender::~sender()
@@ -73,24 +75,14 @@ namespace apl
         req.store(isend_impl(buf, size, type, TAG::MAIN));
     }
 
-    void sender::isend(const void* buf, size_t size, simple_datatype type) const
-    { isend(buf, size, type, *global_req); }
-
     void sender::send_bytes(const void* buf, size_t count) const
     { send(buf, count, byte_datatype()); }
 
     void sender::isend_bytes(const void* buf, size_t count, request_block& req) const
     { isend(buf, count, byte_datatype(), req); }
 
-    void sender::isend_bytes(const void* buf, size_t count) const
-    { isend_bytes(buf, count, *global_req); }
-
-    receiver::receiver(): probe_flag(false), global_req(nullptr)
+    receiver::receiver(): probe_flag(false)
     { }
-
-    receiver::receiver(request_block & req): probe_flag(false), global_req(&req)
-    {
-    }
 
     receiver::~receiver()
     { }
@@ -135,9 +127,6 @@ namespace apl
         req.store(irecv_impl(buf, size, type, TAG::MAIN));
     }
 
-    void receiver::irecv(void* buf, size_t size, simple_datatype type) const
-    { irecv(buf, size, type, *global_req); }
-
     size_t receiver::probe(simple_datatype type) const
     {
         size_t size = 0;
@@ -161,9 +150,6 @@ namespace apl
 
     void receiver::irecv_bytes(void* buf, size_t count, request_block & req) const
     { irecv(buf, count, byte_datatype(), req); }
-
-    void receiver::irecv_bytes(void* buf, size_t count) const
-    { irecv_bytes(buf, count, *global_req); }
 
     size_t receiver::probe_bytes() const
     { return probe(byte_datatype()); }

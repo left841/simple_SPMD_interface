@@ -19,7 +19,6 @@ namespace apl
     public:
 
         standard_sender(MPI_Comm _comm, process _proc);
-        standard_sender(MPI_Comm _comm, process _proc, request_block& _req);
 
     };
 
@@ -37,7 +36,6 @@ namespace apl
     public:
 
         standard_receiver(MPI_Comm _comm, process _proc);
-        standard_receiver(MPI_Comm _comm, process _proc, request_block& _req);
 
     };
 

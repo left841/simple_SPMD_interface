@@ -5,14 +5,18 @@
 #include <limits>
 #include "mpi.h"
 
+#ifndef NDEBUG
 #define apl_MPI_CHECKER(func) \
 do \
 { \
     int ret = MPI_SUCCESS; \
     ret = func; \
-    assert(ret == MPI_SUCCESS); \
+    assert(ret == MPI_SUCCESS && #func); \
 } \
 while(0)
+#else
+#define apl_MPI_CHECKER(func) (void)func
+#endif
 
 namespace apl
 {

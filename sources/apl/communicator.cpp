@@ -3,42 +3,62 @@
 namespace apl
 {
 
-    communicator::communicator(MPI_Comm _comm): comm(_comm)
-    {
-        created = false;
-        apl_MPI_CHECKER(MPI_Comm_rank(comm, &comm_rank));
-        apl_MPI_CHECKER(MPI_Comm_size(comm, &comm_size));
-    }
+    communicator::communicator(): comm(MPI_COMM_NULL)
+    { }
 
     communicator::communicator(const communicator& c)
-    {
-        apl_MPI_CHECKER(MPI_Comm_dup(c.comm, &comm));
-        created = true;
-        apl_MPI_CHECKER(MPI_Comm_rank(comm, &comm_rank));
-        apl_MPI_CHECKER(MPI_Comm_size(comm, &comm_size));
-    }
+    { dublicate(c); }
 
-    communicator::communicator(const communicator& c, int color, int key)
+    communicator& communicator::operator=(const communicator& c)
     {
-        apl_MPI_CHECKER(MPI_Comm_split(c.comm, color, key, &comm));
-        created = true;
-        apl_MPI_CHECKER(MPI_Comm_rank(comm, &comm_rank));
-        apl_MPI_CHECKER(MPI_Comm_size(comm, &comm_size));
+        if (this != &c)
+        {
+            if (comm != MPI_COMM_NULL)
+                free();
+            dublicate(c);
+        }
+        return *this;
     }
 
     communicator::~communicator()
     {
-        if (created)
-            apl_MPI_CHECKER(MPI_Comm_free(&comm));
+        if (comm != MPI_COMM_NULL)
+            free();
     }
 
-    int communicator::rank() const
-    { return comm_rank; }
+    void communicator::assign(MPI_Comm _comm)
+    { comm = _comm; }
+
+    void communicator::unassign()
+    { comm = MPI_COMM_NULL; }
+
+    void communicator::dublicate(const communicator& c)
+    { apl_MPI_CHECKER(MPI_Comm_dup(c.comm, &comm)); }
+
+    void communicator::free()
+    {
+        apl_MPI_CHECKER(MPI_Comm_free(&comm));
+        comm = MPI_COMM_NULL;
+    }
+
+    void communicator::abort(int err) const
+    { apl_MPI_CHECKER(MPI_Abort(comm, err)); }
+
+    process communicator::rank() const
+    {
+        process comm_rank = MPI_PROC_NULL;
+        apl_MPI_CHECKER(MPI_Comm_rank(comm, &comm_rank));
+        return comm_rank;
+    }
 
     MPI_Comm communicator::get_comm() const
     { return comm; }
 
     int communicator::size() const
-    { return comm_size; }
+    {
+        int comm_size = 0;
+        apl_MPI_CHECKER(MPI_Comm_size(comm, &comm_size));
+        return comm_size;
+    }
 
 }

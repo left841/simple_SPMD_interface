@@ -231,8 +231,8 @@ namespace apl
             creator_base();
             virtual ~creator_base();
 
-            virtual message* get_message(const std::vector<message*>& info) = 0;
-            virtual std::vector<message*> get_info() = 0;
+            virtual message* get_message(const std::vector<message*>& info) const = 0;
+            virtual std::vector<message*> get_info() const = 0;
 
         };
 
@@ -255,21 +255,20 @@ namespace apl
             creator();
             ~creator();
 
-            message* get_message(const std::vector<message*>& info);
-            std::vector<message*> get_info();
+            message* get_message(const std::vector<message*>& info) const override final;
+            std::vector<message*> get_info() const override final;
 
             static message_type get_type();
-
-            friend class message_init_factory;
         };
 
-        message_init_factory() = delete;
         static std::vector<std::unique_ptr<creator_base>>& message_vec();
 
         template<typename Type, typename... InfoTypes>
         static message_type add();
 
     public:
+
+        message_init_factory() = delete;
 
         static message* get(message_type id, const std::vector<message*>& info);
         static std::vector<message*> get_info(message_type id);
@@ -291,7 +290,7 @@ namespace apl
     { }
 
     template<typename Type, typename... InfoTypes>
-    message* message_init_factory::creator<Type, InfoTypes...>::get_message(const std::vector<message*>& info)
+    message* message_init_factory::creator<Type, InfoTypes...>::get_message(const std::vector<message*>& info) const
     {
         message* p;
         std::tuple<empty_ref_wrapper<InfoTypes>...> tp;
@@ -304,7 +303,7 @@ namespace apl
     }
 
     template<typename Type, typename... InfoTypes>
-    std::vector<message*> message_init_factory::creator<Type, InfoTypes...>::get_info()
+    std::vector<message*> message_init_factory::creator<Type, InfoTypes...>::get_info() const
     {
         std::vector<message*> v;
         tuple_processors<sizeof...(InfoTypes), InfoTypes...>::create_vector_of_args(v);
@@ -342,10 +341,10 @@ namespace apl
             creator_base();
             virtual ~creator_base();
 
-            virtual message* get_message(const message* parent, const std::vector<message*>& info) = 0;
-            virtual message* get_message(const std::vector<message*>& info) = 0;
-            virtual std::vector<message*> get_info() = 0;
-            virtual void include(message* parent, const message* child, const std::vector<message*>& info) = 0;
+            virtual message* get_message(const message* parent, const std::vector<message*>& info) const = 0;
+            virtual message* get_message(const std::vector<message*>& info) const = 0;
+            virtual std::vector<message*> get_info() const = 0;
+            virtual void include(message* parent, const message* child, const std::vector<message*>& info) const = 0;
 
         };
 
@@ -368,23 +367,22 @@ namespace apl
             creator();
             ~creator();
 
-            message* get_message(const message* parent, const std::vector<message*>& info);
-            message* get_message(const std::vector<message*>& info);
-            std::vector<message*> get_info();
-            void include(message* parent, const message* child, const std::vector<message*>& info);
+            message* get_message(const message* parent, const std::vector<message*>& info) const override final;
+            message* get_message(const std::vector<message*>& info) const override final;
+            std::vector<message*> get_info() const override final;
+            void include(message* parent, const message* child, const std::vector<message*>& info) const override final;
 
             static message_type get_type();
-
-            friend class message_child_factory;
         };
 
-        message_child_factory() = delete;
         static std::vector<std::unique_ptr<creator_base>>& message_vec();
 
         template<typename Type, typename ParentType, typename... InfoTypes>
         static message_type add();
 
     public:
+
+        message_child_factory() = delete;
 
         static message* get(message_type id, const message* parent, const std::vector<message*>& info);
         static message* get(message_type id, const std::vector<message*>& info);
@@ -409,7 +407,7 @@ namespace apl
     { }
 
     template<typename Type, typename ParentType, typename... InfoTypes>
-    message* message_child_factory::creator<Type, ParentType, InfoTypes...>::get_message(const message* parent, const std::vector<message*>& info)
+    message* message_child_factory::creator<Type, ParentType, InfoTypes...>::get_message(const message* parent, const std::vector<message*>& info) const
     {
         message* p;
         std::tuple<empty_ref_wrapper<InfoTypes>...> tp;
@@ -422,7 +420,7 @@ namespace apl
     }
 
     template<typename Type, typename ParentType, typename... InfoTypes>
-    message* message_child_factory::creator<Type, ParentType, InfoTypes...>::get_message(const std::vector<message*>& info)
+    message* message_child_factory::creator<Type, ParentType, InfoTypes...>::get_message(const std::vector<message*>& info) const
     {
         message* p;
         std::tuple<empty_ref_wrapper<InfoTypes>...> tp;
@@ -435,7 +433,7 @@ namespace apl
     }
 
     template<typename Type, typename ParentType, typename... InfoTypes>
-    std::vector<message*> message_child_factory::creator<Type, ParentType, InfoTypes...>::get_info()
+    std::vector<message*> message_child_factory::creator<Type, ParentType, InfoTypes...>::get_info() const
     {
         std::vector<message*> v;
         tuple_processors<sizeof...(InfoTypes), InfoTypes...>::create_vector_of_args(v);
@@ -443,7 +441,7 @@ namespace apl
     }
 
     template<typename Type, typename ParentType, typename... InfoTypes>
-    void message_child_factory::creator<Type, ParentType, InfoTypes...>::include(message* parent, const message* child, const std::vector<message*>& info)
+    void message_child_factory::creator<Type, ParentType, InfoTypes...>::include(message* parent, const message* child, const std::vector<message*>& info) const
     {
         std::tuple<empty_ref_wrapper<InfoTypes>...> tp;
         tuple_processors<sizeof...(InfoTypes), InfoTypes...>::vector_to_ref_tuple(info, tp);

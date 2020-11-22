@@ -9,6 +9,12 @@ namespace apl
     message::~message()
     { }
 
+    void message::isend(const sender& se, request_block& req) const
+    { send(se); }
+
+    void message::irecv(const receiver& re, request_block& req)
+    { recv(re); }
+
     template<>
     void sender::send<message>(const message* buf, size_t size) const
     {
@@ -17,10 +23,10 @@ namespace apl
     }
 
     template<>
-    void sender::isend<message>(const message* buf, size_t size) const
+    void sender::isend<message>(const message* buf, size_t size, request_block& req) const
     {
         for (size_t i = 0; i < size; ++i)
-            (buf + i)->send(*this);
+            (buf + i)->isend(*this, req);
     }
 
     template<>
@@ -31,10 +37,10 @@ namespace apl
     }
 
     template<>
-    void receiver::irecv<message>(message* buf, size_t size) const
+    void receiver::irecv<message>(message* buf, size_t size, request_block& req) const
     {
         for (size_t i = 0; i < size; ++i)
-            (buf + i)->recv(*this);
+            (buf + i)->irecv(*this, req);
     }
 
 }

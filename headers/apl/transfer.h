@@ -7,7 +7,6 @@
 #include <queue>
 #include "mpi.h"
 #include "apl/parallel_defs.h"
-#include "apl/parallel_core.h"
 #include "apl/request_container.h"
 
 namespace apl
@@ -35,6 +34,10 @@ namespace apl
         simple_datatype(MPI_Datatype type);
 
         simple_datatype(std::vector<MPI_Datatype> types, std::vector<size_t> offsets);
+
+        static std::vector<MPI_Datatype> created_datatypes;
+
+        static void add_datatype(MPI_Datatype dt);
     };
 
     template<typename Type, ptrdiff_t offset = 0>
@@ -52,43 +55,36 @@ namespace apl
     {
     protected:
 
-        request_block* global_req;
         virtual void send_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg = TAG::UNDEFINED) const = 0;
         virtual MPI_Request isend_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg = TAG::UNDEFINED) const = 0;
 
     public:
 
         sender();
-        sender(request_block& req);
         virtual ~sender();
 
         void send(const void* buf, size_t size, simple_datatype type) const;
         void isend(const void* buf, size_t size, simple_datatype type, request_block& req) const;
-        void isend(const void* buf, size_t size, simple_datatype type) const;
 
         void send_bytes(const void* buf, size_t count) const;
         void isend_bytes(const void* buf, size_t count, request_block& req) const;
-        void isend_bytes(const void* buf, size_t count) const;
 
         template<class T>
         void send(const T* buf, size_t size = 1) const;
         template<class T>
         void isend(const T* buf, size_t size, request_block& req) const;
-        template<class T>
-        void isend(const T* buf, size_t size = 1) const;
 
     };
 
     template<class T>
-    void sender::isend(const T* buf, size_t size) const
-    { isend(buf, size, *global_req); }
+    void sender::isend(const T* buf, size_t size, request_block& req) const
+    { send(buf, size); }
 
     class receiver
     {
     protected:
 
         mutable bool probe_flag;
-        request_block* global_req;
 
         virtual MPI_Status recv_impl(void* buf, size_t size, const simple_datatype& type, TAG tg = TAG::UNDEFINED) const = 0;
         virtual MPI_Request irecv_impl(void* buf, size_t size, const simple_datatype& type, TAG tg = TAG::UNDEFINED) const = 0;
@@ -97,17 +93,14 @@ namespace apl
     public:
 
         receiver();
-        receiver(request_block& req);
         virtual ~receiver();
 
         void recv(void* buf, size_t size, simple_datatype type) const;
         void irecv(void* buf, size_t size, simple_datatype type, request_block& req) const;
-        void irecv(void* buf, size_t size, simple_datatype type) const;
         size_t probe(simple_datatype type) const;
 
         void recv_bytes(void* buf, size_t count) const;
         void irecv_bytes(void* buf, size_t count, request_block& req) const;
-        void irecv_bytes(void* buf, size_t count) const;
         size_t probe_bytes() const;
 
         template<class T>
@@ -115,15 +108,13 @@ namespace apl
         template<class T>
         void irecv(T* buf, size_t size, request_block& req) const;
         template<class T>
-        void irecv(T* buf, size_t size = 1) const;
-        template<class T>
         size_t probe() const;
 
     };
 
     template<class T>
-    void receiver::irecv(T* buf, size_t size) const
-    { irecv(buf, size, *global_req); }
+    void receiver::irecv(T* buf, size_t size, request_block& req) const
+    { recv(buf, size); }
 
     //send-recv specifications
     // char

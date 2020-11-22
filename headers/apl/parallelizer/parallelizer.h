@@ -51,8 +51,8 @@ namespace apl
 
         const static process main_proc;
 
-        parallelizer();
-        parallelizer(task_graph& _tg);
+        parallelizer(const intracomm& _comm = comm_world);
+        parallelizer(task_graph& _tg, const intracomm& _comm = comm_world);
         ~parallelizer();
 
         process get_current_proc();

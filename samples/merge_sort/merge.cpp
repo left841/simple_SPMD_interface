@@ -33,11 +33,17 @@ public:
             delete[] p;
     }
 
-    void send(const sender& se) const
-    { se.isend(p, size_); }
+    void send(const sender& se) const override
+    { se.send(p, size_); }
 
-    void recv(const receiver& re)
-    { re.irecv(p, size_); }
+    void isend(const sender& se, request_block& req) const override
+    { se.isend(p, size_, req); }
+
+    void recv(const receiver& re) override
+    { re.recv(p, size_); }
+
+    void irecv(const receiver& re, request_block& req) override
+    { re.irecv(p, size_, req); }
 
     int& operator[](size_t n)
     { return p[n]; }

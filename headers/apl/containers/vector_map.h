@@ -37,12 +37,12 @@ public:
         iterator();
         ~iterator();
 
-        bool operator==(const iterator& it);
-        bool operator!=(const iterator& it);
+        bool operator==(const iterator& it) const;
+        bool operator!=(const iterator& it) const;
         iterator& operator++();
         const Key& key() const;
-        Data* operator->();
-        Data& operator*();
+        Data* operator->() const;
+        Data& operator*() const;
 
         friend class vector_map;
     };
@@ -79,7 +79,7 @@ vector_map<Key, Data, MapType>::iterator::~iterator()
 { }
 
 template<typename Key, typename Data, typename MapType>
-bool vector_map<Key, Data, MapType>::iterator::operator==(const iterator & it)
+bool vector_map<Key, Data, MapType>::iterator::operator==(const iterator & it) const
 {
     if (m_it != it.m_it)
         return false;
@@ -87,7 +87,7 @@ bool vector_map<Key, Data, MapType>::iterator::operator==(const iterator & it)
 }
 
 template<typename Key, typename Data, typename MapType>
-bool vector_map<Key, Data, MapType>::iterator::operator!=(const iterator& it)
+bool vector_map<Key, Data, MapType>::iterator::operator!=(const iterator& it) const
 {
     if (m_it != it.m_it)
         return true;
@@ -106,11 +106,11 @@ const Key& vector_map<Key, Data, MapType>::iterator::key() const
 { return m_it->first; }
 
 template<typename Key, typename Data, typename MapType>
-Data* vector_map<Key, Data, MapType>::iterator::operator->()
+Data* vector_map<Key, Data, MapType>::iterator::operator->() const
 { return &((vec + m_it->second)->data); }
 
 template<typename Key, typename Data, typename MapType>
-Data& vector_map<Key, Data, MapType>::iterator::operator*()
+Data& vector_map<Key, Data, MapType>::iterator::operator*() const
 { return (vec + m_it->second)->data; }
 
 template<typename Key, typename Data, typename MapType>

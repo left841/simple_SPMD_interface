@@ -3,7 +3,9 @@
 
 #include <vector>
 #include "mpi.h"
-#include "parallel_defs.h"
+#include "apl/parallel_defs.h"
+#include "apl/transfer.h"
+#include "apl/intracomm.h"
 
 namespace apl
 {
@@ -14,7 +16,6 @@ namespace apl
 
         static double start_time;
         static process global_comm_rank;
-        static std::vector<MPI_Datatype> created_datatypes;
 
     public:
 
@@ -24,12 +25,13 @@ namespace apl
         void init_library(int* argc, char*** argv);
         void finalize_library();
 
-        static void add_datatype(MPI_Datatype dt);
-
         static double get_start_time();
 
         static process global_rank();
     };
+
+    extern intracomm comm_world;
+    extern intracomm comm_self;
 
 }
 

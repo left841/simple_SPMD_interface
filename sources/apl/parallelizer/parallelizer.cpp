@@ -5,10 +5,10 @@ namespace apl
 
     const process parallelizer::main_proc = 0;
 
-    parallelizer::parallelizer(): comm(MPI_COMM_WORLD), instr_comm(comm)
+    parallelizer::parallelizer(const intracomm& _comm): comm(_comm), instr_comm(comm)
     { }
 
-    parallelizer::parallelizer(task_graph& _tg): comm(MPI_COMM_WORLD), instr_comm(comm), memory(_tg)
+    parallelizer::parallelizer(task_graph& _tg, const intracomm& _comm): comm(_comm), instr_comm(comm), memory(_tg)
     { }
 
     parallelizer::~parallelizer()
@@ -50,7 +50,6 @@ namespace apl
             contained_tasks[i] = contained_tasks[0];
 
         std::vector<instruction> ins(comm.size());
-        request_block ins_req;
         std::vector<std::vector<perform_id>> assigned(comm.size());
         size_t all_assigned = 0;
 
@@ -113,13 +112,12 @@ namespace apl
             {
                 if (ins[i].size() > 0)
                 {
-                    instr_comm.send(&ins[i], i, ins_req);
+                    instr_comm.send<message>(&ins[i], i);
                     ins[i].clear();
                 }
             }
             send_instruction(ins[0]);
             ins[0].clear();
-            ins_req.wait_all();
 
             while (all_assigned > 0)
             {
@@ -132,7 +130,7 @@ namespace apl
                     for (size_t j = 0; j < memory.get_perform_const_data(i).size(); ++j)
                         c_data.push_back({j, MESSAGE_SOURCE::TASK_ARG_C});
                     task_data td = {memory.get_perform_type(i), data, c_data};
-                    task_environment te(td, {{0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL});
+                    task_environment te(td);
                     te.set_proc_count(comm.size());
 
                     memory.perform_task(i, te);
@@ -155,8 +153,7 @@ namespace apl
         instruction end;
         end.add_end();
         for (process i = 1; i < instr_comm.size(); ++i)
-            instr_comm.send(&end, i, ins_req);
-        ins_req.wait_all();
+            instr_comm.send<message>(&end, i);
     }
 
     void parallelizer::send_task_data(perform_id tid, process proc, instruction* inss, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con)
@@ -260,7 +257,7 @@ namespace apl
             case INSTRUCTION::MES_SEND:
             {
                 const instruction_message_send& j = dynamic_cast<const instruction_message_send&>(i);
-                comm.send(memory.get_message(j.id()), j.proc(), memory.get_message_request_block(j.id()));
+                comm.isend(memory.get_message(j.id()), j.proc(), memory.get_message_request_block(j.id()));
                 break;
             }
             case INSTRUCTION::MES_INFO_SEND:
@@ -268,13 +265,13 @@ namespace apl
                 const instruction_message_info_send& j = dynamic_cast<const instruction_message_info_send&>(i);
                 request_block& info_req = memory.get_message_info_request_block(j.id());
                 for (message* p: memory.get_message_info(j.id()))
-                    comm.send(p, j.proc(), info_req);
+                    comm.isend(p, j.proc(), info_req);
                 break;
             }
             case INSTRUCTION::MES_RECV:
             {
                 const instruction_message_recv& j = dynamic_cast<const instruction_message_recv&>(i);
-                comm.recv(memory.get_message(j.id()), j.proc(), memory.get_message_request_block(j.id()));
+                comm.irecv(memory.get_message(j.id()), j.proc(), memory.get_message_request_block(j.id()));
                 break;
             }
             case INSTRUCTION::MES_CREATE:
@@ -283,7 +280,7 @@ namespace apl
                 request_block info_req;
                 std::vector<message*> iib = message_init_factory::get_info(j.type());
                 for (message* p: iib)
-                    comm.recv(p, j.proc(), info_req);
+                    comm.irecv(p, j.proc(), info_req);
                 info_req.wait_all();
                 memory.create_message_init_with_id(j.id(), j.type(), iib);
                 break;
@@ -294,7 +291,7 @@ namespace apl
                 std::vector<message*> pib = message_child_factory::get_info(j.type());
                 request_block info_req;
                 for (message* p: pib)
-                    comm.recv(p, j.proc(), info_req);
+                    comm.irecv(p, j.proc(), info_req);
                 info_req.wait_all();
                 memory.create_message_child_with_id(j.id(), j.type(), j.source(), pib);
                 break;
@@ -704,9 +701,7 @@ namespace apl
     void parallelizer::wait_task(process proc, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<perform_id>>& con_t)
     {
         instruction res_ins;
-        request_block res_ins_req;
-        instr_comm.recv(&res_ins, proc, res_ins_req);
-        res_ins_req.wait_all();
+        instr_comm.recv<message>(&res_ins, proc);
 
         instruction::const_iterator it = res_ins.begin();
         const instruction_block& ins = *it;
@@ -724,22 +719,23 @@ namespace apl
 
         const instruction_block& ins2 = *(++it);
         if (ins2.command() != INSTRUCTION::ADD_RES_TO_MEMORY)
-            comm.abort(111);
+            comm.abort(112);
         const instruction_add_result_to_memory& res_to_mem = dynamic_cast<const instruction_add_result_to_memory&>(ins2);
         messages_init_add_id = res_to_mem.added_messages_init();
         messages_childs_add_id = res_to_mem.added_messages_child();
 
         const instruction_block& ins3 = *(++it);
         if (ins2.command() != INSTRUCTION::ADD_RES_TO_MEMORY)
-            comm.abort(111);
+            comm.abort(113);
         const instruction_add_result_to_memory& res_to_mem2 = dynamic_cast<const instruction_add_result_to_memory&>(ins3);
         messages_init_id = res_to_mem2.added_messages_init();
         messages_childs_id = res_to_mem2.added_messages_child();
 
         res_ins.clear();
 
-        task_environment env({{0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL});
-        comm.recv(&env, proc, res_ins_req);
+        request_block res_ins_req;
+        task_environment env;
+        comm.irecv<message>(&env, proc, res_ins_req);
         res_ins_req.wait_all();
 
         std::vector<task_id> tasks_id;
@@ -1093,9 +1089,7 @@ namespace apl
         instruction cur_inst;
         while(1)
         {
-            request_block ins_req;
-            instr_comm.recv(&cur_inst, main_proc, ins_req);
-            ins_req.wait_all();
+            instr_comm.recv<message>(&cur_inst, main_proc);
 
             for (const instruction_block& i: cur_inst)
             {
@@ -1104,13 +1098,13 @@ namespace apl
                 case INSTRUCTION::MES_SEND:
                 {
                     const instruction_message_send& j = dynamic_cast<const instruction_message_send&>(i);
-                    comm.send(memory.get_message(j.id()), j.proc(), memory.get_message_request_block(j.id()));
+                    comm.isend(memory.get_message(j.id()), j.proc(), memory.get_message_request_block(j.id()));
                     break;
                 }
                 case INSTRUCTION::MES_RECV:
                 {
                     const instruction_message_recv& j = dynamic_cast<const instruction_message_recv&>(i);
-                    comm.recv(memory.get_message(j.id()), j.proc(), memory.get_message_request_block(j.id()));
+                    comm.irecv(memory.get_message(j.id()), j.proc(), memory.get_message_request_block(j.id()));
                     break;
                 }
                 case INSTRUCTION::MES_INFO_SEND:
@@ -1118,7 +1112,7 @@ namespace apl
                     const instruction_message_info_send& j = dynamic_cast<const instruction_message_info_send&>(i);
                     request_block& info_req = memory.get_message_info_request_block(j.id());
                     for (message* p: memory.get_message_info(j.id()))
-                        comm.send(p, j.proc(), info_req);
+                        comm.isend(p, j.proc(), info_req);
                     break;
                 }
                 case INSTRUCTION::MES_CREATE:
@@ -1127,7 +1121,7 @@ namespace apl
                     std::vector<message*> iib = message_init_factory::get_info(j.type());
                     request_block info_req;
                     for (message* p: iib)
-                        comm.recv(p, j.proc(), info_req);
+                        comm.irecv(p, j.proc(), info_req);
                     info_req.wait_all();
                     memory.create_message_init_with_id(j.id(), j.type(), iib);
                     break;
@@ -1138,7 +1132,7 @@ namespace apl
                     std::vector<message*> pib = message_child_factory::get_info(j.type());
                     request_block info_req;
                     for (message* p: pib)
-                        comm.recv(p, j.proc(), info_req);
+                        comm.irecv(p, j.proc(), info_req);
                     info_req.wait_all();
                     memory.create_message_child_with_id(j.id(), j.type(), j.source(), pib);
                     break;
@@ -1196,7 +1190,7 @@ namespace apl
             c_data.push_back({j, MESSAGE_SOURCE::TASK_ARG_C});
 
         task_data td = {memory.get_perform_type(id), data, c_data};
-        task_environment env(std::move(td), {{0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL});
+        task_environment env(std::move(td));
         env.set_proc_count(comm.size());
 
         memory.perform_task(id, env);
@@ -1315,11 +1309,10 @@ namespace apl
         res.add_add_result_to_memory(added_m_init, added_m_child);
         res.add_add_result_to_memory(messages_init_id, messages_childs_id);
 
-        request_block req, req1;
-        instr_comm.send(&res, main_proc, req);
-        comm.send(&env, main_proc, req1);
+        request_block req;
+        instr_comm.send<message>(&res, main_proc);
+        comm.isend<message>(&env, main_proc, req);
         req.wait_all();
-        req1.wait_all();
     }
 
     process parallelizer::get_current_proc()

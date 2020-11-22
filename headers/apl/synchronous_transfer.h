@@ -19,7 +19,6 @@ namespace apl
     public:
 
         synchronous_sender(MPI_Comm _comm, process _proc);
-        synchronous_sender(MPI_Comm _comm, process _proc, request_block& _req);
 
     };
 

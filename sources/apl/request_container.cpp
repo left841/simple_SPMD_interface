@@ -9,15 +9,6 @@ namespace apl
     request_block::~request_block()
     { assert(req_vec.empty()); }
 
-    request_block::request_block(request_block&& r) noexcept: req_vec(std::move(r.req_vec))
-    { }
-
-    request_block& request_block::operator=(request_block&& r) noexcept
-    {
-        req_vec = std::move(r.req_vec);
-        return *this;
-    }
-
     void request_block::store(MPI_Request req)
     { req_vec.push_back(req); }
 
@@ -65,22 +56,15 @@ namespace apl
     const MPI_Request* request_block::data() const
     { return req_vec.data(); }
 
+    void request_block::clear()
+    { req_vec.clear(); }
+
 
     request_container::request_container()
     { }
 
     request_container::~request_container()
     { wait_all(); }
-
-    request_container::request_container(request_container&& r) noexcept: req_vec(std::move(r.req_vec)), block_pos(std::move(r.block_pos))
-    { }
-
-    request_container& request_container::operator=(request_container&& r) noexcept
-    {
-        req_vec = std::move(r.req_vec);
-        block_pos = std::move(r.block_pos);
-        return *this;
-    }
 
     void request_container::store(MPI_Request req)
     {
@@ -90,9 +74,9 @@ namespace apl
 
     void request_container::store(request_block& req)
     {
-        std::copy(req.req_vec.begin(), req.req_vec.end(), std::back_inserter(req_vec));
-        block_pos.push_back(req.req_vec.size());
-        req.req_vec.clear();
+        std::copy(req.data(), req.data() + req.size(), std::back_inserter(req_vec));
+        block_pos.push_back(req.size());
+        req.clear();
     }
 
     bool request_container::test_one()

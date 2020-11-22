@@ -6,9 +6,6 @@ namespace apl
     buffer_sender::buffer_sender(MPI_Comm _comm, process _proc): sender(), comm(_comm), proc(_proc)
     { }
 
-    buffer_sender::buffer_sender(MPI_Comm _comm, process _proc, request_block& _req): sender(_req), comm(_comm), proc(_proc)
-    { }
-
     void buffer_sender::send_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const
     { apl_MPI_CHECKER(MPI_Bsend(const_cast<void*>(buf), static_cast<int>(size), type.type, proc, static_cast<int>(tg), comm)); }
 

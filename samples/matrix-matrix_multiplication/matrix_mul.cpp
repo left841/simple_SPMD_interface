@@ -18,7 +18,7 @@ private:
 
 public:
     matrix(const size_t& height, const size_t& width): size_(height), length_(width), created(true)
-    { arr = new int[size_ * length_]; }
+    { arr = new Type[size_ * length_]; }
 
     matrix(const matrix<Type>& m, const size_t& height, const size_t& width, const size_t& offset_h, const size_t& offset_w): size_(height), length_(width), created(false)
     { arr = m.arr + offset_h * length_ + offset_w; }
@@ -40,11 +40,17 @@ public:
             delete[] arr;
     }
 
-    void send(const sender& se) const
-    { se.isend(arr, size_ * length_); }
+    void send(const sender& se) const override
+    { se.send(arr, size_ * length_); }
 
-    void recv(const receiver& re)
-    { re.irecv(arr, size_ * length_); }
+    void recv(const receiver& re) override
+    { re.recv(arr, size_ * length_); }
+
+    void isend(const sender& se, request_block& req) const override
+    { se.isend(arr, size_ * length_, req); }
+
+    void irecv(const receiver& re, request_block& req) override
+    { re.irecv(arr, size_ * length_, req); }
 
     Type* operator[](size_t n)
     { return arr + length_ * n; }

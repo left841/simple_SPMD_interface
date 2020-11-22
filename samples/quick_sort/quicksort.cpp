@@ -55,11 +55,17 @@ public:
     const int& operator[](size_t n) const
     { return p[n]; }
 
-    void send(const sender& se) const
-    { se.isend(p, size); }
+    void send(const sender& se) const override
+    { se.send(p, size); }
 
-    void recv(const receiver& re)
-    { re.irecv(p, size); }
+    void recv(const receiver& re) override
+    { re.recv(p, size); }
+
+    void isend(const sender& se, request_block& req) const override
+    { se.isend(p, size, req); }
+
+    void irecv(const receiver& re, request_block& req) override
+    { re.irecv(p, size, req); }
 };
 
 bool checking = false;
@@ -230,9 +236,9 @@ int main(int argc, char** argv)
 
     parallelizer pz;
 
-    int comm_size = pz.get_proc_count();
+    size_t comm_size = pz.get_proc_count();
     if (!pred_initialized)
-        quick_task::pred = sz / (3 * comm_size / 2);
+        quick_task::pred = sz / (comm_size * 3 / 2);
 
     double time = 0;
     init_task it;

@@ -1,6 +1,7 @@
 #ifndef __COMMUNICATOR_H__
 #define __COMMUNICATOR_H__
 
+#include <utility>
 #include "mpi.h"
 #include "apl/parallel_defs.h"
 
@@ -12,17 +13,24 @@ namespace apl
     protected:
 
         MPI_Comm comm;
-        process comm_rank;
-        int comm_size;
-        bool created;
 
-        communicator(MPI_Comm _comm);
-        explicit communicator(const communicator& c);
-        communicator(const communicator& c, int color, int key);
+        communicator();
+        communicator(const communicator& c);
+        communicator(communicator&& c) noexcept = default;
+        communicator& operator=(const communicator& c);
+        communicator& operator=(communicator&& c) noexcept = default;
 
     public:
 
         ~communicator();
+
+        void assign(MPI_Comm _comm);
+        void unassign();
+
+        void dublicate(const communicator& c);
+        void free();
+
+        void abort(int err) const;
 
         process rank() const;
         MPI_Comm get_comm() const;

@@ -19,14 +19,21 @@ namespace apl
     { }
 
     void instruction::send(const sender& se) const
-    {
-        se.send(v.data(), v.size());
-    }
+    { se.send(v.data(), v.size()); }
 
     void instruction::recv(const receiver& re)
     {
         v.resize(re.probe<size_t>());
         re.recv(v.data(), v.size());
+    }
+
+    void instruction::isend(const sender& se, request_block& req) const
+    { se.isend(v.data(), v.size(), req); }
+
+    void instruction::irecv(const receiver& re, request_block& req)
+    {
+        v.resize(re.probe<size_t>());
+        re.irecv(v.data(), v.size(), req);
     }
 
     size_t& instruction::operator[](size_t n)

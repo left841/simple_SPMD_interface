@@ -3,11 +3,12 @@
 namespace apl
 {
 
+    intracomm comm_world;
+    intracomm comm_self;
+
     double parallel_engine::start_time;
 
     process parallel_engine::global_comm_rank = MPI_PROC_NULL;
-
-    std::vector<MPI_Datatype> parallel_engine::created_datatypes;
 
     parallel_engine::parallel_engine(int* argc, char*** argv)
     {
@@ -27,7 +28,9 @@ namespace apl
         {
             apl_MPI_CHECKER(MPI_Init(argc, argv));
             start_time = MPI_Wtime();
-            apl_MPI_CHECKER(MPI_Comm_rank(MPI_COMM_WORLD, &global_comm_rank));
+            comm_world.assign(MPI_COMM_WORLD);
+            comm_self.assign(MPI_COMM_SELF);
+            global_comm_rank = comm_world.rank();
         }
     }
 
@@ -37,15 +40,12 @@ namespace apl
         apl_MPI_CHECKER(MPI_Initialized(&flag));
         if (flag)
         {
-            for (MPI_Datatype& t: created_datatypes)
+            for (MPI_Datatype& t: simple_datatype::created_datatypes)
                 apl_MPI_CHECKER(MPI_Type_free(&t));
+            comm_self.unassign();
+            comm_world.unassign();
             apl_MPI_CHECKER(MPI_Finalize());
         }
-    }
-
-    void parallel_engine::add_datatype(MPI_Datatype dt)
-    {
-        created_datatypes.push_back(dt);
     }
 
     double parallel_engine::get_start_time()
