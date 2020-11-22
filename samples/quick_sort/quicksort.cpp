@@ -10,26 +10,27 @@ using namespace apl;
 
 class array: public message
 {
-public:
+private:
     bool created;
     int* p;
-    size_t size;
+    size_t size_;
 
-    array(size_t sz): size(sz)
+public:
+    array(size_t sz): size_(sz)
     {
-        p = new int[size];
+        p = new int[size_];
         created = true;
     }
 
-    array(const array& m, size_t sz, size_t offset): size(sz)
+    array(const array& m, size_t sz, size_t offset): size_(sz)
     {
         p = m.p + offset;
         created = false;
     }
 
-    array(size_t sz, size_t offset): size(sz)
+    array(size_t sz, size_t offset): size_(sz)
     {
-        p = new int[size];
+        p = new int[size_];
         created = true;
     }
 
@@ -38,7 +39,7 @@ public:
         if (child.created)
         {
             int* q = p + offset;
-            for (size_t i = 0; i < child.size; ++i)
+            for (size_t i = 0; i < child.size_; ++i)
                 q[i] = child.p[i];
         }
     }
@@ -55,17 +56,26 @@ public:
     const int& operator[](size_t n) const
     { return p[n]; }
 
+    int* data()
+    { return p; }
+
+    const int* data() const
+    { return p; }
+
+    size_t size() const
+    { return size_; }
+
     void send(const sender& se) const override
-    { se.send(p, size); }
+    { se.send(p, size_); }
 
     void recv(const receiver& re) override
-    { re.recv(p, size); }
+    { re.recv(p, size_); }
 
     void isend(const sender& se, request_block& req) const override
-    { se.isend(p, size, req); }
+    { se.isend(p, size_, req); }
 
     void irecv(const receiver& re, request_block& req) override
-    { re.irecv(p, size, req); }
+    { re.irecv(p, size_, req); }
 };
 
 bool checking = false;
@@ -77,12 +87,12 @@ private:
 
     void simple_quicksort(int* a, size_t size)
     {
+        if (size < 2)
+            return;
+
         int bel;
         int mi = std::min(std::min(a[0], a[size - 1]), a[size / 2]);
         int ma = std::max(std::max(a[0], a[size - 1]), a[size / 2]);
-
-        if (size < 2)
-            return;
 
         if ((a[0] > mi) && (a[0] < ma))
             bel = a[0];
@@ -111,9 +121,9 @@ public:
 
     void operator()(array& a)
     {
-        size_t sz = a.size;
+        size_t sz = a.size();
         if (sz < pred)
-            simple_quicksort(a.p, sz);
+            simple_quicksort(a.data(), sz);
         else
         {
             int bel;
@@ -166,7 +176,7 @@ public:
 
         array& a1 = *new array(size);
         mes_id<array> a1_id = add_message(&a1, new size_t(size));
-        for (size_t i = 0; i < a1.size; ++i)
+        for (size_t i = 0; i < a1.size(); ++i)
             a1[i] = uid(mt);
 
         mes_id<array> a2_id;
@@ -174,7 +184,7 @@ public:
         {
             array& a2 = *new array(size);
             a2_id = add_message(&a2, new size_t(size));
-            for (size_t i = 0; i < a1.size; ++i)
+            for (size_t i = 0; i < a1.size(); ++i)
                 a2[i] = a1[i];
         }
         t = MPI_Wtime();
@@ -194,9 +204,9 @@ public:
     void operator()(const array& a1, array& a2, double t)
     {
         double tm1 = MPI_Wtime();
-        std::sort(a2.p, a2.p + a2.size);
-        for (size_t i = 0; i < a1.size; ++i)
-            if (a1.p[i] != a2.p[i])
+        std::sort(a2.data(), a2.data() + a2.size());
+        for (size_t i = 0; i < a1.size(); ++i)
+            if (a1[i] != a2[i])
             {
                 std::cout << "wrong\n";
                 goto gh;
@@ -238,7 +248,7 @@ int main(int argc, char** argv)
 
     size_t comm_size = pz.get_proc_count();
     if (!pred_initialized)
-        quick_task::pred = sz / (comm_size * 3 / 2);
+        quick_task::pred = std::max(sz / (comm_size * 3 / 2), size_t(2));
 
     double time = 0;
     init_task it;
