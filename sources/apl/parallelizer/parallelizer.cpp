@@ -1,4 +1,5 @@
 #include "apl/parallelizer/parallelizer.h"
+#include <iostream>
 
 namespace apl
 {
@@ -707,8 +708,13 @@ namespace apl
         const instruction_block& ins = *it;
 
         if (ins.command() != INSTRUCTION::TASK_RES)
+        {
+            std::cerr << "cmd: " << static_cast<size_t>(ins.command()) << " size: " << res_ins.size() << std::endl;
+            for (size_t i = 0; i < res_ins.size(); ++i)
+                std::cerr << res_ins[i] << ' ';
+            std::cerr << std::endl;
             comm.abort(111);
-
+        }
         const instruction_task_result& result = dynamic_cast<const instruction_task_result&>(ins);
         task_id tid = result.id();
 
@@ -719,14 +725,26 @@ namespace apl
 
         const instruction_block& ins2 = *(++it);
         if (ins2.command() != INSTRUCTION::ADD_RES_TO_MEMORY)
+        {
+            std::cerr << "cmd: " << static_cast<size_t>(ins.command()) << " size: " << res_ins.size() << std::endl;
+            for (size_t i = 0; i < res_ins.size(); ++i)
+                std::cerr << res_ins[i] << ' ';
+            std::cerr << std::endl;
             comm.abort(112);
+        }
         const instruction_add_result_to_memory& res_to_mem = dynamic_cast<const instruction_add_result_to_memory&>(ins2);
         messages_init_add_id = res_to_mem.added_messages_init();
         messages_childs_add_id = res_to_mem.added_messages_child();
 
         const instruction_block& ins3 = *(++it);
         if (ins2.command() != INSTRUCTION::ADD_RES_TO_MEMORY)
+        {
+            std::cerr << "cmd: " << static_cast<size_t>(ins.command()) << " size: " << res_ins.size() << std::endl;
+            for (size_t i = 0; i < res_ins.size(); ++i)
+                std::cerr << res_ins[i] << ' ';
+            std::cerr << std::endl;
             comm.abort(113);
+        }
         const instruction_add_result_to_memory& res_to_mem2 = dynamic_cast<const instruction_add_result_to_memory&>(ins3);
         messages_init_id = res_to_mem2.added_messages_init();
         messages_childs_id = res_to_mem2.added_messages_child();
