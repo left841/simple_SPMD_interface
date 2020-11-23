@@ -30,8 +30,8 @@ namespace apl
         static process global_rank();
     };
 
-    extern intracomm comm_world;
-    extern intracomm comm_self;
+    extern global_intracomm comm_world;
+    extern global_intracomm comm_self;
 
 }
 

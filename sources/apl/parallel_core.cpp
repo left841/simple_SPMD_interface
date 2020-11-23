@@ -3,8 +3,8 @@
 namespace apl
 {
 
-    intracomm comm_world;
-    intracomm comm_self;
+    global_intracomm comm_world;
+    global_intracomm comm_self;
 
     double parallel_engine::start_time;
 

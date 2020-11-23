@@ -21,4 +21,10 @@ namespace apl
     void intracomm::barrier() const
     { apl_MPI_CHECKER(MPI_Barrier(comm)); }
 
+    global_intracomm::global_intracomm(): intracomm()
+    { }
+
+    global_intracomm::~global_intracomm()
+    { comm = MPI_COMM_NULL; }
+
 }

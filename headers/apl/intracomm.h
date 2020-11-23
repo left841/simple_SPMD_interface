@@ -167,6 +167,15 @@ namespace apl
         }
     }
 
+    class global_intracomm: public intracomm
+    {
+    public:
+
+        global_intracomm();
+        ~global_intracomm();
+
+    };
+
 }
 
 #endif // __INTRACOMM_H__
