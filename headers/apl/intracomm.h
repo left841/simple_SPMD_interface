@@ -132,7 +132,7 @@ namespace apl
     void intracomm::bcast(Type* ptr, process root)
     {
         int comm_rank = rank(), comm_size = size();
-        int my_pos = (comm_rank - proc + comm_size) % comm_size;
+        int my_pos = (comm_rank - root + comm_size) % comm_size;
         int i = 1;
         if (my_pos > 0)
         {
@@ -150,7 +150,7 @@ namespace apl
     void intracomm::ibcast(Type* ptr, process root, request_block& req)
     {
         int comm_rank = rank(), comm_size = size();
-        int my_pos = (comm_rank - proc + comm_size) % comm_size;
+        int my_pos = (comm_rank - root + comm_size) % comm_size;
         int i = 1;
         if (my_pos > 0)
         {
