@@ -5,18 +5,12 @@
 #include "apl/parallel_defs.h"
 #include "apl/communicator.h"
 #include "apl/transfer.h"
-#include "apl/standard_transfer.h"
-#include "apl/buffer_transfer.h"
-#include "apl/synchronous_transfer.h"
-#include "apl/ready_transfer.h"
-#include "apl/message.h"
 
 namespace apl
 {
 
     class intracomm: public communicator
     {
-
     public:
 
         intracomm();

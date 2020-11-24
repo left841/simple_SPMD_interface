@@ -154,6 +154,82 @@ namespace apl
     size_t receiver::probe_bytes() const
     { return probe(byte_datatype()); }
 
+    standard_sender::standard_sender(MPI_Comm _comm, process _proc): sender(), comm(_comm), proc(_proc)
+    { }
+
+    void standard_sender::send_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const
+    { apl_MPI_CHECKER(MPI_Send(const_cast<void*>(buf), static_cast<int>(size), type.type, proc, static_cast<int>(tg), comm)); }
+
+    MPI_Request standard_sender::isend_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const
+    {
+        MPI_Request req = MPI_REQUEST_NULL;
+        apl_MPI_CHECKER(MPI_Isend(const_cast<void*>(buf), static_cast<int>(size), type.type, proc, static_cast<int>(tg), comm, &req));
+        return req;
+    }
+
+    standard_receiver::standard_receiver(MPI_Comm _comm, process _proc): receiver(), comm(_comm), proc(_proc)
+    { }
+
+    MPI_Status standard_receiver::recv_impl(void* buf, size_t size, const simple_datatype& type, TAG tg = TAG::UNDEFINED) const
+    {
+        MPI_Status status {};
+        apl_MPI_CHECKER(MPI_Recv(buf, static_cast<int>(size), type.type, proc, static_cast<int>(tg), comm, &status));
+        return status;
+    }
+
+    MPI_Request standard_receiver::irecv_impl(void* buf, size_t size, const simple_datatype& type, TAG tg = TAG::UNDEFINED) const
+    {
+        MPI_Request req = MPI_REQUEST_NULL;
+        apl_MPI_CHECKER(MPI_Irecv(buf, static_cast<int>(size), type.type, proc, static_cast<int>(tg), comm, &req));
+        return req;
+    }
+
+    MPI_Status standard_receiver::probe_impl(TAG tg) const
+    {
+        MPI_Status status {};
+        apl_MPI_CHECKER(MPI_Probe(proc, static_cast<int>(tg), comm, &status));
+        return status;
+    }
+
+    buffer_sender::buffer_sender(MPI_Comm _comm, process _proc): sender(), comm(_comm), proc(_proc)
+    { }
+
+    void buffer_sender::send_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const
+    { apl_MPI_CHECKER(MPI_Bsend(const_cast<void*>(buf), static_cast<int>(size), type.type, proc, static_cast<int>(tg), comm)); }
+
+    MPI_Request buffer_sender::isend_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const
+    {
+        MPI_Request req = MPI_REQUEST_NULL;
+        apl_MPI_CHECKER(MPI_Ibsend(const_cast<void*>(buf), static_cast<int>(size), type.type, proc, static_cast<int>(tg), comm, &req));
+        return req;
+    }
+
+    synchronous_sender::synchronous_sender(MPI_Comm _comm, process _proc): sender(), comm(_comm), proc(_proc)
+    { }
+
+    void synchronous_sender::send_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const
+    { apl_MPI_CHECKER(MPI_Ssend(const_cast<void*>(buf), static_cast<int>(size), type.type, proc, static_cast<int>(tg), comm)); }
+
+    MPI_Request synchronous_sender::isend_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const
+    {
+        MPI_Request req = MPI_REQUEST_NULL;
+        apl_MPI_CHECKER(MPI_Issend(const_cast<void*>(buf), static_cast<int>(size), type.type, proc, static_cast<int>(tg), comm, &req));
+        return req;
+    }
+
+    ready_sender::ready_sender(MPI_Comm _comm, process _proc): sender(), comm(_comm), proc(_proc)
+    { }
+
+    void ready_sender::send_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const
+    { apl_MPI_CHECKER(MPI_Rsend(const_cast<void*>(buf), static_cast<int>(size), type.type, proc, static_cast<int>(tg), comm)); }
+
+    MPI_Request ready_sender::isend_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const
+    {
+        MPI_Request req = MPI_REQUEST_NULL;
+        apl_MPI_CHECKER(MPI_Irsend(const_cast<void*>(buf), static_cast<int>(size), type.type, proc, static_cast<int>(tg), comm, &req));
+        return req;
+    }
+
     //send-recv specifications
     // char
     template<>
@@ -546,91 +622,5 @@ namespace apl
     template<>
     size_t receiver::probe<wchar_t>() const
     { return probe(datatype<wchar_t>()); }
-
-    // local_message_id
-    template<>
-    const simple_datatype& datatype<local_message_id>()
-    {
-        static simple_datatype d({datatype<size_t>().type, datatype<size_t>().type}, {offset_of(&local_message_id::id), offset_of(&local_message_id::src)});
-        return d;
-    }
-
-    template<>
-    void sender::send<local_message_id>(const local_message_id* buf, size_t size) const
-    { send(buf, size, datatype<local_message_id>()); }
-
-    template<>
-    void sender::isend<local_message_id>(const local_message_id* buf, size_t size, request_block& req) const
-    { isend(buf, size, datatype<local_message_id>(), req); }
-
-    template<>
-    void receiver::recv<local_message_id>(local_message_id* buf, size_t size) const
-    { recv(buf, size, datatype<local_message_id>()); }
-
-    template<>
-    void receiver::irecv<local_message_id>(local_message_id* buf, size_t size, request_block& req) const
-    { irecv(buf, size, datatype<local_message_id>(), req); }
-
-    template<>
-    size_t receiver::probe<local_message_id>() const
-    { return probe(datatype<local_message_id>()); }
-
-    // local_task_id
-    template<>
-    const simple_datatype& datatype<local_task_id>()
-    {
-        static simple_datatype d({datatype<local_message_id>().type, datatype<size_t>().type, datatype<size_t>().type},
-            {offset_of(&local_task_id::mes), offset_of(&local_task_id::id), offset_of(&local_task_id::src)});
-        return d;
-    }
-
-    template<>
-    void sender::send<local_task_id>(const local_task_id* buf, size_t size) const
-    { send(buf, size, datatype<local_task_id>()); }
-
-    template<>
-    void sender::isend<local_task_id>(const local_task_id* buf, size_t size, request_block& req) const
-    { isend(buf, size, datatype<local_task_id>(), req); }
-
-    template<>
-    void receiver::recv<local_task_id>(local_task_id* buf, size_t size) const
-    { recv(buf, size, datatype<local_task_id>()); }
-
-    template<>
-    void receiver::irecv<local_task_id>(local_task_id* buf, size_t size, request_block& req) const
-    { irecv(buf, size, datatype<local_task_id>(), req); }
-
-    template<>
-    size_t receiver::probe<local_task_id>() const
-    { return probe(datatype<local_task_id>()); }
-
-    // task_dependence
-    template<>
-    const simple_datatype& datatype<task_dependence>()
-    {
-        static simple_datatype d({datatype<local_task_id>().type, datatype<local_task_id>().type},
-            {offset_of(&task_dependence::parent), offset_of(&task_dependence::child) });
-        return d;
-    }
-
-    template<>
-    void sender::send<task_dependence>(const task_dependence* buf, size_t size) const
-    { send(buf, size, datatype<task_dependence>()); }
-
-    template<>
-    void sender::isend<task_dependence>(const task_dependence* buf, size_t size, request_block& req) const
-    { isend(buf, size, datatype<task_dependence>(), req); }
-
-    template<>
-    void receiver::recv<task_dependence>(task_dependence* buf, size_t size) const
-    { recv(buf, size, datatype<task_dependence>()); }
-
-    template<>
-    void receiver::irecv<task_dependence>(task_dependence* buf, size_t size, request_block& req) const
-    { irecv(buf, size, datatype<task_dependence>(), req); }
-
-    template<>
-    size_t receiver::probe<task_dependence>() const
-    { return probe(datatype<task_dependence>()); }
 
 }

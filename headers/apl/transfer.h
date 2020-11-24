@@ -6,7 +6,6 @@
 #include <climits>
 #include <queue>
 #include "mpi.h"
-#include "apl/parallel_defs.h"
 #include "apl/request_container.h"
 
 namespace apl
@@ -115,6 +114,87 @@ namespace apl
     template<class T>
     void receiver::irecv(T* buf, size_t size, request_block& req) const
     { recv(buf, size); }
+
+    class standard_sender: public sender
+    {
+    private:
+
+        MPI_Comm comm;
+        process proc;
+
+        void send_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const;
+        MPI_Request isend_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const;
+
+    public:
+
+        standard_sender(MPI_Comm _comm, process _proc);
+
+    };
+
+    class standard_receiver: public receiver
+    {
+    private:
+
+        MPI_Comm comm;
+        process proc;
+
+        MPI_Status recv_impl(void* buf, size_t size, const simple_datatype& type, TAG tg) const;
+        MPI_Request irecv_impl(void* buf, size_t size, const simple_datatype& type, TAG tg) const;
+        MPI_Status probe_impl(TAG tg) const;
+
+    public:
+
+        standard_receiver(MPI_Comm _comm, process _proc);
+
+    };
+
+    class buffer_sender: public sender
+    {
+    private:
+
+        MPI_Comm comm;
+        process proc;
+
+        void send_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const;
+        MPI_Request isend_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const;
+
+    public:
+
+        buffer_sender(MPI_Comm _comm, process _proc);
+
+    };
+
+    class synchronous_sender: public sender
+    {
+    private:
+
+        MPI_Comm comm;
+        process proc;
+
+        void send_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const;
+        MPI_Request isend_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const;
+
+    public:
+
+        synchronous_sender(MPI_Comm _comm, process _proc);
+
+    };
+
+    class ready_sender: public sender
+    {
+    private:
+
+        MPI_Comm comm;
+        process proc;
+
+        void send_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const;
+        MPI_Request isend_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const;
+
+    public:
+
+        ready_sender(MPI_Comm _comm, process _proc);
+
+    };
 
     //send-recv specifications
     // char
@@ -382,63 +462,6 @@ namespace apl
 
     template<>
     size_t receiver::probe<wchar_t>() const;
-
-    // local_message_id
-    template<>
-    const simple_datatype& datatype<local_message_id>();
-
-    template<>
-    void sender::send<local_message_id>(const local_message_id* buf, size_t size) const;
-
-    template<>
-    void sender::isend<local_message_id>(const local_message_id* buf, size_t size, request_block& req) const;
-
-    template<>
-    void receiver::recv<local_message_id>(local_message_id* buf, size_t size) const;
-
-    template<>
-    void receiver::irecv<local_message_id>(local_message_id* buf, size_t size, request_block& req) const;
-
-    template<>
-    size_t receiver::probe<local_message_id>() const;
-
-    // local_task_id
-    template<>
-    const simple_datatype& datatype<local_task_id>();
-
-    template<>
-    void sender::send<local_task_id>(const local_task_id* buf, size_t size) const;
-
-    template<>
-    void sender::isend<local_task_id>(const local_task_id* buf, size_t size, request_block& req) const;
-
-    template<>
-    void receiver::recv<local_task_id>(local_task_id* buf, size_t size) const;
-
-    template<>
-    void receiver::irecv<local_task_id>(local_task_id* buf, size_t size, request_block& req) const;
-
-    template<>
-    size_t receiver::probe<local_task_id>() const;
-
-    // task_dependence
-    template<>
-    const simple_datatype& datatype<task_dependence>();
-
-    template<>
-    void sender::send<task_dependence>(const task_dependence* buf, size_t size) const;
-
-    template<>
-    void sender::isend<task_dependence>(const task_dependence* buf, size_t size, request_block& req) const;
-
-    template<>
-    void receiver::recv<task_dependence>(task_dependence* buf, size_t size) const;
-
-    template<>
-    void receiver::irecv<task_dependence>(task_dependence* buf, size_t size, request_block& req) const;
-
-    template<>
-    size_t receiver::probe<task_dependence>() const;
 
 }
 

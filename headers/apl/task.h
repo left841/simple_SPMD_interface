@@ -9,6 +9,150 @@
 namespace apl
 {
 
+    typedef size_t perform_type;
+
+    struct task_type
+    {
+        message_type mt;
+        perform_type pt;
+    };
+
+    constexpr const perform_type PERFORM_TYPE_UNDEFINED = std::numeric_limits<perform_type>::max();
+    constexpr const task_type TASK_TYPE_UNDEFINED = {MESSAGE_TYPE_UNDEFINED, PERFORM_TYPE_UNDEFINED};
+
+    enum class MESSAGE_SOURCE: size_t
+    {
+        UNDEFINED, GLOBAL,
+        TASK_ARG, TASK_ARG_C,
+        REFERENCE,
+        INIT, CHILD,
+        INIT_A, CHILD_A
+    };
+
+    enum class TASK_SOURCE: size_t
+    {
+        UNDEFINED, GLOBAL,
+        INIT, REFERENCE,
+        CHILD
+    };
+
+    struct local_message_id
+    {
+        size_t id;
+        MESSAGE_SOURCE src;
+    };
+
+    struct local_task_id
+    {
+        local_message_id mes;
+        size_t id;
+        TASK_SOURCE src;
+    };
+
+    template<typename Type>
+    struct mes_id
+    {
+        size_t id;
+        MESSAGE_SOURCE src;
+
+        typedef Type type;
+
+        mes_id();
+        mes_id(local_message_id id);
+        mes_id(const mes_id<Type>& id);
+
+        mes_id<const Type> as_const();
+        operator local_message_id();
+    };
+
+    template<typename Type>
+    mes_id<Type>::mes_id(): id(std::numeric_limits<size_t>::max()), src(MESSAGE_SOURCE::UNDEFINED)
+    { }
+
+    template<typename Type>
+    mes_id<Type>::mes_id(local_message_id id): id(id.id), src(id.src)
+    { }
+
+    template<typename Type>
+    mes_id<Type>::mes_id(const mes_id<Type>& id): id(id.id), src(id.src)
+    { }
+
+    template<typename Type>
+    mes_id<const Type> mes_id<Type>::as_const()
+    {
+        mes_id<const Type> i({id, src});
+        return i;
+    }
+
+    template<typename Type>
+    mes_id<Type>::operator local_message_id()
+    {
+        return {id, src};
+    }
+
+    struct task_dependence
+    {
+        local_task_id parent;
+        local_task_id child;
+    };
+
+    // local_message_id
+    template<>
+    const simple_datatype& datatype<local_message_id>();
+
+    template<>
+    void sender::send<local_message_id>(const local_message_id* buf, size_t size) const;
+
+    template<>
+    void sender::isend<local_message_id>(const local_message_id* buf, size_t size, request_block& req) const;
+
+    template<>
+    void receiver::recv<local_message_id>(local_message_id* buf, size_t size) const;
+
+    template<>
+    void receiver::irecv<local_message_id>(local_message_id* buf, size_t size, request_block& req) const;
+
+    template<>
+    size_t receiver::probe<local_message_id>() const;
+
+    // local_task_id
+    template<>
+    const simple_datatype& datatype<local_task_id>();
+
+    template<>
+    void sender::send<local_task_id>(const local_task_id* buf, size_t size) const;
+
+    template<>
+    void sender::isend<local_task_id>(const local_task_id* buf, size_t size, request_block& req) const;
+
+    template<>
+    void receiver::recv<local_task_id>(local_task_id* buf, size_t size) const;
+
+    template<>
+    void receiver::irecv<local_task_id>(local_task_id* buf, size_t size, request_block& req) const;
+
+    template<>
+    size_t receiver::probe<local_task_id>() const;
+
+    // task_dependence
+    template<>
+    const simple_datatype& datatype<task_dependence>();
+
+    template<>
+    void sender::send<task_dependence>(const task_dependence* buf, size_t size) const;
+
+    template<>
+    void sender::isend<task_dependence>(const task_dependence* buf, size_t size, request_block& req) const;
+
+    template<>
+    void receiver::recv<task_dependence>(task_dependence* buf, size_t size) const;
+
+    template<>
+    void receiver::irecv<task_dependence>(task_dependence* buf, size_t size, request_block& req) const;
+
+    template<>
+    size_t receiver::probe<task_dependence>() const;
+
     class task;
 
     struct message_init_data
@@ -245,6 +389,73 @@ namespace apl
     new_task_id<Type> task::this_task_id() const
     { return env->get_this_task_id(); }
 
+    template<typename Type>
+    std::enable_if_t<std::is_const<Type>::value> choose_vector_to_push(mes_id<Type> m, std::vector<local_message_id>& v, std::vector<local_message_id>& cv)
+    { cv.push_back(m); }
+
+    template<typename Type>
+    std::enable_if_t<!std::is_const<Type>::value> choose_vector_to_push(mes_id<Type> m, std::vector<local_message_id>& v, std::vector<local_message_id>& cv)
+    { v.push_back(m); }
+
+    template<size_t Pos, typename... Args>
+    struct ids_to_two_vectors_impl
+    {
+        static constexpr size_t Index = sizeof...(Args) - Pos;
+        using ArgType = std::tuple_element_t<Index, std::tuple<Args...>>;
+
+        static void perform(std::vector<local_message_id>& v, std::vector<local_message_id>& cv, const std::tuple<mes_id<Args>...>& t)
+        {
+            choose_vector_to_push(std::get<Index>(t), v, cv);
+            ids_to_two_vectors_impl<Pos - 1, Args...>::perform(v, cv, t);
+        }
+    };
+
+    template<typename... Args>
+    struct ids_to_two_vectors_impl<0, Args...>
+    {
+        static void perform(std::vector<local_message_id>& v, std::vector<local_message_id>& cv, const std::tuple<mes_id<Args>...>& t)
+        { }
+    };
+
+    template<typename... Args>
+    void ids_to_two_vectors(std::vector<local_message_id>& v, std::vector<local_message_id>& cv, const std::tuple<mes_id<Args>...>& t)
+    { ids_to_two_vectors_impl<sizeof...(Args), Args...>::perform(v, cv, t); }
+
+    template<typename Type>
+    std::enable_if_t<std::is_const<Type>::value, bool> mark_const_as_bool()
+    { return true; }
+
+    template<typename Type>
+    std::enable_if_t<!std::is_const<Type>::value, bool> mark_const_as_bool()
+    { return false; }
+
+    template<size_t Pos, typename... Args>
+    struct get_const_map_impl
+    {
+        static constexpr size_t Index = sizeof...(Args) - Pos;
+        using ArgType = std::tuple_element_t<Index, std::tuple<Args...>>;
+
+        static void perform(std::vector<bool>& v)
+        {
+            v.at(Index) = mark_const_as_bool<ArgType>();
+            get_const_map_impl<Pos - 1, Args...>::perform(v);
+        }
+    };
+
+    template<typename... Args>
+    struct get_const_map_impl<0, Args...>
+    {
+        static void perform(std::vector<bool>& v)
+        { }
+    };
+
+    template<typename... Args>
+    std::vector<bool> get_const_map()
+    {
+        std::vector<bool> v(sizeof...(Args));
+        get_const_map_impl<sizeof...(Args), Args...>::perform(v);
+        return v;
+    }
 
     class task_factory
     {
@@ -360,12 +571,12 @@ namespace apl
     { return performer<Type, ArgTypes...>::get_type(); }
 
 
-    // new task
+    // task
     template<class Type, class... ArgTypes>
     new_task_id<Type> task::add_task(mes_id<Type> t, mes_id<ArgTypes>... args) const
     {
         std::vector<local_message_id> data, const_data;
-        tuple_processors<sizeof...(ArgTypes), ArgTypes...>::ids_to_two_vectors(data, const_data, std::make_tuple(args...));
+        ids_to_two_vectors(data, const_data, std::make_tuple(args...));
         return env->add_task(task_factory::get_type<Type, ArgTypes...>(), t, data, const_data);
     }
 
@@ -373,7 +584,7 @@ namespace apl
     new_task_id<Type> task::add_child_task(mes_id<Type> t, mes_id<ArgTypes>... args) const
     {
         std::vector<local_message_id> data, const_data;
-        tuple_processors<sizeof...(ArgTypes), ArgTypes...>::ids_to_two_vectors(data, const_data, std::make_tuple(args...));
+        ids_to_two_vectors(data, const_data, std::make_tuple(args...));
         return env->add_child_task(task_factory::get_type<Type, ArgTypes...>(), t, data, const_data);
     }
 
@@ -391,7 +602,7 @@ namespace apl
         std::vector<message*> v;
         tuple_processors<sizeof...(InfoTypes), InfoTypes...>::create_vector_from_pointers(v, std::make_tuple(info...));
         std::vector<local_message_id> data, const_data;
-        tuple_processors<sizeof...(ArgTypes), ArgTypes...>::ids_to_two_vectors(data, const_data, args);
+        ids_to_two_vectors(data, const_data, args);
         return env->create_task({message_init_factory::get_type<Type, InfoTypes...>(), task_factory::get_type<Type, ArgTypes...>()}, data, const_data, v);
     }
 
@@ -401,7 +612,7 @@ namespace apl
         std::vector<message*> v;
         tuple_processors<sizeof...(InfoTypes), InfoTypes...>::create_vector_from_pointers(v, std::make_tuple(info...));
         std::vector<local_message_id> data, const_data;
-        tuple_processors<sizeof...(ArgTypes), ArgTypes...>::ids_to_two_vectors(data, const_data, args);
+        ids_to_two_vectors(data, const_data, args);
         return env->create_child_task({message_init_factory::get_type<Type, InfoTypes...>(), task_factory::get_type<Type, ArgTypes...>()}, data, const_data, v);
     }
 
@@ -410,7 +621,7 @@ namespace apl
     {
         std::vector<message*> v;
         std::vector<local_message_id> data, const_data;
-        tuple_processors<sizeof...(ArgTypes), ArgTypes...>::ids_to_two_vectors(data, const_data, std::make_tuple(args...));
+        ids_to_two_vectors(data, const_data, std::make_tuple(args...));
         return env->create_task({message_init_factory::get_type<Type>(), task_factory::get_type<Type, ArgTypes...>()}, data, const_data, v);
     }
 
@@ -419,7 +630,7 @@ namespace apl
     {
         std::vector<message*> v;
         std::vector<local_message_id> data, const_data;
-        tuple_processors<sizeof...(ArgTypes), ArgTypes...>::ids_to_two_vectors(data, const_data, std::make_tuple(args...));
+        ids_to_two_vectors(data, const_data, std::make_tuple(args...));
         return env->create_child_task({message_init_factory::get_type<Type>(), task_factory::get_type<Type, ArgTypes...>()}, data, const_data, v);
     }
 

@@ -8,36 +8,6 @@
 namespace apl
 {
 
-    template<size_t... Indexes>
-    struct index_sequence
-    { };
-
-    template<size_t Pos, size_t... Indexes>
-    struct make_index_sequence: make_index_sequence<Pos - 1, Pos - 1, Indexes...>
-    { };
-
-    template<size_t... Indexes>
-    struct make_index_sequence<0, Indexes...>
-    {
-        typedef index_sequence<Indexes...> type;
-    };
-
-    template<size_t... Indexes, typename Func, typename... Args>
-    auto apply_impl(index_sequence<Indexes...>, Func&& f, const std::tuple<Args...>& args)
-    { return f(std::get<Indexes>(args)...); }
-
-    template<size_t... Indexes, typename Func, typename... Args>
-    auto apply_impl(index_sequence<Indexes...>, Func&& f, std::tuple<Args...>& args)
-    { return f(std::get<Indexes>(args)...); }
-
-    template<typename Func, typename... Args>
-    auto apply(Func&& f, const std::tuple<Args...>& args)
-    { return apply_impl(typename make_index_sequence<sizeof...(Args)>::type(), std::forward<Func>(f), args); }
-
-    template<typename Func, typename... Args>
-    auto apply(Func&& f, std::tuple<Args...>& args)
-    { return apply_impl(typename make_index_sequence<sizeof...(Args)>::type(), std::forward<Func>(f), args); }
-
     template<typename Type>
     class empty_ref_wrapper
     {
@@ -122,21 +92,7 @@ namespace apl
         return transform_from_message<Type>(v.at(v_pos - 1));
     }
 
-    template<typename Type>
-    std::enable_if_t<std::is_const<Type>::value> choose_vector_to_push(mes_id<Type> m, std::vector<local_message_id>& v, std::vector<local_message_id>& cv)
-    { cv.push_back(m); }
 
-    template<typename Type>
-    std::enable_if_t<!std::is_const<Type>::value> choose_vector_to_push(mes_id<Type> m, std::vector<local_message_id>& v, std::vector<local_message_id>& cv)
-    { v.push_back(m); }
-
-    template<typename Type>
-    std::enable_if_t<std::is_const<Type>::value, bool> mark_const_as_bool()
-    { return true; }
-
-    template<typename Type>
-    std::enable_if_t<!std::is_const<Type>::value, bool> mark_const_as_bool()
-    { return false; }
 
     template<size_t Pos, typename... Args>
     class tuple_processors
@@ -169,18 +125,6 @@ namespace apl
             v.push_back(transform_to_message(std::get<sizeof...(Args) - Pos>(t)));
             tuple_processors<Pos - 1, Args...>::create_vector_from_pointers(v, t);
         }
-
-        static void ids_to_two_vectors(std::vector<local_message_id>& v, std::vector<local_message_id>& cv, const std::tuple<mes_id<Args>...>& t)
-        {
-            choose_vector_to_push<arg_type>(std::get<sizeof...(Args) - Pos>(t), v, cv);
-            tuple_processors<Pos - 1, Args...>::ids_to_two_vectors(v, cv, t);
-        }
-
-        static void get_const_map_impl(std::vector<bool>& v)
-        {
-            v.at(sizeof...(Args) - Pos) = mark_const_as_bool<arg_type>();
-            tuple_processors<Pos - 1, Args...>::get_const_map_impl(v);
-        }
     };
 
     template<typename... Args>
@@ -199,25 +143,18 @@ namespace apl
         static void create_vector_from_pointers(std::vector<message*>& v, const std::tuple<Args*...>& tp)
         { }
 
-        static void ids_to_two_vectors(std::vector<local_message_id>& v, std::vector<local_message_id>& cv, const std::tuple<mes_id<Args>...>& t)
-        { }
-
         static void get_const_map_impl(std::vector<bool>& v)
         { }
     };
-
-    template<typename... Args>
-    std::vector<bool> get_const_map()
-    {
-        std::vector<bool> v(sizeof...(Args));
-        tuple_processors<sizeof...(Args), Args...>::get_const_map_impl(v);
-        return v;
-    }
 
     enum class MESSAGE_FACTORY_TYPE: size_t
     {
         UNDEFINED, INIT, CHILD
     };
+
+    typedef size_t message_type;
+
+    constexpr const message_type MESSAGE_TYPE_UNDEFINED = std::numeric_limits<message_type>::max();
 
     // init
     class message_init_factory
