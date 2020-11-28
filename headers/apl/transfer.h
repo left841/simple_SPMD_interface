@@ -12,17 +12,21 @@ namespace apl
 {
 
     template<typename Type, typename Member>
-    constexpr size_t offset_of(Member Type::* member)
+    constexpr const size_t offset_of(Member Type::* member)
     { return reinterpret_cast<char*>(&(reinterpret_cast<Type*>(0)->*member)) - reinterpret_cast<char*>(0); }
 
-    template<typename Type, typename Member, size_t off>
-    struct type_offset
+    template<typename Type, typename Member>
+    constexpr const size_t offset_of2(Member Type::* member)
     {
-        size_t offset;
-        typedef Member type;
+        size_t pr = 0;
+        Member* tj;
+        return 4;
+    }
 
-        type_offset(Member Type::* member)
-        { offset = reinterpret_cast<char*>(&(reinterpret_cast<Type*>(0)->*member)) - reinterpret_cast<char*>(0); }
+    template<typename Type, size_t Offset>
+    class type_map
+    {
+        
     };
 
     struct simple_datatype
@@ -39,14 +43,86 @@ namespace apl
         static void add_datatype(MPI_Datatype dt);
     };
 
-    template<typename Type, ptrdiff_t offset = 0>
-    const simple_datatype& datatype();
-
     //template<typename... Types, ptrdiff_t... offsets>
-    //const simple_datatype& datatype()
+    //const simple_datatype& make_datatype()
     //{
     //    static simple_datatype d({datatype<Types>().type...}, {offsets...});
     //}
+
+    template<typename Type, ptrdiff_t offset = 0>
+    const simple_datatype& datatype();
+
+    //template<typename Type>
+    //class has_simple_datatype
+    //{
+    //private:
+    //    struct ret1
+    //    { };
+
+    //    struct ret2
+    //    { };
+
+    //    template<typename CheckType>
+    //    static constexpr char has_simple_datatype_impl(...);
+    //    template<typename CheckType>
+    //    static constexpr double has_simple_datatype_impl(decltype(datatype<CheckType>()));
+
+    //public:
+    //    static constexpr bool value = std::is_same<decltype(has_simple_datatype_impl<Type>(0)), double>::value;
+    //};
+
+    //template<typename Type>
+    //class is_simple_datatype&
+
+    template<typename... Metatypes>
+    class datatype_constructor
+    {
+    
+    };
+
+    //template<typename Type>
+    //class datatype_constructor<Type>
+    //{
+    //public:
+    //    static const simple_datatype& get()
+    //    {
+    //        static simple_datatype d({}, {});
+    //        return d;
+    //    }
+    //};
+
+    template<typename... Types, size_t... Offsets>
+    class datatype_constructor<type_map<Types, Offsets>...>
+    {
+    public:
+        static const simple_datatype& get()
+        {
+            static simple_datatype d({datatype_constructor<Types>::get().type...}, {Offsets...});
+            return d;
+        }
+    };
+
+    template<>
+    class datatype_constructor<int>
+    {
+    public:
+        static const simple_datatype& get()
+        {
+            static simple_datatype d(MPI_INT);
+            return d;
+        }
+    };
+
+    template<>
+    class datatype_constructor<double>
+    {
+    public:
+        static const simple_datatype& get()
+        {
+            static simple_datatype d(MPI_DOUBLE);
+            return d;
+        }
+    };
 
     const simple_datatype& byte_datatype();
 
@@ -72,6 +148,10 @@ namespace apl
         void send(const T* buf, size_t size = 1) const;
         template<class T>
         void isend(const T* buf, size_t size, request_block& req) const;
+        //template<class T>
+        //void send(const T& obj) const;
+        //template<class T>
+        
 
     };
 

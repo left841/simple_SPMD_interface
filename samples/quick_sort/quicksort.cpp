@@ -222,9 +222,27 @@ public:
     }
 };
 
+struct bred
+{
+    int i;
+    double d;
+};
+
+template<>
+class datatype_constructor<bred>
+{
+public:
+    static const simple_datatype& get()
+    {
+        return datatype_constructor<type_map<int, offsetof(bred, i)>, type_map<double, offsetof(bred, d)>>::get();
+    }
+};
+
 int main(int argc, char** argv)
 {
     parallel_engine pe(&argc, &argv);
+    datatype_constructor<type_map<int, 0>, type_map<double, 4>>::get();
+    datatype_constructor<bred>::get();
 
     size_t sz = 100000;
     for (int i = 1; i < argc; ++i)
