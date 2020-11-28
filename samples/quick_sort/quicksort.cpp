@@ -229,12 +229,12 @@ struct bred
 };
 
 template<>
-class datatype_constructor<bred>
+class apl::datatype_constructor<bred>
 {
 public:
-    static const simple_datatype& get()
+    static const apl::simple_datatype& get()
     {
-        return datatype_constructor<type_map<int, offsetof(bred, i)>, type_map<double, offsetof(bred, d)>>::get();
+        return apl::datatype_constructor<apl::type_map<int, offsetof(bred, i)>, apl::type_map<double, offsetof(bred, d)>>::get();
     }
 };
 
