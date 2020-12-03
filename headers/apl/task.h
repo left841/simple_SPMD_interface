@@ -98,60 +98,25 @@ namespace apl
 
     // local_message_id
     template<>
-    const simple_datatype& datatype<local_message_id>();
-
-    template<>
-    void sender::send<local_message_id>(const local_message_id* buf, size_t size) const;
-
-    template<>
-    void sender::isend<local_message_id>(const local_message_id* buf, size_t size, request_block& req) const;
-
-    template<>
-    void receiver::recv<local_message_id>(local_message_id* buf, size_t size) const;
-
-    template<>
-    void receiver::irecv<local_message_id>(local_message_id* buf, size_t size, request_block& req) const;
-
-    template<>
-    size_t receiver::probe<local_message_id>() const;
+    struct simple_datatype_map<local_message_id>
+    { using map = type_map<type_offset<size_t, offsetof(local_message_id, id)>, type_offset<size_t, offsetof(local_message_id, src)>>; };
 
     // local_task_id
     template<>
-    const simple_datatype& datatype<local_task_id>();
-
-    template<>
-    void sender::send<local_task_id>(const local_task_id* buf, size_t size) const;
-
-    template<>
-    void sender::isend<local_task_id>(const local_task_id* buf, size_t size, request_block& req) const;
-
-    template<>
-    void receiver::recv<local_task_id>(local_task_id* buf, size_t size) const;
-
-    template<>
-    void receiver::irecv<local_task_id>(local_task_id* buf, size_t size, request_block& req) const;
-
-    template<>
-    size_t receiver::probe<local_task_id>() const;
+    struct simple_datatype_map<local_task_id>
+    {
+        using map = type_map
+        <
+            type_offset<local_message_id, offsetof(local_task_id, mes)>,
+            type_offset<size_t, offsetof(local_task_id, id)>,
+            type_offset<size_t, offsetof(local_task_id, src)>
+        >;
+    };
 
     // task_dependence
     template<>
-    const simple_datatype& datatype<task_dependence>();
-
-    template<>
-    void sender::send<task_dependence>(const task_dependence* buf, size_t size) const;
-
-    template<>
-    void sender::isend<task_dependence>(const task_dependence* buf, size_t size, request_block& req) const;
-
-    template<>
-    void receiver::recv<task_dependence>(task_dependence* buf, size_t size) const;
-
-    template<>
-    void receiver::irecv<task_dependence>(task_dependence* buf, size_t size, request_block& req) const;
-
-    template<>
-    size_t receiver::probe<task_dependence>() const;
+    struct simple_datatype_map<task_dependence>
+    { using map = type_map<type_offset<local_task_id, offsetof(task_dependence, parent)>, type_offset<local_task_id, offsetof(task_dependence, child)>>; };
 
     class task;
 
