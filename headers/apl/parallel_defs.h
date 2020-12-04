@@ -49,6 +49,10 @@ namespace apl
     auto apply(Func&& f, std::tuple<Args...>& args)
     { return apply_impl(std::index_sequence_for<Args...>(), std::forward<Func>(f), args); }
 
+    template<typename Type, typename Member>
+    size_t offset_of(Member Type::* member)
+    { return reinterpret_cast<char*>(&(reinterpret_cast<Type*>(0)->*member)) - reinterpret_cast<char*>(0); }
+
 }
 
 #endif // __PARALLEL_DEFS_H__

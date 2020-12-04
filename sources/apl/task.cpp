@@ -3,92 +3,6 @@
 namespace apl
 {
 
-    // local_message_id
-    template<>
-    const simple_datatype& datatype<local_message_id>()
-    {
-        static simple_datatype d({datatype<size_t>().type, datatype<size_t>().type}, {offset_of(&local_message_id::id), offset_of(&local_message_id::src)});
-        return d;
-    }
-
-    template<>
-    void sender::send<local_message_id>(const local_message_id* buf, size_t size) const
-    { send(buf, size, datatype<local_message_id>()); }
-
-    template<>
-    void sender::isend<local_message_id>(const local_message_id* buf, size_t size, request_block& req) const
-    { isend(buf, size, datatype<local_message_id>(), req); }
-
-    template<>
-    void receiver::recv<local_message_id>(local_message_id* buf, size_t size) const
-    { recv(buf, size, datatype<local_message_id>()); }
-
-    template<>
-    void receiver::irecv<local_message_id>(local_message_id* buf, size_t size, request_block& req) const
-    { irecv(buf, size, datatype<local_message_id>(), req); }
-
-    template<>
-    size_t receiver::probe<local_message_id>() const
-    { return probe(datatype<local_message_id>()); }
-
-    // local_task_id
-    template<>
-    const simple_datatype& datatype<local_task_id>()
-    {
-        static simple_datatype d({datatype<local_message_id>().type, datatype<size_t>().type, datatype<size_t>().type},
-            {offset_of(&local_task_id::mes), offset_of(&local_task_id::id), offset_of(&local_task_id::src)});
-        return d;
-    }
-
-    template<>
-    void sender::send<local_task_id>(const local_task_id* buf, size_t size) const
-    { send(buf, size, datatype<local_task_id>()); }
-
-    template<>
-    void sender::isend<local_task_id>(const local_task_id* buf, size_t size, request_block& req) const
-    { isend(buf, size, datatype<local_task_id>(), req); }
-
-    template<>
-    void receiver::recv<local_task_id>(local_task_id* buf, size_t size) const
-    { recv(buf, size, datatype<local_task_id>()); }
-
-    template<>
-    void receiver::irecv<local_task_id>(local_task_id* buf, size_t size, request_block& req) const
-    { irecv(buf, size, datatype<local_task_id>(), req); }
-
-    template<>
-    size_t receiver::probe<local_task_id>() const
-    { return probe(datatype<local_task_id>()); }
-
-    // task_dependence
-    template<>
-    const simple_datatype& datatype<task_dependence>()
-    {
-        static simple_datatype d({datatype<local_task_id>().type, datatype<local_task_id>().type},
-            {offset_of(&task_dependence::parent), offset_of(&task_dependence::child) });
-        return d;
-    }
-
-    template<>
-    void sender::send<task_dependence>(const task_dependence* buf, size_t size) const
-    { send(buf, size, datatype<task_dependence>()); }
-
-    template<>
-    void sender::isend<task_dependence>(const task_dependence* buf, size_t size, request_block& req) const
-    { isend(buf, size, datatype<task_dependence>(), req); }
-
-    template<>
-    void receiver::recv<task_dependence>(task_dependence* buf, size_t size) const
-    { recv(buf, size, datatype<task_dependence>()); }
-
-    template<>
-    void receiver::irecv<task_dependence>(task_dependence* buf, size_t size, request_block& req) const
-    { irecv(buf, size, datatype<task_dependence>(), req); }
-
-    template<>
-    size_t receiver::probe<task_dependence>() const
-    { return probe(datatype<task_dependence>()); }
-
     task_environment::task_environment(): this_task_id({{0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL}), proc_count(0)
     { }
 
@@ -223,30 +137,30 @@ namespace apl
             {
                 case MESSAGE_SOURCE::INIT:
                 {
-                    se.send(&messages_init_v[i.id].type);
+                    se.send(messages_init_v[i.id].type);
                     for (message* p: messages_init_v[i.id].ii)
                         p->send(se);
                     break;
                 }
                 case MESSAGE_SOURCE::INIT_A:
                 {
-                    se.send(&messages_init_add_v[i.id].type);
+                    se.send(messages_init_add_v[i.id].type);
                     for (message* p: messages_init_add_v[i.id].ii)
                         p->send(se);
                     break;
                 }
                 case MESSAGE_SOURCE::CHILD:
                 {
-                    se.send(&messages_childs_v[i.id].type);
-                    se.send(&messages_childs_v[i.id].sourse);
+                    se.send(messages_childs_v[i.id].type);
+                    se.send(messages_childs_v[i.id].sourse);
                     for (message* p: messages_childs_v[i.id].pi)
                         p->send(se);
                     break;
                 }
                 case MESSAGE_SOURCE::CHILD_A:
                 {
-                    se.send(&messages_childs_add_v[i.id].type);
-                    se.send(&messages_childs_add_v[i.id].sourse);
+                    se.send(messages_childs_add_v[i.id].type);
+                    se.send(messages_childs_add_v[i.id].sourse);
                     for (message* p: messages_childs_add_v[i.id].pi)
                         p->send(se);
                     break;
@@ -262,14 +176,14 @@ namespace apl
             {
                 case TASK_SOURCE::INIT:
                 {
-                    se.send(&tasks_v[i.id].type);
+                    se.send(tasks_v[i.id].type);
                     se.send(tasks_v[i.id].data.data(), tasks_v[i.id].data.size());
                     se.send(tasks_v[i.id].c_data.data(), tasks_v[i.id].c_data.size());
                     break;
                 }
                 case TASK_SOURCE::CHILD:
                 {
-                    se.send(&tasks_child_v[i.id].type);
+                    se.send(tasks_child_v[i.id].type);
                     se.send(tasks_child_v[i.id].data.data(), tasks_child_v[i.id].data.size());
                     se.send(tasks_child_v[i.id].c_data.data(), tasks_child_v[i.id].c_data.size());
                     break;
@@ -292,7 +206,7 @@ namespace apl
                 case MESSAGE_SOURCE::INIT:
                 {
                     message_init_data d;
-                    re.recv(&d.type);
+                    re.recv(d.type);
                     d.ii = message_init_factory::get_info(d.type);
                     for (message* p: d.ii)
                         p->recv(re);
@@ -302,7 +216,7 @@ namespace apl
                 case MESSAGE_SOURCE::INIT_A:
                 {
                     message_init_add_data d;
-                    re.recv(&d.type);
+                    re.recv(d.type);
                     d.ii = message_init_factory::get_info(d.type);
                     for (message* p: d.ii)
                         p->recv(re);
@@ -313,8 +227,8 @@ namespace apl
                 case MESSAGE_SOURCE::CHILD:
                 {
                     message_child_data d;
-                    re.recv(&d.type);
-                    re.recv(&d.sourse);
+                    re.recv(d.type);
+                    re.recv(d.sourse);
                     d.pi = message_child_factory::get_info(d.type);
                     for (message* p: d.pi)
                         p->recv(re);
@@ -324,8 +238,8 @@ namespace apl
                 case MESSAGE_SOURCE::CHILD_A:
                 {
                     message_child_add_data d;
-                    re.recv(&d.type);
-                    re.recv(&d.sourse);
+                    re.recv(d.type);
+                    re.recv(d.sourse);
                     d.pi = message_child_factory::get_info(d.type);
                     for (message* p: d.pi)
                         p->recv(re);
@@ -346,7 +260,7 @@ namespace apl
                 case TASK_SOURCE::INIT:
                 {
                     task_data d;
-                    re.recv(&d.type);
+                    re.recv(d.type);
                     d.data.resize(re.probe<local_message_id>());
                     re.recv(d.data.data(), d.data.size());
                     d.c_data.resize(re.probe<local_message_id>());
@@ -357,7 +271,7 @@ namespace apl
                 case TASK_SOURCE::CHILD:
                 {
                     task_data d;
-                    re.recv(&d.type);
+                    re.recv(d.type);
                     d.data.resize(re.probe<local_message_id>());
                     re.recv(d.data.data(), d.data.size());
                     d.c_data.resize(re.probe<local_message_id>());
@@ -376,36 +290,36 @@ namespace apl
     void task_environment::isend(const sender& se, request_block& req) const
     {
         se.send<local_message_id>(created_messages_v.data(), created_messages_v.size());
-        for (const local_message_id& i : created_messages_v)
+        for (const local_message_id& i: created_messages_v)
         {
             switch (i.src)
             {
             case MESSAGE_SOURCE::INIT:
             {
-                se.send(&messages_init_v[i.id].type);
+                se.send(messages_init_v[i.id].type);
                 for (message* p: messages_init_v[i.id].ii)
                     p->send(se);
                 break;
             }
             case MESSAGE_SOURCE::INIT_A:
             {
-                se.send(&messages_init_add_v[i.id].type);
+                se.send(messages_init_add_v[i.id].type);
                 for (message* p: messages_init_add_v[i.id].ii)
                     p->send(se);
                 break;
             }
             case MESSAGE_SOURCE::CHILD:
             {
-                se.send(&messages_childs_v[i.id].type);
-                se.send(&messages_childs_v[i.id].sourse);
+                se.send(messages_childs_v[i.id].type);
+                se.send(messages_childs_v[i.id].sourse);
                 for (message* p: messages_childs_v[i.id].pi)
                     p->send(se);
                 break;
             }
             case MESSAGE_SOURCE::CHILD_A:
             {
-                se.send(&messages_childs_add_v[i.id].type);
-                se.send(&messages_childs_add_v[i.id].sourse);
+                se.send(messages_childs_add_v[i.id].type);
+                se.send(messages_childs_add_v[i.id].sourse);
                 for (message* p: messages_childs_add_v[i.id].pi)
                     p->send(se);
                 break;
@@ -421,14 +335,14 @@ namespace apl
             {
             case TASK_SOURCE::INIT:
             {
-                se.send(&tasks_v[i.id].type);
+                se.send(tasks_v[i.id].type);
                 se.isend(tasks_v[i.id].data.data(), tasks_v[i.id].data.size(), req);
                 se.isend(tasks_v[i.id].c_data.data(), tasks_v[i.id].c_data.size(), req);
                 break;
             }
             case TASK_SOURCE::CHILD:
             {
-                se.send(&tasks_child_v[i.id].type);
+                se.send(tasks_child_v[i.id].type);
                 se.isend(tasks_child_v[i.id].data.data(), tasks_child_v[i.id].data.size(), req);
                 se.isend(tasks_child_v[i.id].c_data.data(), tasks_child_v[i.id].c_data.size(), req);
                 break;
@@ -451,7 +365,7 @@ namespace apl
             case MESSAGE_SOURCE::INIT:
             {
                 message_init_data d;
-                re.recv(&d.type);
+                re.recv(d.type);
                 d.ii = message_init_factory::get_info(d.type);
                 for (message* p: d.ii)
                     p->recv(re);
@@ -461,7 +375,7 @@ namespace apl
             case MESSAGE_SOURCE::INIT_A:
             {
                 message_init_add_data d;
-                re.recv(&d.type);
+                re.recv(d.type);
                 d.ii = message_init_factory::get_info(d.type);
                 for (message* p: d.ii)
                     p->recv(re);
@@ -472,8 +386,8 @@ namespace apl
             case MESSAGE_SOURCE::CHILD:
             {
                 message_child_data d;
-                re.recv(&d.type);
-                re.recv(&d.sourse);
+                re.recv(d.type);
+                re.recv(d.sourse);
                 d.pi = message_child_factory::get_info(d.type);
                 for (message* p: d.pi)
                     p->recv(re);
@@ -483,8 +397,8 @@ namespace apl
             case MESSAGE_SOURCE::CHILD_A:
             {
                 message_child_add_data d;
-                re.recv(&d.type);
-                re.recv(&d.sourse);
+                re.recv(d.type);
+                re.recv(d.sourse);
                 d.pi = message_child_factory::get_info(d.type);
                 for (message* p: d.pi)
                     p->recv(re);
@@ -505,7 +419,7 @@ namespace apl
             case TASK_SOURCE::INIT:
             {
                 task_data d;
-                re.recv(&d.type);
+                re.recv(d.type);
                 d.data.resize(re.probe<local_message_id>());
                 re.recv(d.data.data(), d.data.size());
                 d.c_data.resize(re.probe<local_message_id>());
@@ -516,7 +430,7 @@ namespace apl
             case TASK_SOURCE::CHILD:
             {
                 task_data d;
-                re.recv(&d.type);
+                re.recv(d.type);
                 d.data.resize(re.probe<local_message_id>());
                 re.recv(d.data.data(), d.data.size());
                 d.c_data.resize(re.probe<local_message_id>());

@@ -24,16 +24,16 @@ namespace apl
     };
 
     template<>
-    void sender::send<message>(const message* buf, size_t size) const;
+    void sender::send<message>(const message& buf) const;
 
     template<>
-    void sender::isend<message>(const message* buf, size_t size, request_block& req) const;
+    void sender::isend<message>(const message& buf, request_block& req) const;
 
     template<>
-    void receiver::recv<message>(message* buf, size_t size) const;
+    void receiver::recv<message>(message& buf) const;
 
     template<>
-    void receiver::irecv<message>(message* buf, size_t size, request_block& req) const;
+    void receiver::irecv<message>(message& buf, request_block& req) const;
 
     template<typename Type>
     class message_wrapper: public message
@@ -85,19 +85,19 @@ namespace apl
 
     template<typename Type>
     void message_wrapper<Type>::send(const sender& se) const
-    { se.send(value); }
+    { se.send(*value); }
 
     template<typename Type>
     void message_wrapper<Type>::recv(const receiver& re)
-    { re.recv(value); }
+    { re.recv(*value); }
 
     template<typename Type>
     void message_wrapper<Type>::isend(const sender& se, request_block& req) const
-    { se.isend(value, 1, req); }
+    { se.isend(*value, req); }
 
     template<typename Type>
     void message_wrapper<Type>::irecv(const receiver& re, request_block& req)
-    { re.irecv(value, 1, req); }
+    { re.irecv(*value, req); }
 
 }
 

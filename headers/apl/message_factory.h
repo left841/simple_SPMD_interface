@@ -229,7 +229,7 @@ namespace apl
     template<typename Type, typename... InfoTypes>
     message* message_init_factory::creator<Type, InfoTypes...>::get_message(const std::vector<message*>& info) const
     {
-        message* p;
+        message* p = nullptr;
         std::tuple<empty_ref_wrapper<InfoTypes>...> tp;
         tuple_processors<sizeof...(InfoTypes), InfoTypes...>::vector_to_ref_tuple(info, tp);
         apply([&p](empty_ref_wrapper<InfoTypes>... args)->void
@@ -346,7 +346,7 @@ namespace apl
     template<typename Type, typename ParentType, typename... InfoTypes>
     message* message_child_factory::creator<Type, ParentType, InfoTypes...>::get_message(const message* parent, const std::vector<message*>& info) const
     {
-        message* p;
+        message* p = nullptr;
         std::tuple<empty_ref_wrapper<InfoTypes>...> tp;
         tuple_processors<sizeof...(InfoTypes), InfoTypes...>::vector_to_ref_tuple(info, tp);
         apply([&p, &parent](empty_ref_wrapper<InfoTypes>... args)->void
@@ -359,7 +359,7 @@ namespace apl
     template<typename Type, typename ParentType, typename... InfoTypes>
     message* message_child_factory::creator<Type, ParentType, InfoTypes...>::get_message(const std::vector<message*>& info) const
     {
-        message* p;
+        message* p = nullptr;
         std::tuple<empty_ref_wrapper<InfoTypes>...> tp;
         tuple_processors<sizeof...(InfoTypes), InfoTypes...>::vector_to_ref_tuple(info, tp);
         apply([&p](empty_ref_wrapper<InfoTypes>... args)->void
