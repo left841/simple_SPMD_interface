@@ -45,22 +45,22 @@ namespace apl
     class is_simple_datatype
     {
     public:
-        static constexpr bool value = !std::is_void_v<typename simple_datatype_map<Type>::map>;
+        static constexpr bool value = !std::is_void<typename simple_datatype_map<Type>::map>::value;
     };
 
     template<typename Type>
-    std::enable_if_t<!std::is_enum_v<Type>, const simple_datatype&> datatype()
+    std::enable_if_t<!std::is_enum<Type>::value, const simple_datatype&> datatype()
     { return simple_datatype_map<Type>::map::get(); }
 
     template<typename Type>
-    std::enable_if_t<std::is_enum_v<Type>, const simple_datatype&> datatype()
+    std::enable_if_t<std::is_enum<Type>::value, const simple_datatype&> datatype()
     { return simple_datatype_map<std::underlying_type_t<Type>>::map::get(); }
 
     template<typename Type, size_t Offset, size_t BlockLength = 1>
     struct type_offset
     {
         static MPI_Datatype type()
-        { return simple_datatype_map<Type>::map::get().type; }
+        { return datatype<Type>().type; }
         static constexpr size_t offset()
         { return Offset; }
         static constexpr size_t block_length()
