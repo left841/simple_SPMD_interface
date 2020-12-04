@@ -112,10 +112,6 @@ namespace apl
     { send(&val, 1, datatype<T>()); }
 
     template<class T>
-    std::enable_if_t<!is_simple_datatype<T>::value> sender::send(const T& val) const
-    { static_assert(false, "send isn't overloaded"); }
-
-    template<class T>
     std::enable_if_t<is_simple_datatype<T>::value> sender::isend(const T& val, request_block& req) const
     { isend(&val, 1, datatype<T>(), req); }
 
@@ -197,10 +193,6 @@ namespace apl
     { recv(&val, 1, datatype<T>()); }
 
     template<class T>
-    std::enable_if_t<!is_simple_datatype<T>::value> receiver::recv(T& val) const
-    { static_assert(false, "recv isn't overloaded"); }
-
-    template<class T>
     std::enable_if_t<is_simple_datatype<T>::value> receiver::irecv(T& val, request_block& req) const
     { irecv(&val, 1, datatype<T>(), req); }
 
@@ -233,10 +225,6 @@ namespace apl
     template<class T>
     std::enable_if_t<is_simple_datatype<T>::value, size_t> receiver::probe() const
     { return probe(datatype<T>()); }
-
-    template<class T>
-    std::enable_if_t<!is_simple_datatype<T>::value, size_t> receiver::probe() const
-    { static_assert(false, "probe isn't overloaded"); }
 
     class standard_sender: public sender
     {
