@@ -16,31 +16,19 @@ namespace apl
     { recv(re); }
 
     template<>
-    void sender::send<message>(const message* buf, size_t size) const
-    {
-        for (size_t i = 0; i < size; ++i)
-            (buf + i)->send(*this);
-    }
+    void sender::send<message>(const message& buf) const
+    { buf.send(*this); }
 
     template<>
-    void sender::isend<message>(const message* buf, size_t size, request_block& req) const
-    {
-        for (size_t i = 0; i < size; ++i)
-            (buf + i)->isend(*this, req);
-    }
+    void sender::isend<message>(const message& buf, request_block& req) const
+    { buf.isend(*this, req); }
 
     template<>
-    void receiver::recv<message>(message* buf, size_t size) const
-    {
-        for (size_t i = 0; i < size; ++i)
-            (buf + i)->recv(*this);
-    }
+    void receiver::recv<message>(message& buf) const
+    { buf.recv(*this); }
 
     template<>
-    void receiver::irecv<message>(message* buf, size_t size, request_block& req) const
-    {
-        for (size_t i = 0; i < size; ++i)
-            (buf + i)->irecv(*this, req);
-    }
+    void receiver::irecv<message>(message& buf, request_block& req) const
+    { buf.irecv(*this, req); }
 
 }

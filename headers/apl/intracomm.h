@@ -56,70 +56,70 @@ namespace apl
     void intracomm::send(const Type* ptr, process proc) const
     {
         standard_sender se(comm, proc);
-        se.send(ptr);
+        se.send(*ptr);
     }
 
     template<typename Type>
     void intracomm::isend(const Type* ptr, process proc, request_block& req) const
     {
         standard_sender se(comm, proc);
-        se.isend(ptr, 1, req);
+        se.isend(*ptr, req);
     }
 
     template<typename Type>
     void intracomm::bsend(const Type* ptr, process proc) const
     {
         buffer_sender se(comm, proc);
-        se.send(ptr);
+        se.send(*ptr);
     }
 
     template<typename Type>
     void intracomm::ibsend(const Type* ptr, process proc, request_block& req) const
     {
         buffer_sender se(comm, proc);
-        se.isend(ptr, 1, req);
+        se.isend(*ptr, req);
     }
 
     template<typename Type>
     void intracomm::ssend(const Type* ptr, process proc) const
     {
         synchronous_sender se(comm, proc);
-        se.send(ptr);
+        se.send(*ptr);
     }
 
     template<typename Type>
     void intracomm::issend(const Type* ptr, process proc, request_block& req) const
     {
         synchronous_sender se(comm, proc);
-        se.isend(ptr, 1, req);
+        se.isend(*ptr, req);
     }
 
     template<typename Type>
     void intracomm::rsend(const Type* ptr, process proc) const
     {
         ready_sender se(comm, proc);
-        se.send(ptr);
+        se.send(*ptr);
     }
 
     template<typename Type>
     void intracomm::irsend(const Type* ptr, process proc, request_block& req) const
     {
         ready_sender se(comm, proc);
-        se.isend(ptr, 1, req);
+        se.isend(*ptr, req);
     }
 
     template<typename Type>
     void intracomm::recv(Type* ptr, process proc) const
     {
         standard_receiver re(comm, proc);
-        re.recv(ptr);
+        re.recv(*ptr);
     }
 
     template<typename Type>
     void intracomm::irecv(Type* ptr, process proc, request_block& req) const
     {
         standard_receiver re(comm, proc);
-        re.irecv(ptr, 1, req);
+        re.irecv(*ptr, req);
     }
 
     template<typename Type>

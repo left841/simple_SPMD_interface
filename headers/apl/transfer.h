@@ -88,9 +88,18 @@ namespace apl
         void isend_bytes(const void* buf, size_t count, request_block& req) const;
 
         template<class T>
-        std::enable_if_t<is_simple_datatype<T>::value> send(const T* buf, size_t size = 1) const;
+        std::enable_if_t<is_simple_datatype<T>::value> send(const T& val) const;
         template<class T>
-        std::enable_if_t<!is_simple_datatype<T>::value> send(const T* buf, size_t size = 1) const;
+        std::enable_if_t<!is_simple_datatype<T>::value> send(const T& val) const;
+        template<class T>
+        std::enable_if_t<is_simple_datatype<T>::value> isend(const T& val, request_block& req) const;
+        template<class T>
+        std::enable_if_t<!is_simple_datatype<T>::value> isend(const T& val, request_block& req) const;
+
+        template<class T>
+        std::enable_if_t<is_simple_datatype<T>::value> send(const T* buf, size_t size) const;
+        template<class T>
+        std::enable_if_t<!is_simple_datatype<T>::value> send(const T* buf, size_t size) const;
         template<class T>
         std::enable_if_t<is_simple_datatype<T>::value> isend(const T* buf, size_t size, request_block& req) const;
         template<class T>
@@ -99,8 +108,31 @@ namespace apl
     };
 
     template<class T>
+    std::enable_if_t<is_simple_datatype<T>::value> sender::send(const T& val) const
+    { send(&val, 1, datatype<T>()); }
+
+    template<class T>
+    std::enable_if_t<!is_simple_datatype<T>::value> sender::send(const T& val) const
+    { static_assert(false, "send isn't overloaded"); }
+
+    template<class T>
+    std::enable_if_t<is_simple_datatype<T>::value> sender::isend(const T& val, request_block& req) const
+    { isend(&val, 1, datatype<T>(), req); }
+
+    template<class T>
+    std::enable_if_t<!is_simple_datatype<T>::value> sender::isend(const T& val, request_block& req) const
+    { send(val); }
+
+    template<class T>
     std::enable_if_t<is_simple_datatype<T>::value> sender::send(const T* buf, size_t size) const
     { send(buf, size, datatype<T>()); }
+
+    template<class T>
+    std::enable_if_t<!is_simple_datatype<T>::value> sender::send(const T* buf, size_t size) const
+    {
+        for (size_t i = 0; i < size; ++i)
+            send(buf[i]);
+    }
 
     template<class T>
     std::enable_if_t<is_simple_datatype<T>::value> sender::isend(const T* buf, size_t size, request_block& req) const
@@ -108,7 +140,10 @@ namespace apl
 
     template<class T>
     std::enable_if_t<!is_simple_datatype<T>::value> sender::isend(const T* buf, size_t size, request_block& req) const
-    { send(buf, size); }
+    {
+        for (size_t i = 0; i < size; ++i)
+            isend(buf[i], req);
+    }
 
     class receiver
     {
@@ -134,9 +169,18 @@ namespace apl
         size_t probe_bytes() const;
 
         template<class T>
-        std::enable_if_t<is_simple_datatype<T>::value> recv(T* buf, size_t size = 1) const;
+        std::enable_if_t<is_simple_datatype<T>::value> recv(T& val) const;
         template<class T>
-        std::enable_if_t<!is_simple_datatype<T>::value> recv(T* buf, size_t size = 1) const;
+        std::enable_if_t<!is_simple_datatype<T>::value> recv(T& val) const;
+        template<class T>
+        std::enable_if_t<is_simple_datatype<T>::value> irecv(T& val, request_block& req) const;
+        template<class T>
+        std::enable_if_t<!is_simple_datatype<T>::value> irecv(T& val, request_block& req) const;
+
+        template<class T>
+        std::enable_if_t<is_simple_datatype<T>::value> recv(T* buf, size_t size) const;
+        template<class T>
+        std::enable_if_t<!is_simple_datatype<T>::value> recv(T* buf, size_t size) const;
         template<class T>
         std::enable_if_t<is_simple_datatype<T>::value> irecv(T* buf, size_t size, request_block& req) const;
         template<class T>
@@ -149,8 +193,31 @@ namespace apl
     };
 
     template<class T>
+    std::enable_if_t<is_simple_datatype<T>::value> receiver::recv(T& val) const
+    { recv(&val, 1, datatype<T>()); }
+
+    template<class T>
+    std::enable_if_t<!is_simple_datatype<T>::value> receiver::recv(T& val) const
+    { static_assert(false, "recv isn't overloaded"); }
+
+    template<class T>
+    std::enable_if_t<is_simple_datatype<T>::value> receiver::irecv(T& val, request_block& req) const
+    { irecv(&val, 1, datatype<T>(), req); }
+
+    template<class T>
+    std::enable_if_t<!is_simple_datatype<T>::value> receiver::irecv(T& val, request_block& req) const
+    { recv(val); }
+
+    template<class T>
     std::enable_if_t<is_simple_datatype<T>::value> receiver::recv(T* buf, size_t size) const
     { recv(buf, size, datatype<T>()); }
+
+    template<class T>
+    std::enable_if_t<!is_simple_datatype<T>::value> receiver::recv(T* buf, size_t size) const
+    {
+        for (size_t i = 0; i < size; ++i)
+            recv(buf[i]);
+    }
 
     template<class T>
     std::enable_if_t<is_simple_datatype<T>::value> receiver::irecv(T* buf, size_t size, request_block& req) const
@@ -158,11 +225,18 @@ namespace apl
 
     template<class T>
     std::enable_if_t<!is_simple_datatype<T>::value> receiver::irecv(T* buf, size_t size, request_block& req) const
-    { recv(buf, size); }
+    {
+        for (size_t i = 0; i < size; ++i)
+            irecv(buf[i], req);
+    }
 
     template<class T>
     std::enable_if_t<is_simple_datatype<T>::value, size_t> receiver::probe() const
-    { return probe(datatype<T>());}
+    { return probe(datatype<T>()); }
+
+    template<class T>
+    std::enable_if_t<!is_simple_datatype<T>::value, size_t> receiver::probe() const
+    { static_assert(false, "probe isn't overloaded"); }
 
     class standard_sender: public sender
     {
