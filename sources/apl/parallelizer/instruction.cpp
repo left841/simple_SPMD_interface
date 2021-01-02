@@ -12,6 +12,49 @@ namespace apl
     INSTRUCTION instruction_block::command() const
     { return static_cast<INSTRUCTION>(ins[0]); }
 
+    template<>
+    message_id instruction_block::read<message_id>(size_t& pos) const
+    {
+        message_id val{ins[pos], static_cast<process>(ins[pos + 1])};
+        pos += 2;
+        return val;
+    }
+
+    template<>
+    std::pair<message_id, message_id> instruction_block::read<std::pair<message_id, message_id>>(size_t& pos) const
+    {
+        pos += 4;
+        return {{ins[pos - 4], static_cast<process>(ins[pos - 3])}, {ins[pos - 2], static_cast<process>(ins[pos - 1])}};
+    }
+
+    template<>
+    void instruction::write<message_id>(const message_id& val)
+    {
+        v.push_back(val.num);
+        v.push_back(val.proc);
+    }
+
+    template<>
+    void instruction::write<perform_id>(const perform_id& val)
+    {
+        v.push_back(val.num);
+        v.push_back(val.proc);
+    }
+
+    template<>
+    void instruction::write<task_id>(const task_id& val)
+    {
+        write(val.mi);
+        write(val.pi);
+    }
+
+    template<>
+    void instruction::write<std::pair<message_id, message_id>>(const std::pair<message_id, message_id>& val)
+    {
+        write(val.first);
+        write(val.second);
+    }
+
     instruction::instruction(): message()
     { }
 
@@ -170,8 +213,7 @@ namespace apl
     void instruction::add_message_sending(message_id id, process proc)
     {
         add_cmd(INSTRUCTION::MES_SEND);
-        v.push_back(id.num);
-        v.push_back(id.proc);
+        write(id);
         v.push_back(proc);
     }
 
@@ -191,8 +233,7 @@ namespace apl
     void instruction::add_message_receiving(message_id id, process proc)
     {
         add_cmd(INSTRUCTION::MES_RECV);
-        v.push_back(id.num);
-        v.push_back(id.proc);
+        write(id);
         v.push_back(proc);
     }
 
@@ -212,8 +253,7 @@ namespace apl
     void instruction::add_message_info_sending(message_id id, process proc)
     {
         add_cmd(INSTRUCTION::MES_INFO_SEND);
-        v.push_back(id.num);
-        v.push_back(id.proc);
+        write(id);
         v.push_back(proc);
     }
 
@@ -236,8 +276,7 @@ namespace apl
     void instruction::add_message_creation(message_id id, message_type type, process proc)
     {
         add_cmd(INSTRUCTION::MES_CREATE);
-        v.push_back(id.num);
-        v.push_back(id.proc);
+        write(id);
         v.push_back(type);
         v.push_back(proc);
     }
@@ -264,16 +303,14 @@ namespace apl
     void instruction::add_message_part_creation(message_id id, message_type type, message_id source, process proc)
     {
         add_cmd(INSTRUCTION::MES_P_CREATE);
-        v.push_back(id.num);
-        v.push_back(id.proc);
+        write(id);
         v.push_back(type);
-        v.push_back(source.num);
-        v.push_back(source.proc);
+        write(source);
         v.push_back(proc);
     }
 
     // INCLUDE_MES_CHILD
-    instruction_message_include_child_to_parent::instruction_message_include_child_to_parent(const size_t* const p) : instruction_block(p)
+    instruction_message_include_child_to_parent::instruction_message_include_child_to_parent(const size_t* const p): instruction_block(p)
     { }
 
     size_t instruction_message_include_child_to_parent::size() const
@@ -288,10 +325,8 @@ namespace apl
     void instruction::add_include_child_to_parent(message_id parent, message_id child)
     {
         add_cmd(INSTRUCTION::INCLUDE_MES_CHILD);
-        v.push_back(parent.num);
-        v.push_back(parent.proc);
-        v.push_back(child.num);
-        v.push_back(child.proc);
+        write(parent);
+        write(child);
     }
 
     // TASK_EXE
@@ -307,10 +342,7 @@ namespace apl
     void instruction::add_task_execution(task_id id)
     {
         add_cmd(INSTRUCTION::TASK_EXE);
-        v.push_back(id.mi.num);
-        v.push_back(id.mi.proc);
-        v.push_back(id.pi.num);
-        v.push_back(id.pi.proc);
+        write(id);
     }
 
     // TASK_CREATE
@@ -331,41 +363,23 @@ namespace apl
 
     std::vector<message_id> instruction_task_create::data() const
     {
-        std::vector<message_id> v(ins[6]);
-        for (size_t i = 0; i < v.size(); ++i)
-            v[i] = {ins[7 + i * 2], static_cast<process>(ins[8 + i * 2])};
-        return v;
+        size_t pos = 6;
+        return read_vector<message_id>(pos);
     }
 
     std::vector<message_id> instruction_task_create::const_data() const
     {
-        std::vector<message_id> v(ins[7 + ins[6] * 2]);
-        size_t n = 8 + ins[6] * 2;
-        for (size_t i = 0; i < v.size(); ++i)
-            v[i] = {ins[n + i * 2], static_cast<process>(ins[n + i * 2 + 1])};
-        return v;
+        size_t pos = 7 + ins[6] * 2;
+        return read_vector<message_id>(pos);
     }
 
     void instruction::add_task_creation(task_id id, perform_type type, std::vector<message_id> data, std::vector<message_id> c_data)
     {
         add_cmd(INSTRUCTION::TASK_CREATE);
-        v.push_back(id.mi.num);
-        v.push_back(id.mi.proc);
-        v.push_back(id.pi.num);
-        v.push_back(id.pi.proc);
+        write(id);
         v.push_back(type);
-        v.push_back(data.size());
-        for (message_id i: data)
-        {
-            v.push_back(i.num);
-            v.push_back(i.proc);
-        }
-        v.push_back(c_data.size());
-        for (message_id i: c_data)
-        {
-            v.push_back(i.num);
-            v.push_back(i.proc);
-        }
+        write_vector(data);
+        write_vector(c_data);
     }
 
     // TASK_RES
@@ -381,10 +395,7 @@ namespace apl
     void instruction::add_task_result(task_id id)
     {
         add_cmd(INSTRUCTION::TASK_RES);
-        v.push_back(id.mi.num);
-        v.push_back(id.mi.proc);
-        v.push_back(id.pi.num);
-        v.push_back(id.pi.proc);
+        write(id);
     }
 
     // ADD_RES_TO_MEMORY
@@ -401,42 +412,20 @@ namespace apl
     std::vector<message_id> instruction_add_result_to_memory::added_messages_init() const
     {
         size_t pos = offsets[0];
-        std::vector<message_id> v = read_vector<message_id>(pos, [this](size_t& p)->message_id
-        {
-            p += 2;
-            return {ins[p - 2], static_cast<process>(ins[p - 1])};
-        });
-        return v;
+        return read_vector<message_id>(pos);
     }
 
     std::vector<std::pair<message_id, message_id>> instruction_add_result_to_memory::added_messages_child() const
     {
         size_t pos = offsets[1];
-        std::vector<std::pair<message_id, message_id>> v = read_vector<std::pair<message_id, message_id>>(pos, [this](size_t& p)->std::pair<message_id, message_id>
-        {
-            p += 4;
-            return {{ins[p - 4], static_cast<process>(ins[p - 3])}, {ins[p - 2], static_cast<process>(ins[p - 1])}};
-        });
-        return v;
+        return read_vector<std::pair<message_id, message_id>>(pos);
     }
 
     void instruction::add_add_result_to_memory(const std::vector<message_id>& mes, const std::vector<std::pair<message_id, message_id>>& mes_c)
     {
         add_cmd(INSTRUCTION::ADD_RES_TO_MEMORY);
-        v.push_back(mes.size());
-        for (message_id i: mes)
-        {
-            v.push_back(i.num);
-            v.push_back(i.proc);
-        }
-        v.push_back(mes_c.size());
-        for (const std::pair<message_id, message_id>& i: mes_c)
-        {
-            v.push_back(i.first.num);
-            v.push_back(i.first.proc);
-            v.push_back(i.second.num);
-            v.push_back(i.second.proc);
-        }
+        write_vector(mes);
+        write_vector(mes_c);
     }
 
     // MES_DEL
@@ -452,8 +441,7 @@ namespace apl
     void instruction::add_message_del(message_id id)
     {
         add_cmd(INSTRUCTION::MES_DEL);
-        v.push_back(id.num);
-        v.push_back(id.proc);
+        write(id);
     }
 
     // TASK_DEL
@@ -469,8 +457,7 @@ namespace apl
     void instruction::add_task_del(perform_id id)
     {
         add_cmd(INSTRUCTION::TASK_DEL);
-        v.push_back(id.num);
-        v.push_back(id.proc);
+        write(id);
     }
 
 }

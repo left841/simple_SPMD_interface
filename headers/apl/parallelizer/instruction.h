@@ -25,7 +25,9 @@ namespace apl
         const size_t* ins;
 
         template<class T>
-        std::vector<T> read_vector(size_t& pos, std::function<T(size_t&)> rf) const;
+        T read(size_t& pos) const;
+        template<class T>
+        std::vector<T> read_vector(size_t& pos) const;
 
     public:
         instruction_block(const size_t* const p);
@@ -40,11 +42,11 @@ namespace apl
     };
 
     template<class T>
-    std::vector<T> instruction_block::read_vector(size_t& pos, std::function<T(size_t&)> rf) const
+    std::vector<T> instruction_block::read_vector(size_t& pos) const
     {
         std::vector<T> v(ins[pos++]);
         for (T& i: v)
-            i = rf(pos);
+            i = read<T>(pos);
         return v;
     }
 
@@ -195,6 +197,11 @@ namespace apl
 
         void add_cmd(INSTRUCTION id);
 
+        template<class T>
+        void write(const T& val);
+        template<class T>
+        void write_vector(const std::vector<T>& val);
+
     public:
 
         class block_factory
@@ -252,6 +259,14 @@ namespace apl
         const_iterator begin() const;
         const_iterator end() const;
     };
+
+    template<class T>
+    void instruction::write_vector(const std::vector<T>& val)
+    {
+        v.push_back(val.size());
+        for (const T& i: val)
+            write<T>(i);
+    }
 
 }
 
