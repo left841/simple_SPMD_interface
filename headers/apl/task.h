@@ -182,6 +182,7 @@ namespace apl
         task_environment();
         task_environment(task_data& td);
         task_environment(task_data&& td);
+        task_environment(perform_type type);
 
         local_message_id create_message_init(message_type type, const std::vector<message*>& info);
         local_message_id create_message_child(message_type type, local_message_id source, const std::vector<message*>& info);

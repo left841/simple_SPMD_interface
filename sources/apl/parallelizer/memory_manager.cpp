@@ -85,7 +85,7 @@ namespace apl
         std::set<message_id> childs;
         CREATION_STATE state = (ptr == nullptr) ? CREATION_STATE::WAITING: CREATION_STATE::CREATED;
         message_id new_id = {base_mes_id++, parallel_engine::global_rank()};
-        d_info& d = mes_map[new_id];
+        memory_node& d = mes_map[new_id];
         d.d = ptr;
         d.info = info;
         d.version = 0;
@@ -100,7 +100,7 @@ namespace apl
         std::set<message_id> childs;
         CREATION_STATE state = (ptr == nullptr) ? CREATION_STATE::WAITING: CREATION_STATE::CHILD;
         message_id new_id = {base_mes_id++, parallel_engine::global_rank()};
-        d_info& d = mes_map[new_id];
+        memory_node& d = mes_map[new_id];
         d.d = ptr;
         d.info = info;
         d.version = 0;
@@ -162,7 +162,7 @@ namespace apl
 
     void memory_manager::include_child_to_parent(message_id child)
     {
-        d_info& di = mes_map[child];
+        memory_node& di = mes_map[child];
         message* parent = get_message(mes_graph[child].parent);
         di.info_req.wait_all();
         di.d_req.wait_all();
@@ -182,7 +182,7 @@ namespace apl
     void memory_manager::add_message_init_with_id(message* ptr, message_id id, message_type type, std::vector<message*>& info)
     {
         CREATION_STATE state = (ptr == nullptr) ? CREATION_STATE::WAITING: CREATION_STATE::CREATED;
-        d_info& d = mes_map[id];
+        memory_node& d = mes_map[id];
         d.d = ptr;
         d.info = info;
         d.version = 0;
@@ -198,7 +198,7 @@ namespace apl
     void memory_manager::add_message_child_with_id(message* ptr, message_id id, message_type type, message_id parent, std::vector<message*>& info)
     {
         CREATION_STATE state = (ptr == nullptr) ? CREATION_STATE::WAITING: CREATION_STATE::CHILD;
-        d_info& d = mes_map[id];
+        memory_node& d = mes_map[id];
         d.d = ptr;
         d.info = info;
         d.version = 0;
@@ -247,7 +247,7 @@ namespace apl
 
     void memory_manager::update_message_versions(perform_id id)
     {
-        t_info& ti = task_map[id];
+        task_node& ti = task_map[id];
         for (message_id i: ti.data)
             ++mes_map[i].version;
     }
@@ -267,6 +267,12 @@ namespace apl
         ++task_map[child.pi].parents_count;
     }
 
+    void memory_manager::send_message(message_id id, const intracomm& comm, process proc)
+    { comm.send<message>(get_message(id), proc); }
+
+    void memory_manager::recv_message(message_id id, const intracomm& comm, process proc)
+    { comm.recv<message>(get_message(id), proc); }
+
     void memory_manager::perform_task(perform_id id, task_environment& te)
     {
         std::vector<message*> args;
@@ -277,7 +283,7 @@ namespace apl
         for (message_id i: get_perform_const_data(id))
             c_args.push_back(get_message(i));
 
-        t_info& ti = task_map[id];
+        task_node& ti = task_map[id];
 
         get_task(ti.m_id)->set_environment(&te);
         task_factory::perform(ti.type, get_task(ti.m_id), args, c_args);
@@ -315,7 +321,7 @@ namespace apl
     {
         if (mes_map.contains(id))
         {
-            d_info& di = mes_map[id];
+            memory_node& di = mes_map[id];
             if (di.c_type != CREATION_STATE::REFFERED)
             {
                 if (di.c_type != CREATION_STATE::WAITING)
@@ -341,7 +347,7 @@ namespace apl
 
     void memory_manager::delete_perform(perform_id id)
     {
-        t_info& ti = task_map[id];
+        task_node& ti = task_map[id];
 
         dec_ref_count(ti.m_id);
         for (message_id i: ti.data)
@@ -453,7 +459,7 @@ namespace apl
 
     message* memory_manager::get_message(message_id id)
     {
-        d_info& di = mes_map[id];
+        memory_node& di = mes_map[id];
         if (di.c_type == CREATION_STATE::WAITING)
         {
             di.info_req.wait_all();
@@ -579,5 +585,18 @@ namespace apl
 
     bool memory_manager::task_has_parent(task_id id)
     { return task_map[id.pi].parent != PERFORM_ID_UNDEFINED; }
+
+    memory_manager_graph_adapter::memory_manager_graph_adapter(memory_manager& mem): graph_adapter()
+    { }
+
+    message_graph_node& memory_manager_graph_adapter::get_message_node(message_id id) const
+    {
+        return message_graph_node();
+    }
+
+    task_graph_node& memory_manager_graph_adapter::get_task_node(perform_id id) const
+    {
+        return task_graph_node();
+    }
 
 }

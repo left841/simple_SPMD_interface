@@ -9,22 +9,10 @@
 #include "apl/task_graph.h"
 #include "apl/containers/it_queue.h"
 #include "apl/containers/vector_map.h"
+#include "apl/parallelizer/graphs.h"
 
 namespace apl
 {
-
-    constexpr const message_id MESSAGE_ID_UNDEFINED = {std::numeric_limits<size_t>::max(), MPI_PROC_NULL};
-    constexpr const perform_id PERFORM_ID_UNDEFINED = {std::numeric_limits<size_t>::max(), MPI_PROC_NULL};
-    constexpr const task_id TASK_ID_UNDEFINED = {MESSAGE_ID_UNDEFINED, PERFORM_ID_UNDEFINED};
-
-    enum class CREATION_STATE: size_t
-    {
-        UNDEFINED,
-        REFFERED,
-        WAITING,
-        CREATED,
-        CHILD
-    };
 
     enum class CHILD_STATE: size_t
     {
@@ -36,7 +24,7 @@ namespace apl
     class memory_manager
     {
     private:
-        struct d_info
+        struct memory_node
         {
             message* d = nullptr;
             request_block d_req;
@@ -46,7 +34,7 @@ namespace apl
             CREATION_STATE c_type = CREATION_STATE::UNDEFINED;
         };
 
-        struct t_info
+        struct task_node
         {
             message_id m_id = MESSAGE_ID_UNDEFINED;
             perform_type type = PERFORM_TYPE_UNDEFINED;
@@ -68,8 +56,8 @@ namespace apl
             CHILD_STATE ch_state = CHILD_STATE::UNDEFINED;
         };
 
-        vector_map<message_id, d_info> mes_map;
-        vector_map<perform_id, t_info> task_map;
+        vector_map<message_id, memory_node> mes_map;
+        vector_map<perform_id, task_node> task_map;
         vector_map<message_id, message_graph> mes_graph;
 
         std::set<message_id> messages_to_del;
@@ -122,6 +110,8 @@ namespace apl
         void add_dependence(perform_id parent, perform_id child);
         void add_dependence(task_id parent, task_id child);
 
+        void send_message(message_id id, const intracomm& comm, process proc);
+        void recv_message(message_id id, const intracomm& comm, process proc);
         void perform_task(perform_id id, task_environment& te);
 
         void set_message(message_id id, message* new_message);
@@ -187,6 +177,15 @@ namespace apl
         void delete_task(task_id id);
 
         void clear();
+    };
+
+    class memory_manager_graph_adapter: public graph_adapter
+    {
+    public:
+        memory_manager_graph_adapter(memory_manager& mem);
+
+        message_graph_node& get_message_node(message_id id) const override final;
+        task_graph_node& get_task_node(perform_id id) const override final;
     };
 
 }

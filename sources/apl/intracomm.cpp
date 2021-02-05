@@ -21,6 +21,23 @@ namespace apl
     void intracomm::barrier() const
     { apl_MPI_CHECKER(MPI_Barrier(comm)); }
 
+    process intracomm::wait_any_process() const
+    {
+        MPI_Status status;
+        apl_MPI_CHECKER(MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, comm, &status));
+        return status.MPI_SOURCE;
+    }
+
+    process intracomm::test_any_process() const
+    {
+        int flag = 0;
+        MPI_Status status;
+        apl_MPI_CHECKER(MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, comm, &flag, &status));
+        if (flag)
+            return status.MPI_SOURCE;
+        return MPI_PROC_NULL;
+    }
+
     global_intracomm::global_intracomm(): intracomm()
     { }
 

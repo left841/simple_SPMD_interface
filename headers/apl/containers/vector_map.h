@@ -65,6 +65,7 @@ public:
 
     iterator begin();
     iterator end();
+    iterator find(const Key& val);
 
     void clear();
 
@@ -219,6 +220,15 @@ typename vector_map<Key, Data, MapType>::iterator vector_map<Key, Data, MapType>
 {
     iterator i;
     i.m_it = m.end();
+    i.vec = c.data();
+    return i;
+}
+
+template<typename Key, typename Data, typename MapType>
+typename vector_map<Key, Data, MapType>::iterator vector_map<Key, Data, MapType>::find(const Key& val)
+{
+    iterator i;
+    i.m_it = m.find(val);
     i.vec = c.data();
     return i;
 }

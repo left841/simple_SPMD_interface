@@ -44,11 +44,14 @@ namespace apl
         template<typename Type>
         void irecv(Type* ptr, process proc, request_block& req) const;
         template<typename Type>
-        void bcast(Type* ptr, process root);
+        void bcast(Type* ptr, process root) const;
         template<typename Type>
-        void ibcast(Type* ptr, process root, request_block& req);
+        void ibcast(Type* ptr, process root, request_block& req) const;
 
         void barrier() const;
+
+        process wait_any_process() const;
+        process test_any_process() const;
 
     };
 
@@ -123,7 +126,7 @@ namespace apl
     }
 
     template<typename Type>
-    void intracomm::bcast(Type* ptr, process root)
+    void intracomm::bcast(Type* ptr, process root) const
     {
         int comm_rank = rank(), comm_size = size();
         int my_pos = (comm_rank - root + comm_size) % comm_size;
@@ -141,7 +144,7 @@ namespace apl
     }
 
     template<typename Type>
-    void intracomm::ibcast(Type* ptr, process root, request_block& req)
+    void intracomm::ibcast(Type* ptr, process root, request_block& req) const
     {
         int comm_rank = rank(), comm_size = size();
         int my_pos = (comm_rank - root + comm_size) % comm_size;
