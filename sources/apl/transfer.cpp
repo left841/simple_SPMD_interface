@@ -30,7 +30,7 @@ namespace apl
     {
         std::vector<int> block_legth(types.size());
         for (size_t i = 0; i < types.size(); ++i)
-            block_legth[i] = block_lengths[i];
+            block_legth[i] = static_cast<int>(block_lengths[i]);
         std::vector<MPI_Aint> mpi_offsets(offsets.size());
         for (size_t i = 0; i < offsets.size(); ++i)
             mpi_offsets[i] = offsets[i];

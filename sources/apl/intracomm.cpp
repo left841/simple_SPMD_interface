@@ -1,4 +1,5 @@
 #include "apl/intracomm.h"
+#include "apl/comm_group.h"
 
 namespace apl
 {
@@ -11,6 +12,9 @@ namespace apl
 
     intracomm::intracomm(const intracomm& c, int color, int key)
     { split(c, color, key); }
+
+    intracomm::intracomm(const intracomm& c, const comm_group& g)
+    { apl_MPI_CHECKER(MPI_Comm_create(c.get_comm(), g.group(), &comm)); }
 
     intracomm::~intracomm()
     { }

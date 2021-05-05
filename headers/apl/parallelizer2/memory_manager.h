@@ -1,7 +1,8 @@
-#ifndef __MEMORY_MANAGER_H__
-#define __MEMORY_MANAGER_H__
+#ifndef __MEMORY_MANAGER2_H__
+#define __MEMORY_MANAGER2_H__
 
 #include <vector>
+#include <deque>
 #include "apl/parallel_defs.h"
 #include "apl/parallel_core.h"
 #include "apl/message.h"
@@ -9,68 +10,18 @@
 #include "apl/task_graph.h"
 #include "apl/containers/it_queue.h"
 #include "apl/containers/vector_map.h"
+#include "apl/parallelizer2/graphs.h"
 
 namespace apl
 {
 
-    constexpr const message_id MESSAGE_ID_UNDEFINED = {std::numeric_limits<size_t>::max(), MPI_PROC_NULL};
-    constexpr const perform_id PERFORM_ID_UNDEFINED = {std::numeric_limits<size_t>::max(), MPI_PROC_NULL};
-    constexpr const task_id TASK_ID_UNDEFINED = {MESSAGE_ID_UNDEFINED, PERFORM_ID_UNDEFINED};
-
-    enum class CHILD_STATE: size_t
-    {
-        UNDEFINED,
-        INCLUDED,
-        NEWER
-    };
-
-    enum class CREATION_STATE: size_t
-    {
-        UNDEFINED,
-        REFFERED,
-        WAITING,
-        CREATED,
-        CHILD
-    };
-
-    class memory_manager
+    class memory_manager2
     {
     private:
-        struct memory_node
-        {
-            message* d = nullptr;
-            request_block d_req;
-            std::vector<message*> info;
-            request_block info_req;
-            size_t version = 0;
-            CREATION_STATE c_type = CREATION_STATE::UNDEFINED;
-        };
-
-        struct task_node
-        {
-            message_id m_id = MESSAGE_ID_UNDEFINED;
-            perform_type type = PERFORM_TYPE_UNDEFINED;
-            perform_id parent = PERFORM_ID_UNDEFINED;
-            size_t parents_count = 0;
-            size_t created_childs = 0;
-            std::vector<perform_id> childs;
-            std::vector<message_id> data;
-            std::vector<message_id> const_data;
-        };
-
-        struct message_graph
-        {
-            message_type type = MESSAGE_TYPE_UNDEFINED;
-            MESSAGE_FACTORY_TYPE f_type = MESSAGE_FACTORY_TYPE::UNDEFINED;
-            message_id parent = MESSAGE_ID_UNDEFINED;
-            std::set<message_id> childs;
-            size_t refs_count = 0;
-            CHILD_STATE ch_state = CHILD_STATE::UNDEFINED;
-        };
-
-        vector_map<message_id, memory_node> mes_map;
-        vector_map<perform_id, task_node> task_map;
-        vector_map<message_id, message_graph> mes_graph;
+        vector_map<message_id, memory_graph_node> mes_map;
+        vector_map<perform_id, task_graph_node> task_map;
+        vector_map<message_id, message_graph_node> mes_graph;
+        std::set<graph_connection> ins, outs, child_ins, child_outs;
 
         std::set<message_id> messages_to_del;
         std::vector<perform_id> tasks_to_del;
@@ -82,39 +33,39 @@ namespace apl
         size_t base_task_id = 0;
 
     public:
-        memory_manager();
-        memory_manager(task_graph& _tg);
-        ~memory_manager();
+        memory_manager2();
+        memory_manager2(task_graph& _tg, process main_proc);
+        ~memory_manager2();
 
-        void init(task_graph& _tg);
+        void init(task_graph& _tg, process main_proc);
 
-        std::queue<perform_id> get_ready_tasks();
+        std::deque<perform_id> get_ready_tasks(process owner);
         std::set<message_id>& get_unreferenced_messages();
         std::set<message_id> get_messages_set();
         std::set<perform_id> get_performs_set();
 
-        message_id add_message_init(message* ptr, message_type type, std::vector<message*>& info);
-        message_id add_message_child(message* ptr, message_type type, message_id parent, std::vector<message*>& info);
-        perform_id add_perform(message_id mes, perform_type type, const std::vector<message_id>& data, const std::vector<message_id>& const_data);
-        task_id add_task(task* ptr, task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info);
+        message_id add_message_init(message* ptr, message_type type, std::vector<message*>& info, process owner);
+        message_id add_message_child(message* ptr, message_type type, message_id parent, std::vector<message*>& info, process owner);
+        perform_id add_perform(message_id mes, perform_type type, const std::vector<message_id>& data, const std::vector<message_id>& const_data, process owner);
+        task_id add_task(task* ptr, task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info, process owner);
 
-        message_id create_message_init(message_type type, std::vector<message*>& info);
-        message_id create_message_child(message_type type, message_id parent, std::vector<message*>& info);
-        task_id create_task(task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info);
+        message_id create_message_init(message_type type, std::vector<message*>& info, process owner);
+        message_id create_message_child(message_type type, message_id parent, std::vector<message*>& info, process owner);
+        task_id create_task(task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info, process owner);
         void include_child_to_parent(message_id child);
         void include_child_to_parent_recursive(message_id child);
 
-        void add_message_init_with_id(message* ptr, message_id id, message_type type, std::vector<message*>& info);
-        void add_message_child_with_id(message* ptr, message_id id, message_type type, message_id parent, std::vector<message*>& info);
-        void add_perform_with_id(task_id id, perform_type type, const std::vector<message_id>& data, const std::vector<message_id>& const_data);
-        void add_task_with_id(task* ptr, task_id id, task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info);
+        void add_message_init_with_id(message* ptr, message_id id, message_type type, std::vector<message*>& info, process owner);
+        void add_message_child_with_id(message* ptr, message_id id, message_type type, message_id parent, std::vector<message*>& info, process owner);
+        void add_perform_with_id(task_id id, perform_type type, const std::vector<message_id>& data, const std::vector<message_id>& const_data, process owner);
+        void add_task_with_id(task* ptr, task_id id, task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info, process owner);
 
-        void create_message_init_with_id(message_id id, message_type type, std::vector<message*>& info);
-        void create_message_child_with_id(message_id id, message_type type, message_id parent, std::vector<message*>& info);
-        void create_task_with_id(task_id id, task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info);
+        void create_message_init_with_id(message_id id, message_type type, std::vector<message*>& info, process owner);
+        void create_message_child_with_id(message_id id, message_type type, message_id parent, std::vector<message*>& info, process owner);
+        void create_task_with_id(task_id id, task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info, process owner);
 
-        void add_message_to_graph(message_id id, message_type type);
-        void add_message_child_to_graph(message_id id, message_type type, message_id parent);
+        void add_message_to_graph(message_id id, message_type type, process owner);
+        void add_message_child_to_graph(message_id id, message_type type, message_id parent, process owner);
 
         void update_message_versions(perform_id id);
         void update_version(message_id id, size_t new_version);
@@ -145,6 +96,17 @@ namespace apl
         void set_task_childs(task_id id, std::vector<perform_id> new_childs);
         void set_task_data(task_id id, std::vector<message_id> new_data);
         void set_task_const_data(task_id id, std::vector<message_id> new_const_data);
+
+        size_t ins_count() const;
+        size_t outs_count() const;
+        size_t child_ins_count() const;
+        size_t child_outs_count() const;
+        void connect_extern_in(perform_id out, perform_id in, size_t ext_proc);
+        void connect_extern_child_out(perform_id out, perform_id in, size_t ext_proc);
+        void erase_subgraph(const sub_graph& graph, size_t new_owner);
+
+        void send_task_node(perform_id id, const intracomm& comm, process proc);
+        void recv_task_node(perform_id id, const intracomm& comm, process proc);
 
         size_t message_count();
         message* get_message(message_id id);
@@ -191,6 +153,15 @@ namespace apl
         void clear();
     };
 
+    class memory_manager_graph_adapter: public graph_adapter
+    {
+    public:
+        memory_manager_graph_adapter(memory_manager2& mem);
+
+        message_graph_node& get_message_node(message_id id) const override final;
+        task_graph_node& get_task_node(perform_id id) const override final;
+    };
+
 }
 
-#endif // __MEMORY_MANAGER_H__
+#endif // __MEMORY_MANAGER2_H__

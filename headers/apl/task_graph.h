@@ -20,6 +20,16 @@ namespace apl
         bool operator<(const message_id& other) const;
     };
 
+    template<>
+    struct simple_datatype_map<message_id>
+    {
+        using map = type_map
+        <
+            type_offset<size_t, offsetof(message_id, num)>,
+            type_offset<process, offsetof(message_id, proc)>
+        >;
+    };
+
     struct perform_id
     {
         size_t num;
@@ -29,6 +39,16 @@ namespace apl
         bool operator<(const perform_id& other) const;
     };
 
+    template<>
+    struct simple_datatype_map<perform_id>
+    {
+        using map = type_map
+        <
+            type_offset<size_t, offsetof(perform_id, num)>,
+            type_offset<process, offsetof(perform_id, proc)>
+        >;
+    };
+
     struct task_id
     {
         message_id mi;
@@ -36,6 +56,16 @@ namespace apl
 
         bool operator!=(const task_id& other) const;
         bool operator<(const task_id& other) const;
+    };
+
+    template<>
+    struct simple_datatype_map<task_id>
+    {
+        using map = type_map
+        <
+            type_offset<size_t, offsetof(task_id, mi)>,
+            type_offset<process, offsetof(task_id, pi)>
+        >;
     };
 
     class task_graph
@@ -92,6 +122,7 @@ namespace apl
         void clear();
 
         friend class memory_manager;
+        friend class memory_manager2;
     };
 
     template<typename Type, typename... Args>

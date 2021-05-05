@@ -10,12 +10,11 @@
 #include "mpi.h"
 #include "apl/parallel_defs.h"
 #include "apl/parallel_core.h"
-#include "apl/parallelizer/instruction.h"
+#include "apl/parallelizer_shared/instruction.h"
 #include "apl/parallelizer/memory_manager.h"
 #include "apl/task_graph.h"
 #include "apl/intracomm.h"
 #include "apl/containers/it_queue.h"
-#include "apl/parallelizer/graphs.h"
 
 namespace apl
 {

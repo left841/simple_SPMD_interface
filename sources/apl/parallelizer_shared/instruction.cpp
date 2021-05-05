@@ -1,4 +1,4 @@
-#include "apl/parallelizer/instruction.h"
+#include "apl/parallelizer_shared/instruction.h"
 
 namespace apl
 {
@@ -96,6 +96,7 @@ namespace apl
 
     std::vector<std::function<const instruction_block* (const size_t* const)>> instruction::block_factory::constructors =
     {
+        // old
         [](const size_t* const p)->const instruction_block*
         { return new instruction_undefined(p); },
 
@@ -136,7 +137,19 @@ namespace apl
         { return new instruction_message_delete(p); },
 
         [](const size_t* const p)->const instruction_block*
-        { return new instruction_task_delete(p); }
+        { return new instruction_task_delete(p); },
+        // new
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_task_graph_recv(p); },
+
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_select_mes_receiver(p); },
+
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_select_mes_sender(p); },
+
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_graph_finished(p); }
     };
 
     const instruction_block* instruction::block_factory::get(const size_t* const p)
@@ -459,5 +472,55 @@ namespace apl
         add_cmd(INSTRUCTION::TASK_DEL);
         write(id);
     }
+
+    // new
+    // TASK_GRAPH_RECV
+    instruction_task_graph_recv::instruction_task_graph_recv(const size_t* const p): instruction_block(p)
+    { }
+
+    size_t instruction_task_graph_recv::size() const
+    { return 1; }
+
+    void instruction::add_task_graph_recv()
+    { add_cmd(INSTRUCTION::TASK_GRAPH_RECV); }
+
+    // SELECT_MES_RECEIVER
+    instruction_select_mes_receiver::instruction_select_mes_receiver(const size_t* const p): instruction_block(p)
+    { }
+
+    size_t instruction_select_mes_receiver::size() const
+    { return 3; }
+
+    message_id instruction_select_mes_receiver::id() const
+    { return {ins[1], static_cast<process>(ins[2])}; }
+
+    void instruction::add_select_mes_receiver(message_id id)
+    {
+        add_cmd(INSTRUCTION::SELECT_MES_RECEIVER);
+        write(id);
+    }
+
+    // SELECT_MES_SENDER
+    instruction_select_mes_sender::instruction_select_mes_sender(const size_t* const p): instruction_block(p)
+    { }
+
+    size_t instruction_select_mes_sender::size() const
+    { return 3; }
+
+    message_id instruction_select_mes_sender::id() const
+    { return {ins[1], static_cast<process>(ins[2])}; }
+
+    void instruction::add_select_mes_sender(message_id id)
+    {
+        add_cmd(INSTRUCTION::SELECT_MES_SENDER);
+        write(id);
+    }
+
+    // GRAPH_FINISHED
+    instruction_graph_finished::instruction_graph_finished(const size_t* const p): instruction_block(p)
+    { }
+
+    size_t instruction_graph_finished::size() const
+    { return 1; }
 
 }

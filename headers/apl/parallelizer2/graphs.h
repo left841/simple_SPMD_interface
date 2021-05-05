@@ -31,9 +31,16 @@ namespace apl
         CHILD
     };
 
+    enum class CHILD_STATE: size_t
+    {
+        UNDEFINED,
+        INCLUDED,
+        NEWER
+    };
+
     class memory_graph_node
     {
-    private:
+    public:
         message* d = nullptr;
         request_block d_req;
         std::vector<message*> info;
@@ -43,7 +50,7 @@ namespace apl
 
     public:
         memory_graph_node() = default;
-        memory_graph_node(memory_graph_node&& src) = default;
+        memory_graph_node(memory_graph_node&& src) noexcept = default;
         ~memory_graph_node() = default;
         memory_graph_node& operator=(memory_graph_node&& src) = default;
 
@@ -55,28 +62,56 @@ namespace apl
 
     class message_graph_node
     {
+    public:
+        message_type type = MESSAGE_TYPE_UNDEFINED;
+        MESSAGE_FACTORY_TYPE f_type = MESSAGE_FACTORY_TYPE::UNDEFINED;
+        message_id parent = MESSAGE_ID_UNDEFINED;
+        std::set<message_id> childs;
+        size_t refs_count = 0;
+        CHILD_STATE ch_state = CHILD_STATE::UNDEFINED;
+        process owner = MPI_PROC_NULL;
 
+    public:
+        message_graph_node() = default;
+        message_graph_node(message_graph_node&& src) noexcept = default;
+        ~message_graph_node() = default;
+        message_graph_node& operator=(message_graph_node&& src) = default;
     };
+
+    template<>
+    void sender::send<message_graph_node>(const message_graph_node& src) const;
+
+    template<>
+    void receiver::recv<message_graph_node>(message_graph_node& dst) const;
 
     class task_graph_node
     {
-    private:
+    public:
         message_id m_id = MESSAGE_ID_UNDEFINED;
         perform_type type = PERFORM_TYPE_UNDEFINED;
         perform_id parent = PERFORM_ID_UNDEFINED;
         size_t parents_count = 0;
-        size_t created_childs = 0;
-        std::vector<perform_id> childs;
+        size_t created_childs_count = 0;
+        std::vector<perform_id> childs_v;
         std::vector<message_id> data;
         std::vector<message_id> const_data;
+        process owner = MPI_PROC_NULL;
 
     public:
         task_graph_node() = default;
-        task_graph_node(task_graph_node&& src) = default;
+        task_graph_node(const task_graph_node& src) = default;
+        task_graph_node(task_graph_node&& src) noexcept = default;
         ~task_graph_node() = default;
         task_graph_node& operator=(task_graph_node&& src) = default;
+        task_graph_node& operator=(const task_graph_node& src) = default;
 
     };
+    
+    template<>
+    void sender::send<task_graph_node>(const task_graph_node& src) const;
+
+    template<>
+    void receiver::recv<task_graph_node>(task_graph_node& dst) const;
 
     class graph_adapter
     {
@@ -91,6 +126,8 @@ namespace apl
         perform_id out;
         perform_id in;
         size_t external_group_id;
+
+        bool operator<(const graph_connection& oth) const;
     };
 
     template<>
@@ -107,7 +144,18 @@ namespace apl
     struct sub_graph
     {
         std::vector<perform_id> tasks;
-        std::vector<graph_connection> ins, outs;
+        std::vector<graph_connection> ins, outs, child_ins, child_outs;
+    };
+
+    template<>
+    void sender::send<sub_graph>(const sub_graph& src) const;
+
+    template<>
+    void receiver::recv<sub_graph>(sub_graph& dst) const;
+
+    struct group_info
+    {
+        size_t active_tasks;
     };
 
     class graph_analizer
@@ -118,8 +166,9 @@ namespace apl
     public:
         graph_analizer(const graph_adapter& a);
 
+        bool need_split(const std::vector<processes_group>& groups, const std::vector<group_info>& info, size_t ready_tasks_size) const;
         std::vector<perform_id> get_subgraph(size_t prefered_size) const;
-        std::vector<graph_connection> split_graph(const std::vector<processes_group>& groups) const;
+        std::vector<sub_graph> split_graph(const std::vector<processes_group>& groups, const std::vector<group_info>& info, std::deque<perform_id>& ready_tasks) const;
 
     };
 

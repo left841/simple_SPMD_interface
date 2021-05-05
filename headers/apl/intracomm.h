@@ -9,6 +9,8 @@
 namespace apl
 {
 
+    class comm_group;
+
     class intracomm: public communicator
     {
     public:
@@ -16,6 +18,7 @@ namespace apl
         intracomm();
         intracomm(const intracomm& c);
         intracomm(const intracomm& c, int color, int key);
+        intracomm(const intracomm& c, const comm_group& g);
         intracomm(intracomm&& c) noexcept = default;
         intracomm& operator=(const intracomm& c) = default;
         intracomm& operator=(intracomm&& c) noexcept = default;

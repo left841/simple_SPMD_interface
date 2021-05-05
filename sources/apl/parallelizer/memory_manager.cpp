@@ -586,17 +586,4 @@ namespace apl
     bool memory_manager::task_has_parent(task_id id)
     { return task_map[id.pi].parent != PERFORM_ID_UNDEFINED; }
 
-    memory_manager_graph_adapter::memory_manager_graph_adapter(memory_manager& mem): graph_adapter()
-    { }
-
-    message_graph_node& memory_manager_graph_adapter::get_message_node(message_id id) const
-    {
-        return message_graph_node();
-    }
-
-    task_graph_node& memory_manager_graph_adapter::get_task_node(perform_id id) const
-    {
-        return task_graph_node();
-    }
-
 }
