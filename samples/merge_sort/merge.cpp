@@ -5,7 +5,12 @@
 #include <vector>
 #include <random>
 #include <algorithm>
-#include "parallel.h"
+#include "mpi.h"
+#include "apl/message.h"
+#include "apl/task.h"
+#include "apl/task_graph.h"
+#include "apl/parallelizer2/parallelizer2.h"
+#include <thread>
 using namespace apl;
 
 class array: public message
@@ -65,6 +70,8 @@ public:
     { }
     void operator()(const array& s1, const array& s2, array& out)
     {
+        if (comm_world.rank() != 0)
+            return;
         size_t first = 0, second = 0;
         for (size_t i = 0; i < out.size(); ++i)
         {
@@ -85,6 +92,8 @@ public:
     { }
     void operator()(array& s1, array& s2)
     {
+        if (comm_world.rank() != 0)
+            return;
         for (size_t i = 0; i < s1.size(); ++i)
             s2[i] = s1[i];
         merge_it(&s1[0], &s2[0], s1.size()/2, s1.size());
@@ -113,12 +122,19 @@ public:
     }
 };
 
+process global_proc;
+
 int main(int argc, char** argv)
 {
     parallel_engine pe(&argc, &argv);
+    //HERE
+    global_proc = comm_world.rank();
+    //std::this_thread::sleep_for(std::chrono::seconds(7));
+    //HERE
     size_t layers = 2;
     size_t size = 100000;
     bool checks = false;
+    size_t tree_param = 2;
     for (int i = 1; i < argc; ++i)
     {
         if ((strcmp(argv[i], "-s") == 0) || (strcmp(argv[i], "-size") == 0))
@@ -132,6 +148,10 @@ int main(int argc, char** argv)
         else if (strcmp(argv[i], "-check") == 0)
         {
             checks = true;
+        }
+        else if (strcmp(argv[i], "-tr") == 0)
+        {
+            tree_param = atoll(argv[++i]);
         }
     }
 
@@ -151,7 +171,7 @@ int main(int argc, char** argv)
     }
     
     double true_start_time = MPI_Wtime();
-    parallelizer pz;
+    parallelizer2 pz;
     task_graph tg;
 
     int comm_size = pz.get_proc_count();
@@ -241,11 +261,11 @@ int main(int argc, char** argv)
         fin.push_back(arr2);
     }
 
-    pz.init(tg);
+    //pz.init(tg);
 
-    pz.execution();
+    pz.execution(tree_param, tg);
 
-    if (pz.get_current_proc() == parallelizer::main_proc)
+    if (pz.get_current_proc() == parallelizer2::main_proc)
     {
         double dt = MPI_Wtime();
         if (checks)

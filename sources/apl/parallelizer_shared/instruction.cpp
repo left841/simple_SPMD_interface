@@ -149,7 +149,31 @@ namespace apl
         { return new instruction_select_mes_sender(p); },
 
         [](const size_t* const p)->const instruction_block*
-        { return new instruction_graph_finished(p); }
+        { return new instruction_graph_finished(p); },
+
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_transfer_state(p); },
+
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_transfer_state_end(p); },
+
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_select_mes_sender_with_info(p); },
+
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_select_mes_create_receiver(p); },
+
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_sign_graph_out(p); },
+
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_sign_graph_child_out(p); },
+
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_perform_assigned_to(p); },
+
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_graph_out_proc(p); },
     };
 
     const instruction_block* instruction::block_factory::get(const size_t* const p)
@@ -522,5 +546,163 @@ namespace apl
 
     size_t instruction_graph_finished::size() const
     { return 1; }
+
+    // TRANSFER_STATE
+    instruction_transfer_state::instruction_transfer_state(const size_t* const p): instruction_block(p)
+    { }
+
+    size_t instruction_transfer_state::size() const
+    { return 1; }
+
+    void instruction::add_transfer_state()
+    { add_cmd(INSTRUCTION::TRANSFER_STATE); }
+
+    // TRANSFER_STATE_END
+    instruction_transfer_state_end::instruction_transfer_state_end(const size_t* const p): instruction_block(p)
+    { }
+
+    size_t instruction_transfer_state_end::size() const
+    { return 1; }
+
+    void instruction::add_transfer_state_end()
+    { add_cmd(INSTRUCTION::TRANSFER_STATE_END); }
+
+    // SELECT_MES_SENDER_WITH_INFO
+    instruction_select_mes_sender_with_info::instruction_select_mes_sender_with_info(const size_t* const p): instruction_block(p)
+    { }
+
+    size_t instruction_select_mes_sender_with_info::size() const
+    { return 3; }
+
+    message_id instruction_select_mes_sender_with_info::id() const
+    { return {ins[1], static_cast<process>(ins[2])}; }
+
+    void instruction::add_select_mes_sender_with_info(message_id id)
+    {
+        add_cmd(INSTRUCTION::SELECT_MES_SENDER_WITH_INFO);
+        write(id);
+    }
+
+    // SELECT_MES_CREATE_RECEIVER
+    instruction_select_mes_create_receiver::instruction_select_mes_create_receiver(const size_t* const p): instruction_block(p)
+    { }
+
+    size_t instruction_select_mes_create_receiver::size() const
+    { return 5; }
+
+    message_id instruction_select_mes_create_receiver::id() const
+    { return {ins[1], static_cast<process>(ins[2])}; }
+
+    size_t instruction_select_mes_create_receiver::type() const
+    { return ins[3]; }
+
+    process instruction_select_mes_create_receiver::proc() const
+    { return static_cast<process>(ins[4]); }
+
+    void instruction::add_select_mes_create_receiver(message_id id, message_type type, process proc)
+    {
+        add_cmd(INSTRUCTION::SELECT_MES_CREATE_RECEIVER);
+        write(id);
+        v.push_back(type);
+        v.push_back(proc);
+    }
+
+    // SIGN_GRAPH_OUT
+    instruction_sign_graph_out::instruction_sign_graph_out(const size_t* const p): instruction_block(p)
+    { }
+
+    size_t instruction_sign_graph_out::size() const
+    { return 5; }
+
+    perform_id instruction_sign_graph_out::out() const
+    { return {ins[1], static_cast<process>(ins[2])}; }
+
+    perform_id instruction_sign_graph_out::in() const
+    { return {ins[3], static_cast<process>(ins[4])}; }
+
+    void instruction::add_sign_graph_out(perform_id in, perform_id out)
+    {
+        add_cmd(INSTRUCTION::SIGN_GRAPH_OUT);
+        write(in);
+        write(out);
+    }
+
+    // SIGN_GRAPH_CHILD_OUT
+    instruction_sign_graph_child_out::instruction_sign_graph_child_out(const size_t* const p): instruction_block(p)
+    { }
+
+    size_t instruction_sign_graph_child_out::size() const
+    { return 5; }
+
+    perform_id instruction_sign_graph_child_out::out() const
+    { return {ins[1], static_cast<process>(ins[2])}; }
+
+    perform_id instruction_sign_graph_child_out::in() const
+    { return {ins[3], static_cast<process>(ins[4])}; }
+
+    void instruction::add_sign_graph_child_out(perform_id in, perform_id out)
+    {
+        add_cmd(INSTRUCTION::SIGN_GRAPH_CHILD_OUT);
+        write(in);
+        write(out);
+    }
+
+
+    void instruction::add_perform_assigned_to(perform_id id, process proc)
+    {
+        add_cmd(INSTRUCTION::PERFORM_ASSIGNED_TO);
+        write(id);
+        v.push_back(proc);
+    }
+
+    instruction_perform_assigned_to::instruction_perform_assigned_to(const size_t* const p): instruction_block(p)
+    { }
+
+    size_t instruction_perform_assigned_to::size() const
+    {
+        return 4;
+    }
+
+    perform_id instruction_perform_assigned_to::id() const
+    {
+        return {ins[1], static_cast<process>(ins[2])};
+    }
+
+    process instruction_perform_assigned_to::proc() const
+    {
+        return static_cast<process>(ins[3]);
+    }
+
+
+    void instruction::add_graph_out_proc(perform_id out, perform_id in, process proc)
+    {
+        add_cmd(INSTRUCTION::GRAPH_OUT_PROC);
+        write(out);
+        write(in);
+        v.push_back(proc);
+    }
+
+    instruction_graph_out_proc::instruction_graph_out_proc(const size_t* const p): instruction_block(p)
+    { }
+
+    size_t instruction_graph_out_proc::size() const
+    {
+        return 6;
+    }
+
+    perform_id instruction_graph_out_proc::out() const
+    {
+        return {ins[1], static_cast<process>(ins[2])};
+    }
+
+    perform_id instruction_graph_out_proc::in() const
+    {
+        return {ins[3], static_cast<process>(ins[4])};
+    }
+
+    process instruction_graph_out_proc::proc() const
+    {
+        return static_cast<process>(ins[5]);
+    }
 
 }

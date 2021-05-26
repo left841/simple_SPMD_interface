@@ -17,9 +17,11 @@ namespace apl
 
     struct processes_group
     {
-        size_t size;
-        process head;
-        process owner;
+        size_t size = 0;
+        process head = MPI_PROC_NULL;
+        process owner = MPI_PROC_NULL;
+        process internal_head = MPI_PROC_NULL;
+        intracomm comm;
     };
 
     enum class CREATION_STATE: size_t

@@ -19,10 +19,10 @@ namespace apl
         for (size_t i = 0; i < offsets.size(); ++i)
             mpi_offsets[i] = offsets[i];
         apl_MPI_CHECKER(MPI_Type_create_struct(static_cast<int>(types.size()), block_legth.data(), mpi_offsets.data(), types.data(), &type));
-        apl_MPI_CHECKER(MPI_Type_commit(&type));
         MPI_Aint lb, extent;
         apl_MPI_CHECKER(MPI_Type_get_extent(type, &lb, &extent));
         size_in_bytes = extent - lb;
+        apl_MPI_CHECKER(MPI_Type_commit(&type));
         add_datatype(type);
     }
 
@@ -35,10 +35,18 @@ namespace apl
         for (size_t i = 0; i < offsets.size(); ++i)
             mpi_offsets[i] = offsets[i];
         apl_MPI_CHECKER(MPI_Type_create_struct(static_cast<int>(types.size()), block_legth.data(), mpi_offsets.data(), const_cast<MPI_Datatype*>(types.data()), &type));
-        apl_MPI_CHECKER(MPI_Type_commit(&type));
         MPI_Aint lb, extent;
         apl_MPI_CHECKER(MPI_Type_get_extent(type, &lb, &extent));
         size_in_bytes = extent - lb;
+        apl_MPI_CHECKER(MPI_Type_commit(&type));
+        add_datatype(type);
+    }
+
+    simple_datatype::simple_datatype(simple_datatype s_type, MPI_Aint lb, MPI_Aint extent)
+    {
+        apl_MPI_CHECKER(MPI_Type_create_resized(s_type.type, lb, extent, &type));
+        apl_MPI_CHECKER(MPI_Type_commit(&type));
+        size_in_bytes = extent;
         add_datatype(type);
     }
 

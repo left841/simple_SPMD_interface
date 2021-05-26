@@ -13,6 +13,7 @@
 #include "apl/parallelizer_shared/instruction.h"
 #include "apl/parallelizer2/memory_manager.h"
 #include "apl/task_graph.h"
+#include "apl/comm_group.h"
 #include "apl/intracomm.h"
 #include "apl/containers/it_queue.h"
 #include "apl/parallelizer2/graphs.h"
@@ -28,32 +29,37 @@ namespace apl
         {
             std::vector<std::set<message_id>> versions_mes;
             std::vector<std::set<message_id>> contained_mes;
-            std::vector<std::set<perform_id>> contained_tasks;
             std::deque<perform_id> ready_tasks;
             std::vector<processes_group> childs_groups;
             std::vector<group_info> group_info_v;
             process parent = MPI_PROC_NULL;
             std::vector<size_t> group_workload;
             size_t active_graphs = 0;
+            bool exe = true;
+            size_t internal_comm_size = 0;
         };
 
         intracomm internal_comm, external_comm;
         intracomm comm;
         intracomm instr_comm;
 
-        std::vector<perform_id> tasks_to_del;
         memory_manager2 memory;
 
-        void generate_subgraph_instructions(const std::vector<sub_graph>& sub_graphs, exe_info& info, std::vector<instruction>& ins_v);
+        void transfer_state(const std::vector<sub_graph>& sub_graphs, exe_info& info, std::vector<instruction>& ins_v);
+        void sub_transfer_state(exe_info& info);
         void init_task_data_sending(perform_id tid, size_t group_id, instruction* inss, exe_info& info);
         void init_message_sending(message_id id, size_t group_id, instruction* inss, exe_info& info);
         bool process_instruction(instruction& ins, exe_info& info, process assigner);
+        void match_sendrecv_pairs(const std::vector<instruction>& ins, std::vector<instruction>& outs, exe_info& info);
+        std::vector<sub_graph> split_graph(exe_info& info);
+        std::vector<sub_graph> split_graph_sub(sub_graph& gr, std::map<perform_id, task_graph_node>& mm, exe_info& info);
 
         void clear();
 
-        void execution(size_t tree_param, task_graph& _tg);
+        
         std::vector<processes_group> make_topology(size_t tree_param);
         void execute_task(perform_id id, exe_info& info);
+        void update_ready_tasks(perform_id tid, exe_info& info);
 
     public:
 
@@ -66,6 +72,7 @@ namespace apl
         process get_current_proc();
         int get_proc_count();
 
+        void execution(size_t tree_param, task_graph& _tg);
         void execution(task_graph& _tg);
         template<class TaskType, class... InfoTypes, class... ArgTypes>
         void execution(TaskType* root, std::tuple<InfoTypes*...> info, ArgTypes*... args);

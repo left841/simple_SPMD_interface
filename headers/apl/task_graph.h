@@ -35,6 +35,7 @@ namespace apl
         size_t num;
         process proc;
 
+        bool operator==(const perform_id& other) const;
         bool operator!=(const perform_id& other) const;
         bool operator<(const perform_id& other) const;
     };

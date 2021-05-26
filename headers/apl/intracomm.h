@@ -24,6 +24,7 @@ namespace apl
         intracomm& operator=(intracomm&& c) noexcept = default;
         ~intracomm();
 
+        void create(const intracomm& c, const comm_group& g);
         void split(const intracomm& c, int color, int key);
 
         template<typename Type>

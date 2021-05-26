@@ -19,6 +19,13 @@ namespace apl
     intracomm::~intracomm()
     { }
 
+    void intracomm::create(const intracomm& c, const comm_group& g)
+    {
+        if (comm != MPI_COMM_NULL)
+            free();
+        apl_MPI_CHECKER(MPI_Comm_create(c.get_comm(), g.group(), &comm));
+    }
+
     void intracomm::split(const intracomm& c, int color, int key)
     { apl_MPI_CHECKER(MPI_Comm_split(c.comm, color, key, &comm)); }
 

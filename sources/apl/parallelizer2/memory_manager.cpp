@@ -61,6 +61,15 @@ namespace apl
         return q;
     }
 
+    std::deque<perform_id> memory_manager2::get_ready_tasks()
+    {
+        std::deque<perform_id> q;
+        for (auto it = task_map.begin(); it != task_map.end(); ++it)
+            if (it->parents_count == 0)
+                q.push_back(it.key());
+        return q;
+    }
+
     std::set<message_id>& memory_manager2::get_unreferenced_messages()
     { return messages_to_del; }
 
@@ -498,22 +507,54 @@ namespace apl
         }
     }
 
+    process memory_manager2::find_connection_out_by_in_out(perform_id out, perform_id in) const
+    {
+        auto it = outs.lower_bound({out, in, 0});
+        if ((it != outs.end()) && (it->out == out) && (it->in == in))
+            return it->external_group_id;
+        return MPI_PROC_NULL;
+    }
+
+    process memory_manager2::find_connection_child_in_by_in_out(perform_id out, perform_id in) const
+    {
+        auto it = child_ins.lower_bound({out, in, 0});
+        if ((it != child_ins.end()) && (it->out == out) && (it->in == in))
+            return it->external_group_id;
+        return MPI_PROC_NULL;
+    }
+
+    void memory_manager2::erase_out(perform_id out, perform_id in, size_t ext_proc)
+    { outs.erase({out, in, ext_proc}); }
+
+    void memory_manager2::erase_child_in(perform_id out, perform_id in, size_t ext_proc)
+    { child_ins.erase({out, in, ext_proc}); }
+
+    void memory_manager2::insert_out(perform_id out, perform_id in, size_t ext_proc)
+    {
+        outs.insert({out, in, ext_proc});
+    }
+
+    void memory_manager2::insert_task_graph_node(perform_id id, const task_graph_node& tgn)
+    {
+        task_map[id] = tgn;
+    }
+
     void memory_manager2::erase_subgraph(const sub_graph& graph, size_t new_owner)
     {
         for (perform_id i: graph.tasks)
             task_map.erase(i);
-        for (const graph_connection& i: graph.ins)
-            if (i.external_group_id == parallel_engine::global_rank())
-                outs.insert({i.out, i.in, new_owner});
-        for (const graph_connection& i: graph.outs)
-            if (i.external_group_id == parallel_engine::global_rank())
-                ins.insert({i.out, i.in, new_owner});
-        for (const graph_connection& i: graph.child_ins)
-            if (i.external_group_id == parallel_engine::global_rank())
-                child_outs.insert({i.out, i.in, new_owner});
-        for (const graph_connection& i: graph.child_outs)
-            if (i.external_group_id == parallel_engine::global_rank())
-                child_ins.insert({i.out, i.in, new_owner});
+        //for (const graph_connection& i: graph.ins)
+        //    if (i.external_group_id == parallel_engine::global_rank())
+        //        outs.insert({i.out, i.in, new_owner});
+        //for (const graph_connection& i: graph.outs)
+        //    if (i.external_group_id == parallel_engine::global_rank())
+        //        ins.insert({i.out, i.in, new_owner});
+        //for (const graph_connection& i: graph.child_ins)
+        //    if (i.external_group_id == parallel_engine::global_rank())
+        //        child_outs.insert({i.out, i.in, new_owner});
+        //for (const graph_connection& i: graph.child_outs)
+        //    if (i.external_group_id == parallel_engine::global_rank())
+        //        child_ins.insert({i.out, i.in, new_owner});
     }
 
     void memory_manager2::send_task_node(perform_id id, const intracomm& comm, process proc)
@@ -646,8 +687,11 @@ namespace apl
     std::vector<message_id>& memory_manager2::get_task_const_data(task_id id)
     { return task_map[id.pi].const_data; }
 
-    bool memory_manager2::message_contained(message_id id)
+    bool memory_manager2::message_contained(message_id id) const
     { return mes_map.contains(id); }
+
+    bool memory_manager2::perform_contained(perform_id id) const
+    { return task_map.contains(id); }
 
     bool memory_manager2::message_created(message_id id)
     { return mes_map[id].d != nullptr; }

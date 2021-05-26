@@ -1,4 +1,5 @@
 #include "apl/communicator.h"
+#include "apl/comm_group.h"
 
 namespace apl
 {
@@ -9,6 +10,9 @@ namespace apl
     communicator::communicator(const communicator& c)
     { dublicate(c); }
 
+    communicator::communicator(communicator && c) noexcept: comm(std::exchange(c.comm, MPI_COMM_NULL))
+    { }
+
     communicator& communicator::operator=(const communicator& c)
     {
         if (this != &c)
@@ -16,6 +20,17 @@ namespace apl
             if (comm != MPI_COMM_NULL)
                 free();
             dublicate(c);
+        }
+        return *this;
+    }
+
+    communicator& communicator::operator=(communicator&& c) noexcept
+    {
+        if (this != &c)
+        {
+            if (comm != MPI_COMM_NULL)
+                free();
+            comm = std::exchange(c.comm, MPI_COMM_NULL);
         }
         return *this;
     }
@@ -60,5 +75,14 @@ namespace apl
         apl_MPI_CHECKER(MPI_Comm_size(comm, &comm_size));
         return comm_size;
     }
+
+    comm_group communicator::group() const
+    {
+        comm_group g(*this);
+        return g;
+    }
+
+    bool communicator::valid() const
+    { return comm != MPI_COMM_NULL; }
 
 }

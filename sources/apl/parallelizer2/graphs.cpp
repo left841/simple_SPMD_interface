@@ -46,9 +46,9 @@ namespace apl
         recv(dst.owner);
         dst.childs_v.resize(probe<perform_id>());
         recv(dst.childs_v.data(), dst.childs_v.size());
-        dst.childs_v.resize(probe<perform_id>());
+        dst.data.resize(probe<message_id>());
         recv(dst.data.data(), dst.data.size());
-        dst.childs_v.resize(probe<perform_id>());
+        dst.const_data.resize(probe<message_id>());
         recv(dst.const_data.data(), dst.const_data.size());
     }
 
@@ -93,8 +93,8 @@ namespace apl
 
     std::vector<sub_graph> graph_analizer::split_graph(const std::vector<processes_group>& groups, const std::vector<group_info>& info, std::deque<perform_id>& ready_tasks) const
     {
-        std::vector<sub_graph> sub_graphs;
-        // add implementation
+        std::vector<sub_graph> sub_graphs(groups.size());
+
         return sub_graphs;
     }
 

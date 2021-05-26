@@ -6,6 +6,9 @@ namespace apl
     bool message_id::operator!=(const message_id& other) const
     { return (num != other.num) || (proc != other.proc); }
 
+    bool perform_id::operator==(const perform_id& other) const
+    { return (num == other.num) && (proc == other.proc); }
+
     bool perform_id::operator!=(const perform_id& other) const
     { return (num != other.num) || (proc != other.proc); }
 

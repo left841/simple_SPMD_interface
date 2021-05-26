@@ -19,7 +19,9 @@ namespace apl
         MES_P_CREATE, INCLUDE_MES_CHILD, TASK_EXE, TASK_CREATE, TASK_RES, ADD_RES_TO_MEMORY,
         MES_DEL, TASK_DEL,
         // new
-        TASK_GRAPH_RECV, SELECT_MES_RECEIVER, SELECT_MES_SENDER, GRAPH_FINISHED
+        TASK_GRAPH_RECV, SELECT_MES_RECEIVER, SELECT_MES_SENDER, GRAPH_FINISHED, TRANSFER_STATE,
+        TRANSFER_STATE_END, SELECT_MES_SENDER_WITH_INFO, SELECT_MES_CREATE_RECEIVER, SIGN_GRAPH_OUT,
+        SIGN_GRAPH_CHILD_OUT, PERFORM_ASSIGNED_TO, GRAPH_OUT_PROC
     };
 
     class instruction_block
@@ -228,6 +230,83 @@ namespace apl
         size_t size() const;
     };
 
+    class instruction_transfer_state: public instruction_block
+    {
+    public:
+        instruction_transfer_state(const size_t* const p);
+
+        size_t size() const;
+    };
+
+    class instruction_transfer_state_end: public instruction_block
+    {
+    public:
+        instruction_transfer_state_end(const size_t* const p);
+
+        size_t size() const;
+    };
+
+    class instruction_select_mes_sender_with_info: public instruction_block
+    {
+    public:
+        instruction_select_mes_sender_with_info(const size_t* const p);
+
+        size_t size() const;
+        message_id id() const;
+    };
+
+    class instruction_select_mes_create_receiver: public instruction_block
+    {
+    public:
+        instruction_select_mes_create_receiver(const size_t* const p);
+
+        size_t size() const;
+        message_id id() const;
+        message_type type() const;
+        process proc() const;
+    };
+
+    class instruction_sign_graph_out: public instruction_block
+    {
+    public:
+        instruction_sign_graph_out(const size_t* const p);
+
+        size_t size() const;
+        perform_id out() const;
+        perform_id in() const;
+    };
+
+    class instruction_sign_graph_child_out: public instruction_block
+    {
+    public:
+        instruction_sign_graph_child_out(const size_t* const p);
+
+        size_t size() const;
+        perform_id out() const;
+        perform_id in() const;
+    };
+
+    class instruction_perform_assigned_to: public instruction_block
+    {
+    public:
+        instruction_perform_assigned_to(const size_t* const p);
+
+        size_t size() const;
+        perform_id id() const;
+        process proc() const;
+    };
+
+    class instruction_graph_out_proc: public instruction_block
+    {
+    public:
+        instruction_graph_out_proc(const size_t* const p);
+
+        size_t size() const;
+        perform_id out() const;
+        perform_id in() const;
+        process proc() const;
+    };
+
 
     class instruction: public message
     {
@@ -301,6 +380,14 @@ namespace apl
         void add_task_graph_recv();
         void add_select_mes_receiver(message_id id);
         void add_select_mes_sender(message_id id);
+        void add_transfer_state();
+        void add_transfer_state_end();
+        void add_select_mes_sender_with_info(message_id id);
+        void add_select_mes_create_receiver(message_id id, message_type type, process proc);
+        void add_sign_graph_out(perform_id out, perform_id in);
+        void add_sign_graph_child_out(perform_id out, perform_id in);
+        void add_perform_assigned_to(perform_id id, process proc);
+        void add_graph_out_proc(perform_id out, perform_id in, process proc);
 
         const_iterator begin() const;
         const_iterator end() const;

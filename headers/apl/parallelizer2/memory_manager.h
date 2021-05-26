@@ -40,6 +40,7 @@ namespace apl
         void init(task_graph& _tg, process main_proc);
 
         std::deque<perform_id> get_ready_tasks(process owner);
+        std::deque<perform_id> get_ready_tasks();
         std::set<message_id>& get_unreferenced_messages();
         std::set<message_id> get_messages_set();
         std::set<perform_id> get_performs_set();
@@ -103,6 +104,13 @@ namespace apl
         size_t child_outs_count() const;
         void connect_extern_in(perform_id out, perform_id in, size_t ext_proc);
         void connect_extern_child_out(perform_id out, perform_id in, size_t ext_proc);
+        process find_connection_out_by_in_out(perform_id out, perform_id in) const;
+        process find_connection_child_in_by_in_out(perform_id out, perform_id in) const;
+        void erase_out(perform_id out, perform_id in, size_t ext_proc);
+        void erase_child_in(perform_id out, perform_id in, size_t ext_proc);
+        void insert_out(perform_id out, perform_id in, size_t ext_proc);
+        void insert_task_graph_node(perform_id id, const task_graph_node& tgn);
+
         void erase_subgraph(const sub_graph& graph, size_t new_owner);
 
         void send_task_node(perform_id id, const intracomm& comm, process proc);
@@ -139,7 +147,8 @@ namespace apl
         std::vector<message_id>& get_perform_const_data(perform_id id);
         std::vector<message_id>& get_task_const_data(task_id id);
 
-        bool message_contained(message_id id);
+        bool message_contained(message_id id) const;
+        bool perform_contained(perform_id id) const;
         bool message_created(message_id id);
         bool message_has_parent(message_id id);
         bool perform_has_parent(perform_id id);
