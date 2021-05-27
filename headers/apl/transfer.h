@@ -66,11 +66,11 @@ namespace apl
 
     template<typename Type>
     std::enable_if_t<!std::is_enum<Type>::value, const simple_datatype&> datatype()
-    { return resized_type_map<simple_datatype_map<Type>::map, 0, sizeof(Type)>::get(); }
+    { return resized_type_map<typename simple_datatype_map<Type>::map, 0, sizeof(Type)>::get(); }
 
     template<typename Type>
     std::enable_if_t<std::is_enum<Type>::value, const simple_datatype&> datatype()
-    { return resized_type_map<simple_datatype_map<std::underlying_type_t<Type>>::map, 0, sizeof(Type)>::get(); }
+    { return resized_type_map<typename simple_datatype_map<std::underlying_type_t<Type>>::map, 0, sizeof(Type)>::get(); }
 
     template<typename Type, size_t Offset, size_t BlockLength = 1>
     struct type_offset
