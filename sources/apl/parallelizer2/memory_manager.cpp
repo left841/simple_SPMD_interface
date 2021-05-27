@@ -710,12 +710,14 @@ namespace apl
 
     message_graph_node& memory_manager_graph_adapter::get_message_node(message_id id) const
     {
-        return message_graph_node();
+        message_graph_node mgn;
+        return mgn;
     }
 
     task_graph_node& memory_manager_graph_adapter::get_task_node(perform_id id) const
     {
-        return task_graph_node();
+        task_graph_node tgn;
+        return tgn;
     }
 
 }
