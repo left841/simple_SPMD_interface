@@ -8,6 +8,8 @@
 namespace apl
 {
 
+    class comm_group;
+
     class communicator
     {
     protected:
@@ -16,9 +18,9 @@ namespace apl
 
         communicator();
         communicator(const communicator& c);
-        communicator(communicator&& c) noexcept = default;
+        communicator(communicator&& c) noexcept;
         communicator& operator=(const communicator& c);
-        communicator& operator=(communicator&& c) noexcept = default;
+        communicator& operator=(communicator&& c) noexcept;
 
     public:
 
@@ -35,6 +37,9 @@ namespace apl
         process rank() const;
         MPI_Comm get_comm() const;
         int size() const;
+        comm_group group() const;
+
+        bool valid() const;
 
     };
 

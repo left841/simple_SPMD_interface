@@ -9,6 +9,8 @@
 namespace apl
 {
 
+    class comm_group;
+
     class intracomm: public communicator
     {
     public:
@@ -16,11 +18,13 @@ namespace apl
         intracomm();
         intracomm(const intracomm& c);
         intracomm(const intracomm& c, int color, int key);
+        intracomm(const intracomm& c, const comm_group& g);
         intracomm(intracomm&& c) noexcept = default;
         intracomm& operator=(const intracomm& c) = default;
         intracomm& operator=(intracomm&& c) noexcept = default;
         ~intracomm();
 
+        void create(const intracomm& c, const comm_group& g);
         void split(const intracomm& c, int color, int key);
 
         template<typename Type>
@@ -44,11 +48,14 @@ namespace apl
         template<typename Type>
         void irecv(Type* ptr, process proc, request_block& req) const;
         template<typename Type>
-        void bcast(Type* ptr, process root);
+        void bcast(Type* ptr, process root) const;
         template<typename Type>
-        void ibcast(Type* ptr, process root, request_block& req);
+        void ibcast(Type* ptr, process root, request_block& req) const;
 
         void barrier() const;
+
+        process wait_any_process() const;
+        process test_any_process() const;
 
     };
 
@@ -123,7 +130,7 @@ namespace apl
     }
 
     template<typename Type>
-    void intracomm::bcast(Type* ptr, process root)
+    void intracomm::bcast(Type* ptr, process root) const
     {
         int comm_rank = rank(), comm_size = size();
         int my_pos = (comm_rank - root + comm_size) % comm_size;
@@ -141,7 +148,7 @@ namespace apl
     }
 
     template<typename Type>
-    void intracomm::ibcast(Type* ptr, process root, request_block& req)
+    void intracomm::ibcast(Type* ptr, process root, request_block& req) const
     {
         int comm_rank = rank(), comm_size = size();
         int my_pos = (comm_rank - root + comm_size) % comm_size;

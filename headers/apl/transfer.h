@@ -20,6 +20,7 @@ namespace apl
         simple_datatype(MPI_Datatype type);
         simple_datatype(std::vector<MPI_Datatype> types, std::vector<size_t> offsets);
         simple_datatype(const std::vector<MPI_Datatype>& types, const std::vector<size_t>& offsets, const std::vector<size_t>& block_lengths);
+        simple_datatype(simple_datatype s_type, MPI_Aint lb, MPI_Aint extent);
 
         static std::vector<MPI_Datatype> created_datatypes;
 
@@ -28,6 +29,10 @@ namespace apl
 
     template<class Type>
     struct simple_datatype_map
+    { using map = void; };
+
+    template<class Type, MPI_Aint lb, MPI_Aint extent>
+    struct datatype_map
     { using map = void; };
 
     template<typename... MapParts>
@@ -41,6 +46,17 @@ namespace apl
         }
     };
 
+    template<typename SubMap, MPI_Aint lb, MPI_Aint extent>
+    class resized_type_map
+    {
+    public:
+        static const simple_datatype& get()
+        {
+            static simple_datatype d(SubMap::get(), lb, extent);
+            return d;
+        }
+    };
+
     template<typename Type>
     class is_simple_datatype
     {
@@ -50,11 +66,11 @@ namespace apl
 
     template<typename Type>
     std::enable_if_t<!std::is_enum<Type>::value, const simple_datatype&> datatype()
-    { return simple_datatype_map<Type>::map::get(); }
+    { return resized_type_map<simple_datatype_map<Type>::map, 0, sizeof(Type)>::get(); }
 
     template<typename Type>
     std::enable_if_t<std::is_enum<Type>::value, const simple_datatype&> datatype()
-    { return simple_datatype_map<std::underlying_type_t<Type>>::map::get(); }
+    { return resized_type_map<simple_datatype_map<std::underlying_type_t<Type>>::map, 0, sizeof(Type)>::get(); }
 
     template<typename Type, size_t Offset, size_t BlockLength = 1>
     struct type_offset
