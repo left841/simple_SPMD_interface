@@ -21,7 +21,7 @@ namespace apl
         // new
         TASK_GRAPH_RECV, SELECT_MES_RECEIVER, SELECT_MES_SENDER, GRAPH_FINISHED, TRANSFER_STATE,
         TRANSFER_STATE_END, SELECT_MES_SENDER_WITH_INFO, SELECT_MES_CREATE_RECEIVER, SIGN_GRAPH_OUT,
-        SIGN_GRAPH_CHILD_OUT, PERFORM_ASSIGNED_TO, GRAPH_OUT_PROC
+        SIGN_GRAPH_CHILD_OUT, PERFORM_ASSIGNED_TO, GRAPH_OUT_PROC, SEND_EXE_STATS
     };
 
     class instruction_block
@@ -307,6 +307,16 @@ namespace apl
         process proc() const;
     };
 
+    class instruction_send_exe_stats: public instruction_block
+    {
+    public:
+        instruction_send_exe_stats(const size_t* const p);
+
+        size_t size() const;
+        size_t active_count() const;
+        size_t all_count() const;
+    };
+
 
     class instruction: public message
     {
@@ -388,6 +398,7 @@ namespace apl
         void add_sign_graph_child_out(perform_id out, perform_id in);
         void add_perform_assigned_to(perform_id id, process proc);
         void add_graph_out_proc(perform_id out, perform_id in, process proc);
+        void add_send_exe_stats(size_t active_count, size_t all_count);
 
         const_iterator begin() const;
         const_iterator end() const;

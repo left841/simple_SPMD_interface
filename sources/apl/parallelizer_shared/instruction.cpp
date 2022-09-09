@@ -174,6 +174,9 @@ namespace apl
 
         [](const size_t* const p)->const instruction_block*
         { return new instruction_graph_out_proc(p); },
+
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_send_exe_stats(p); }
     };
 
     const instruction_block* instruction::block_factory::get(const size_t* const p)
@@ -647,6 +650,18 @@ namespace apl
         write(out);
     }
 
+    // PERFORM_ASSIGNED_TO
+    instruction_perform_assigned_to::instruction_perform_assigned_to(const size_t* const p): instruction_block(p)
+    { }
+
+    size_t instruction_perform_assigned_to::size() const
+    { return 4; }
+
+    perform_id instruction_perform_assigned_to::id() const
+    { return {ins[1], static_cast<process>(ins[2])}; }
+
+    process instruction_perform_assigned_to::proc() const
+    { return static_cast<process>(ins[3]); }
 
     void instruction::add_perform_assigned_to(perform_id id, process proc)
     {
@@ -655,24 +670,21 @@ namespace apl
         v.push_back(proc);
     }
 
-    instruction_perform_assigned_to::instruction_perform_assigned_to(const size_t* const p): instruction_block(p)
+    // GRAPH_OUT_PROC
+    instruction_graph_out_proc::instruction_graph_out_proc(const size_t* const p): instruction_block(p)
     { }
 
-    size_t instruction_perform_assigned_to::size() const
-    {
-        return 4;
-    }
+    size_t instruction_graph_out_proc::size() const
+    { return 6; }
 
-    perform_id instruction_perform_assigned_to::id() const
-    {
-        return {ins[1], static_cast<process>(ins[2])};
-    }
+    perform_id instruction_graph_out_proc::out() const
+    { return {ins[1], static_cast<process>(ins[2])}; }
 
-    process instruction_perform_assigned_to::proc() const
-    {
-        return static_cast<process>(ins[3]);
-    }
+    perform_id instruction_graph_out_proc::in() const
+    { return {ins[3], static_cast<process>(ins[4])}; }
 
+    process instruction_graph_out_proc::proc() const
+    { return static_cast<process>(ins[5]); }
 
     void instruction::add_graph_out_proc(perform_id out, perform_id in, process proc)
     {
@@ -682,27 +694,24 @@ namespace apl
         v.push_back(proc);
     }
 
-    instruction_graph_out_proc::instruction_graph_out_proc(const size_t* const p): instruction_block(p)
+    // SEND_EXE_STATS
+    instruction_send_exe_stats::instruction_send_exe_stats(const size_t* const p): instruction_block(p)
     { }
 
-    size_t instruction_graph_out_proc::size() const
-    {
-        return 6;
-    }
+    size_t instruction_send_exe_stats::size() const
+    { return 3; }
 
-    perform_id instruction_graph_out_proc::out() const
-    {
-        return {ins[1], static_cast<process>(ins[2])};
-    }
+    size_t instruction_send_exe_stats::active_count() const
+    { return ins[1]; }
 
-    perform_id instruction_graph_out_proc::in() const
-    {
-        return {ins[3], static_cast<process>(ins[4])};
-    }
+    size_t instruction_send_exe_stats::all_count() const
+    { return ins[2]; }
 
-    process instruction_graph_out_proc::proc() const
+    void instruction::add_send_exe_stats(size_t count, size_t all_count)
     {
-        return static_cast<process>(ins[5]);
+        add_cmd(INSTRUCTION::SEND_EXE_STATS);
+        v.push_back(count);
+        v.push_back(all_count);
     }
 
 }

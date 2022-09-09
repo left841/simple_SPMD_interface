@@ -36,14 +36,19 @@ namespace apl
             if (info.parent != MPI_PROC_NULL)
                 external_comm = std::move(groups[info.parent].comm);
             info.childs_groups.resize(1);
+            info.groups_of_processes.resize(comm.size());
         
             for (size_t i = 0, j = 1; i < groups.size(); ++i)
+            {
                 if (groups[i].owner == comm.rank())
                 {
+                    info.groups_of_processes[groups[i].head] = info.childs_groups.size();
                     info.childs_groups.push_back(std::move(groups[i]));
                     info.childs_groups.back().internal_head = j++;
                 }
+            }
 
+            info.groups_of_processes[comm.rank()] = 0;
             internal_comm = std::move(groups[comm.rank()].comm);
             info.childs_groups[0] = std::move(groups[comm.rank()]);
             info.childs_groups[0].internal_head = 0;
@@ -75,8 +80,9 @@ namespace apl
         {
             info.ready_tasks = memory.get_ready_tasks(main_proc);
             info.group_info_v[0].active_tasks = info.ready_tasks.size();
-            if (info.group_info_v[0].active_tasks > 0)
-                ++info.active_graphs;
+            info.all_active_tasks += info.group_info_v[0].active_tasks;
+            info.group_info_v[0].all_tasks = memory.task_count();
+            info.all_tasks += memory.task_count();
         }
         else
         {
@@ -86,13 +92,14 @@ namespace apl
         }
 
         info.exe = true;
-        bool running = true;
         bool splited = false;
-        while (running)
+        while (info.exe)
         {
-            if (/*(info.active_graphs == 0) &&*/ /*(graph.need_split(info.childs_groups, info.group_info_v, info.ready_tasks.size())) &&*/ (comm.rank() == 0) && !splited)
+            ptrdiff_t old_active_tasks_count = info.all_active_tasks;
+            //if (/*(info.all_active_tasks == 0) &&*/ /*(graph.need_split(info.childs_groups, info.group_info_v, info.ready_tasks.size())) &&*/ (comm.rank() == 0) && !splited)
+            if (graph.need_split(info.childs_groups, info.group_info_v, info.ready_tasks.size()))
             {
-                splited = true;
+                //splited = true;
                 std::vector<sub_graph> tasks_for_childs = split_graph(info);
 
                 transfer_state(tasks_for_childs, info, internal_instructions);
@@ -100,37 +107,41 @@ namespace apl
             }
 
             process ext_proc = MPI_PROC_NULL;
+            if (info.ready_tasks.empty())
+                instr_comm.wait_any_process();
             while ((ext_proc = instr_comm.test_any_process()) != MPI_PROC_NULL)
             {
                 instr_comm.recv<message>(&external_instruction, ext_proc);
                 if (!process_instruction(external_instruction, info, ext_proc))
-                {
-                    running = false;
                     info.exe = false;
-                }
+                external_instruction.clear();
             }
 
             if (info.ready_tasks.size())
             {
-                perform_id ctrf = { 0, -1 };
                 perform_id up_id = info.ready_tasks.front();
                 info.ready_tasks.pop_front();
+                --info.group_info_v[0].active_tasks;
+                --info.all_active_tasks;
+                --info.group_info_v[0].all_tasks;
+                --info.all_tasks;
                 execute_task(up_id, info);
-                if ((comm.rank() == 0) && (up_id == ctrf))
-                    --info.active_graphs;
-
-                //if (info.ready_tasks.empty() && (info.active_graphs > 0))
-                //    --info.active_graphs;
             }
 
-            if (((info.parent == MPI_PROC_NULL)  && (info.active_graphs == 0) && (memory.task_count() == 0)) || (info.exe == false))
+            if ((info.parent != MPI_PROC_NULL) && ((old_active_tasks_count != info.all_active_tasks) || (info.all_tasks == 0)))
+            {
+                external_instruction.add_send_exe_stats(info.all_active_tasks, info.all_tasks);
+                instr_comm.send<message>(&external_instruction, info.parent);
+                external_instruction.clear();
+            }
+
+            if (((info.parent == MPI_PROC_NULL) && (info.all_tasks == 0)) || (info.exe == false))
             {
                 for (size_t i = 1; i < info.group_info_v.size(); ++i)
                 {
                     internal_instructions[i].add_end();
                     instr_comm.send<message>(&internal_instructions[i], info.childs_groups[i].head);
                 }
-                running = false;
                 info.exe = false;
             }
         }
@@ -184,14 +195,14 @@ namespace apl
     {
         std::vector<sub_graph> sub_graphs(info.childs_groups.size());
         info.group_info_v[0].active_tasks = 0;
-        std::vector<size_t> load(info.childs_groups.size());
+        info.group_info_v[0].all_tasks = 0;
         std::map<perform_id, size_t> parents_count;
         std::map<perform_id, size_t> perform_group;
 
         std::set<size_t, std::function<bool(size_t, size_t)>> procs([&](size_t a, size_t b)->bool
         {
-            if (load[a] + info.group_info_v[a].active_tasks * 2 != load[b] + info.group_info_v[b].active_tasks * 2)
-                return load[a] + info.group_info_v[a].active_tasks * 2 < load[b] + info.group_info_v[b].active_tasks * 2;
+            if (info.group_info_v[a].active_tasks != info.group_info_v[b].active_tasks)
+                return info.group_info_v[a].active_tasks < info.group_info_v[b].active_tasks;
             return a < b;
         });
 
@@ -203,7 +214,6 @@ namespace apl
             std::queue<perform_id> q;
             q.push(info.ready_tasks.front());
             info.ready_tasks.pop_front();
-            bool fl = true;
             while (q.size())
             {
                 perform_id id = q.front();
@@ -211,8 +221,7 @@ namespace apl
 
                 size_t cur_g = *procs.begin();
                 procs.erase(cur_g);
-                load[cur_g] += (fl) ? 2: 1;
-                fl = false;
+                ++info.group_info_v[cur_g].active_tasks;
                 procs.insert(cur_g);
 
                 while (1)
@@ -248,6 +257,7 @@ namespace apl
 
         for (size_t i = 0; i < sub_graphs.size(); ++i)
         {
+            info.group_info_v[i].all_tasks += sub_graphs[i].tasks.size();
             for (perform_id j: sub_graphs[i].tasks)
             {
                 for (perform_id k: memory.get_perform_childs(j))
@@ -264,20 +274,23 @@ namespace apl
     std::vector<sub_graph> parallelizer2::split_graph_sub(sub_graph& gr, std::map<perform_id, task_graph_node>& mm, exe_info& info)
     {
         std::vector<sub_graph> sub_graphs(info.childs_groups.size());
-        info.group_info_v[0].active_tasks = 0;
-        std::vector<size_t> load(info.childs_groups.size());
         std::map<perform_id, size_t> parents_count;
         std::map<perform_id, size_t> perform_group;
+        info.all_tasks += gr.tasks.size();
 
         std::deque<perform_id> ready;
         for (auto& i: gr.tasks)
             if (mm[i].parents_count == 0)
                 ready.push_front(i);
+        info.all_active_tasks += ready.size();
 
         std::set<size_t, std::function<bool(size_t, size_t)>> procs([&](size_t a, size_t b)->bool
         {
-            if (load[a] + info.group_info_v[a].active_tasks * 2 != load[b] + info.group_info_v[b].active_tasks * 2)
-                return load[a] + info.group_info_v[a].active_tasks * 2 < load[b] + info.group_info_v[b].active_tasks * 2;
+            double a_d = static_cast<double>(info.group_info_v[a].active_tasks) / info.childs_groups[a].size;
+            double b_d = static_cast<double>(info.group_info_v[b].active_tasks) / info.childs_groups[b].size;
+
+            if (a_d != b_d)
+                return a_d < b_d;
             return a < b;
         });
 
@@ -289,7 +302,6 @@ namespace apl
             std::queue<perform_id> q;
             q.push(ready.front());
             ready.pop_front();
-            bool fl = true;
             while (q.size())
             {
                 perform_id id = q.front();
@@ -297,10 +309,8 @@ namespace apl
 
                 size_t cur_g = *procs.begin();
                 procs.erase(cur_g);
-                load[cur_g] += (fl) ? 2 : 1;
-                fl = false;
+                ++info.group_info_v[cur_g].active_tasks;
                 procs.insert(cur_g);
-
                 
                 while (1)
                 {
@@ -333,6 +343,7 @@ namespace apl
 
         for (size_t i = 0; i < sub_graphs.size(); ++i)
         {
+            info.group_info_v[i].all_tasks += sub_graphs[i].tasks.size();
             for (perform_id j: sub_graphs[i].tasks)
             {
                 for (perform_id k: mm[j].childs_v)
@@ -348,14 +359,9 @@ namespace apl
 
     void parallelizer2::transfer_state(const std::vector<sub_graph>& sub_graphs, exe_info& info, std::vector<instruction>& ins_v)
     {
-        //if (sub_graphs[0].tasks.size() > 0)
-        //    ++info.active_graphs;
-        //info.group_info_v[0].active_tasks = sub_graphs[0].tasks.size();
-
         // 1
         for (size_t i = 1; i < sub_graphs.size(); ++i)
         {
-            //info.group_info_v[i].active_tasks += sub_graphs[i].tasks.size();
             ins_v[i].add_transfer_state();
             instr_comm.send<message>(&ins_v[i], info.childs_groups[i].head);
             ins_v[i].clear();
@@ -364,8 +370,6 @@ namespace apl
         for (size_t i = 1; i < sub_graphs.size(); ++i)
         {
             ins_v[i].add_task_graph_recv();
-            //if (sub_graphs[i].tasks.size() > 0)
-            //    ++info.active_graphs;
             internal_comm.send<message>(&ins_v[i], info.childs_groups[i].internal_head);
             ins_v[i].clear();
         }
@@ -667,95 +671,18 @@ namespace apl
                    ret = false;
                    break;
                 }
-                //case INSTRUCTION::MES_SEND:
-                //{
-                //    const instruction_message_send& j = dynamic_cast<const instruction_message_send&>(i);
-                //    memory.send_message(j.id(), comm, j.proc());
-                //    break;
-                //}
-                //case INSTRUCTION::MES_RECV:
-                //{
-                //    const instruction_message_recv& j = dynamic_cast<const instruction_message_recv&>(i);
-                //    memory.recv_message(j.id(), comm, j.proc());
-                //    break;
-                //}
-                //case INSTRUCTION::MES_INFO_SEND:
-                //{
-                //    const instruction_message_info_send& j = dynamic_cast<const instruction_message_info_send&>(i);
-                //    request_block& info_req = memory.get_message_info_request_block(j.id());
-                //    for (message* p: memory.get_message_info(j.id()))
-                //        comm.isend(p, j.proc(), info_req);
-                //    break;
-                //}
-                //case INSTRUCTION::MES_CREATE:
-                //{
-                //    const instruction_message_create& j = dynamic_cast<const instruction_message_create&>(i);
-                //    request_block info_req;
-                //    std::vector<message*> iib = message_init_factory::get_info(j.type());
-                //    for (message* p: iib)
-                //        comm.irecv(p, j.proc(), info_req);
-                //    info_req.wait_all();
-                //    memory.create_message_init_with_id(j.id(), j.type(), iib, assigner);
-                //    break;
-                //}
-                //case INSTRUCTION::MES_P_CREATE:
-                //{
-                //    const instruction_message_part_create& j = dynamic_cast<const instruction_message_part_create&>(i);
-                //    std::vector<message*> pib = message_child_factory::get_info(j.type());
-                //    request_block info_req;
-                //    for (message* p: pib)
-                //        comm.irecv(p, j.proc(), info_req);
-                //    info_req.wait_all();
-                //    memory.create_message_child_with_id(j.id(), j.type(), j.source(), pib, assigner);
-                //    break;
-                //}
-                //case INSTRUCTION::INCLUDE_MES_CHILD:
-                //{
-                //    const instruction_message_include_child_to_parent& j = dynamic_cast<const instruction_message_include_child_to_parent&>(i);
-                //    memory.include_child_to_parent(j.child());
-                //    break;
-                //}
-                //case INSTRUCTION::TASK_EXE:
-                //{
-                //    const instruction_task_execute& j = dynamic_cast<const instruction_task_execute&>(i);
-                //    info.ready_tasks.push_back(j.id().pi);
-                //    break;
-                //}
-                //case INSTRUCTION::TASK_CREATE:
-                //{
-                //    const instruction_task_create& j = dynamic_cast<const instruction_task_create&>(i);
-                //    memory.add_perform_with_id(j.id(), j.type(), j.data(), j.const_data(), assigner);
-                //    break;
-                //}
-                //case INSTRUCTION::TASK_RES:
-                //{
-                //    comm.abort(876);
-                //}
-                //case INSTRUCTION::ADD_RES_TO_MEMORY:
-                //{
-                //    comm.abort(876);
-                //}
-                //case INSTRUCTION::MES_DEL:
-                //{
-                //    const instruction_message_delete& j = dynamic_cast<const instruction_message_delete&>(i);
-                //    memory.delete_message(j.id());
-                //    break;
-                //}
-                //case INSTRUCTION::TASK_DEL:
-                //{
-                //    const instruction_task_delete& j = dynamic_cast<const instruction_task_delete&>(i);
-                //    memory.delete_perform(j.id());
-                //    break;
-                //}
                 case INSTRUCTION::SIGN_GRAPH_OUT:
                 {
                     const instruction_sign_graph_out& j = dynamic_cast<const instruction_sign_graph_out&>(i);
-                    //memory.connect_extern_in(j.out(), j.in(), assigner);
                     if (memory.perform_contained(j.in()))
                     {
                         memory.set_perform_parents_count(j.in(), memory.get_perform_parents_count(j.in()) - 1);
                         if (memory.get_perform_parents_count(j.in()) == 0)
+                        {
                             info.ready_tasks.push_back(j.in());
+                            ++info.all_active_tasks;
+                            ++info.group_info_v[0].active_tasks;
+                        }
                     }
                     break;
                 }
@@ -770,6 +697,18 @@ namespace apl
                 {
                     sub_transfer_state(info);
                     info.ready_tasks = memory.get_ready_tasks();
+                    break;
+                }
+                case INSTRUCTION::SEND_EXE_STATS:
+                {
+                    const instruction_send_exe_stats& j = dynamic_cast<const instruction_send_exe_stats&>(i);
+                    size_t ext_group = info.groups_of_processes[assigner];
+                    info.all_active_tasks -= info.group_info_v[ext_group].active_tasks;
+                    info.group_info_v[ext_group].active_tasks = j.active_count();
+                    info.all_active_tasks += info.group_info_v[ext_group].active_tasks;
+                    info.all_tasks -= info.group_info_v[ext_group].all_tasks;
+                    info.group_info_v[ext_group].all_tasks = j.all_count();
+                    info.all_tasks += info.group_info_v[ext_group].all_tasks;
                     break;
                 }
                 default:
@@ -1173,7 +1112,11 @@ namespace apl
                     {
                         memory.set_perform_parents_count(i, memory.get_perform_parents_count(i) - 1);
                         if (memory.get_perform_parents_count(i) == 0)
+                        {
                             info.ready_tasks.push_front(i);
+                            ++info.all_active_tasks;
+                            ++info.group_info_v[0].active_tasks;
+                        }
                     }
                     else
                     {

@@ -34,9 +34,11 @@ namespace apl
             std::vector<group_info> group_info_v;
             process parent = MPI_PROC_NULL;
             std::vector<size_t> group_workload;
-            size_t active_graphs = 0;
+            size_t all_active_tasks = 0;
+            size_t all_tasks = 0;
             bool exe = true;
             size_t internal_comm_size = 0;
+            std::vector<size_t> groups_of_processes;
         };
 
         intracomm internal_comm, external_comm;

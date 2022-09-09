@@ -158,6 +158,7 @@ namespace apl
     struct group_info
     {
         size_t active_tasks;
+        size_t all_tasks;
     };
 
     class graph_analizer

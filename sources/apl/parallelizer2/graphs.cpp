@@ -82,10 +82,11 @@ namespace apl
 
     bool graph_analizer::need_split(const std::vector<processes_group>& groups, const std::vector<group_info>& info, size_t ready_tasks_size) const
     {
-        for (size_t i = 0; i < groups.size(); ++i)
+        double d0 = static_cast<double>(info[0].active_tasks);
+        for (size_t i = 1; i < groups.size(); ++i)
         {
-            size_t sz = groups[i].size - std::min(info[i].active_tasks, groups[i].size);
-            if (sz > 1)
+            double di = static_cast<double>(info[i].active_tasks) / groups[i].size;
+            if (di < d0)
                 return true;
         }
         return false;

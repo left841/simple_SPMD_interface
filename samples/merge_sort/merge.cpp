@@ -70,8 +70,6 @@ public:
     { }
     void operator()(const array& s1, const array& s2, array& out)
     {
-        if (comm_world.rank() != 0)
-            return;
         size_t first = 0, second = 0;
         for (size_t i = 0; i < out.size(); ++i)
         {
@@ -92,8 +90,6 @@ public:
     { }
     void operator()(array& s1, array& s2)
     {
-        if (comm_world.rank() != 0)
-            return;
         for (size_t i = 0; i < s1.size(); ++i)
             s2[i] = s1[i];
         merge_it(&s1[0], &s2[0], s1.size()/2, s1.size());
@@ -129,7 +125,7 @@ int main(int argc, char** argv)
     parallel_engine pe(&argc, &argv);
     //HERE
     global_proc = comm_world.rank();
-    //std::this_thread::sleep_for(std::chrono::seconds(7));
+    std::this_thread::sleep_for(std::chrono::seconds(7));
     //HERE
     size_t layers = 2;
     size_t size = 100000;
