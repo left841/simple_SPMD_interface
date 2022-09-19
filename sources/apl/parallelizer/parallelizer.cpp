@@ -1157,233 +1157,270 @@ namespace apl
 
     void parallelizer::worker()
     {
+        std::thread task_execution_thread(&parallelizer::task_execution_thread_function, this, comm.size());
+
         instruction cur_inst;
         while(1)
         {
-            instr_comm.recv<message>(&cur_inst, main_proc);
+            bool queue_try = false;
+            bool comm_try = false;
 
-            for (const instruction_block& i: cur_inst)
+            if (instr_comm.test_process(main_proc))
             {
-                switch (i.command())
-                {
-                case INSTRUCTION::MES_SEND:
-                {
-                    const instruction_message_send& j = dynamic_cast<const instruction_message_send&>(i);
-                    comm.isend(memory.get_message(j.id()), j.proc(), memory.get_message_request_block(j.id()));
-                    break;
-                }
-                case INSTRUCTION::MES_RECV:
-                {
-                    const instruction_message_recv& j = dynamic_cast<const instruction_message_recv&>(i);
-                    comm.irecv(memory.get_message(j.id()), j.proc(), memory.get_message_request_block(j.id()));
-                    break;
-                }
-                case INSTRUCTION::MES_INFO_SEND:
-                {
-                    const instruction_message_info_send& j = dynamic_cast<const instruction_message_info_send&>(i);
-                    request_block& info_req = memory.get_message_info_request_block(j.id());
-                    for (message* p: memory.get_message_info(j.id()))
-                        comm.isend(p, j.proc(), info_req);
-                    break;
-                }
-                case INSTRUCTION::MES_CREATE:
-                {
-                    const instruction_message_create& j = dynamic_cast<const instruction_message_create&>(i);
-                    std::vector<message*> iib = message_init_factory::get_info(j.type());
-                    request_block info_req;
-                    for (message* p: iib)
-                        comm.irecv(p, j.proc(), info_req);
-                    info_req.wait_all();
-                    memory.create_message_init_with_id(j.id(), j.type(), iib);
-                    break;
-                }
-                case INSTRUCTION::MES_P_CREATE:
-                {
-                    const instruction_message_part_create& j = dynamic_cast<const instruction_message_part_create&>(i);
-                    std::vector<message*> pib = message_child_factory::get_info(j.type());
-                    request_block info_req;
-                    for (message* p: pib)
-                        comm.irecv(p, j.proc(), info_req);
-                    info_req.wait_all();
-                    memory.create_message_child_with_id(j.id(), j.type(), j.source(), pib);
-                    break;
-                }
-                case INSTRUCTION::INCLUDE_MES_CHILD:
-                {
-                    const instruction_message_include_child_to_parent& j = dynamic_cast<const instruction_message_include_child_to_parent&>(i);
-                    memory.include_child_to_parent(j.child());
-                    break;
-                }
-                case INSTRUCTION::TASK_CREATE:
-                {
-                    const instruction_task_create& j = dynamic_cast<const instruction_task_create&>(i);
-                    memory.add_perform_with_id(j.id(), j.type(), j.data(), j.const_data());
-                    break;
-                }
-                case INSTRUCTION::TASK_EXE:
-                {
-                    const instruction_task_execute& j = dynamic_cast<const instruction_task_execute&>(i);
-                    execute_task(j.id().pi);
-                    break;
-                }
-                case INSTRUCTION::MES_DEL:
-                {
-                    const instruction_message_delete& j = dynamic_cast<const instruction_message_delete&>(i);
-                    memory.delete_message(j.id());
-                    break;
-                }
-                case INSTRUCTION::TASK_DEL:
-                {
-                    const instruction_task_delete& j = dynamic_cast<const instruction_task_delete&>(i);
-                    memory.delete_perform(j.id());
-                    break;
-                }
-                case INSTRUCTION::END:
+                instr_comm.recv<message>(&cur_inst, main_proc);
 
-                    goto end;
+                for (const instruction_block& i: cur_inst)
+                {
+                    switch (i.command())
+                    {
+                    case INSTRUCTION::MES_SEND:
+                    {
+                        const instruction_message_send& j = dynamic_cast<const instruction_message_send&>(i);
+                        comm.isend(memory.get_message(j.id()), j.proc(), memory.get_message_request_block(j.id()));
+                        break;
+                    }
+                    case INSTRUCTION::MES_RECV:
+                    {
+                        const instruction_message_recv& j = dynamic_cast<const instruction_message_recv&>(i);
+                        comm.irecv(memory.get_message(j.id()), j.proc(), memory.get_message_request_block(j.id()));
+                        break;
+                    }
+                    case INSTRUCTION::MES_INFO_SEND:
+                    {
+                        const instruction_message_info_send& j = dynamic_cast<const instruction_message_info_send&>(i);
+                        request_block& info_req = memory.get_message_info_request_block(j.id());
+                        for (message* p: memory.get_message_info(j.id()))
+                            comm.isend(p, j.proc(), info_req);
+                        break;
+                    }
+                    case INSTRUCTION::MES_CREATE:
+                    {
+                        const instruction_message_create& j = dynamic_cast<const instruction_message_create&>(i);
+                        std::vector<message*> iib = message_init_factory::get_info(j.type());
+                        request_block info_req;
+                        for (message* p: iib)
+                            comm.irecv(p, j.proc(), info_req);
+                        info_req.wait_all();
+                        memory.create_message_init_with_id(j.id(), j.type(), iib);
+                        break;
+                    }
+                    case INSTRUCTION::MES_P_CREATE:
+                    {
+                        const instruction_message_part_create& j = dynamic_cast<const instruction_message_part_create&>(i);
+                        std::vector<message*> pib = message_child_factory::get_info(j.type());
+                        request_block info_req;
+                        for (message* p: pib)
+                            comm.irecv(p, j.proc(), info_req);
+                        info_req.wait_all();
+                        memory.create_message_child_with_id(j.id(), j.type(), j.source(), pib);
+                        break;
+                    }
+                    case INSTRUCTION::INCLUDE_MES_CHILD:
+                    {
+                        const instruction_message_include_child_to_parent& j = dynamic_cast<const instruction_message_include_child_to_parent&>(i);
+                        memory.include_child_to_parent(j.child());
+                        break;
+                    }
+                    case INSTRUCTION::TASK_CREATE:
+                    {
+                        const instruction_task_create& j = dynamic_cast<const instruction_task_create&>(i);
+                        memory.add_perform_with_id(j.id(), j.type(), j.data(), j.const_data());
+                        break;
+                    }
+                    case INSTRUCTION::TASK_EXE:
+                    {
+                        const instruction_task_execute& j = dynamic_cast<const instruction_task_execute&>(i);
+                        execute_task(j.id().pi);
+                        break;
+                    }
+                    case INSTRUCTION::MES_DEL:
+                    {
+                        const instruction_message_delete& j = dynamic_cast<const instruction_message_delete&>(i);
+                        memory.delete_message(j.id());
+                        break;
+                    }
+                    case INSTRUCTION::TASK_DEL:
+                    {
+                        const instruction_task_delete& j = dynamic_cast<const instruction_task_delete&>(i);
+                        memory.delete_perform(j.id());
+                        break;
+                    }
+                    case INSTRUCTION::END:
 
-                default:
+                        goto end;
 
-                    instr_comm.abort(234);
+                    default:
+
+                        instr_comm.abort(234);
+                    }
+                }
+                cur_inst.clear();
+                comm_try = true;
+            }
+
+            queue_try = finished_task_queue_mutex.try_lock();
+            if (queue_try)
+            {
+                if (finished_task_queue.empty())
+                {
+                    queue_try = false;
+                    finished_task_queue_mutex.unlock();
+                }
+                else
+                {
+                    finished_task_execution_queue_data current_finished_task_data{ finished_task_queue.front() };
+                    finished_task_queue.pop();
+                    finished_task_queue_mutex.unlock();
+
+                    worker_task_finishing(current_finished_task_data);
                 }
             }
-            cur_inst.clear();
+
+            if (!queue_try && !comm_try)
+                std::this_thread::yield();
         }
-        end:;
+        end:
+        task_execution_queue_data finish_queue_data;
+        finish_queue_data.this_task = nullptr;
+        task_queue_mutex.lock();
+        task_queue.push(finish_queue_data);
+        task_queue_mutex.unlock();
+        task_execution_thread.join();
     }
 
-    void parallelizer::execute_task(perform_id id)
+    void parallelizer::worker_task_finishing(finished_task_execution_queue_data& cur_task_exe_data)
     {
-        std::vector<local_message_id> data, c_data;
-        for (size_t j = 0; j < memory.get_perform_data(id).size(); ++j)
-            data.push_back({j, MESSAGE_SOURCE::TASK_ARG});
-        for (size_t j = 0; j < memory.get_perform_const_data(id).size(); ++j)
-            c_data.push_back({j, MESSAGE_SOURCE::TASK_ARG_C});
-
-        task_data td = {memory.get_perform_type(id), data, c_data};
-        task_environment env(std::move(td));
-        env.set_proc_count(comm.size());
-
-        memory.perform_task(id, env);
-
         std::vector<message_id> added_m_init, messages_init_id;
         std::vector<std::pair<message_id, message_id>> added_m_child, messages_childs_id;
-        for (const local_message_id& i: env.result_message_ids())
+        for (const local_message_id& i : cur_task_exe_data.this_task_environment.result_message_ids())
         {
             switch (i.src)
             {
-                case MESSAGE_SOURCE::INIT_A:
+            case MESSAGE_SOURCE::INIT_A:
+            {
+                message_init_add_data& d = cur_task_exe_data.this_task_environment.added_messages_init()[i.id];
+                added_m_init.push_back(memory.add_message_init(d.mes, d.type, d.ii));
+                break;
+            }
+            case MESSAGE_SOURCE::CHILD_A:
+            {
+                message_child_add_data& d = cur_task_exe_data.this_task_environment.added_messages_child()[i.id];
+
+                message_id src = MESSAGE_ID_UNDEFINED;
+                switch (d.sourse.src)
                 {
-                    message_init_add_data& d = env.added_messages_init()[i.id];
-                    added_m_init.push_back(memory.add_message_init(d.mes, d.type, d.ii));
+                case MESSAGE_SOURCE::TASK_ARG:
+                {
+                    src = memory.get_perform_data(cur_task_exe_data.this_task_id)[d.sourse.id];
                     break;
                 }
-                case MESSAGE_SOURCE::CHILD_A:
+                case MESSAGE_SOURCE::TASK_ARG_C:
                 {
-                    message_child_add_data& d = env.added_messages_child()[i.id];
-
-                    message_id src = MESSAGE_ID_UNDEFINED;
-                    switch (d.sourse.src)
-                    {
-                        case MESSAGE_SOURCE::TASK_ARG:
-                        {
-                            src = memory.get_perform_data(id)[d.sourse.id];
-                            break;
-                        }
-                        case MESSAGE_SOURCE::TASK_ARG_C:
-                        {
-                            src = memory.get_perform_const_data(id)[d.sourse.id];
-                            break;
-                        }
-                        case MESSAGE_SOURCE::INIT:
-                        {
-                            src = messages_init_id[d.sourse.id];
-                            break;
-                        }
-                        case MESSAGE_SOURCE::INIT_A:
-                        {
-                            src = added_m_init[d.sourse.id];
-                            break;
-                        }
-                        case MESSAGE_SOURCE::CHILD:
-                        {
-                            src = messages_childs_id[d.sourse.id].second;
-                            break;
-                        }
-                        case MESSAGE_SOURCE::CHILD_A:
-                        {
-                            src = added_m_child[d.sourse.id].second;
-                            break;
-                        }
-                        default:
-                            comm.abort(767);
-                    }
-                    added_m_child.push_back({src, memory.add_message_child(d.mes, d.type, src, d.pi)});
+                    src = memory.get_perform_const_data(cur_task_exe_data.this_task_id)[d.sourse.id];
                     break;
                 }
                 case MESSAGE_SOURCE::INIT:
                 {
-                    message_init_data& d = env.created_messages_init()[i.id];
-                    messages_init_id.push_back(memory.create_message_init(d.type, d.ii));
+                    src = messages_init_id[d.sourse.id];
+                    break;
+                }
+                case MESSAGE_SOURCE::INIT_A:
+                {
+                    src = added_m_init[d.sourse.id];
                     break;
                 }
                 case MESSAGE_SOURCE::CHILD:
                 {
-                    message_child_data& d = env.created_messages_child()[i.id];
-
-                    message_id src = MESSAGE_ID_UNDEFINED;
-                    switch (d.sourse.src)
-                    {
-                        case MESSAGE_SOURCE::TASK_ARG:
-                        {
-                            src = memory.get_perform_data(id)[d.sourse.id];
-                            break;
-                        }
-                        case MESSAGE_SOURCE::TASK_ARG_C:
-                        {
-                            src = memory.get_perform_const_data(id)[d.sourse.id];
-                            break;
-                        }
-                        case MESSAGE_SOURCE::INIT:
-                        {
-                            src = messages_init_id[d.sourse.id];
-                            break;
-                        }
-                        case MESSAGE_SOURCE::INIT_A:
-                        {
-                            src = added_m_init[d.sourse.id];
-                            break;
-                        }
-                        case MESSAGE_SOURCE::CHILD:
-                        {
-                            src = messages_childs_id[d.sourse.id].second;
-                            break;
-                        }
-                        case MESSAGE_SOURCE::CHILD_A:
-                        {
-                            src = added_m_child[d.sourse.id].second;
-                            break;
-                        }
-                        default:
-                            comm.abort(767);
-                    }
-                    messages_childs_id.push_back({src, memory.create_message_child(d.type, src, d.pi)});
+                    src = messages_childs_id[d.sourse.id].second;
+                    break;
+                }
+                case MESSAGE_SOURCE::CHILD_A:
+                {
+                    src = added_m_child[d.sourse.id].second;
                     break;
                 }
                 default:
                     comm.abort(767);
+                }
+                added_m_child.push_back({ src, memory.add_message_child(d.mes, d.type, src, d.pi) });
+                break;
+            }
+            case MESSAGE_SOURCE::INIT:
+            {
+                message_init_data& d = cur_task_exe_data.this_task_environment.created_messages_init()[i.id];
+                messages_init_id.push_back(memory.create_message_init(d.type, d.ii));
+                break;
+            }
+            case MESSAGE_SOURCE::CHILD:
+            {
+                message_child_data& d = cur_task_exe_data.this_task_environment.created_messages_child()[i.id];
+
+                message_id src = MESSAGE_ID_UNDEFINED;
+                switch (d.sourse.src)
+                {
+                case MESSAGE_SOURCE::TASK_ARG:
+                {
+                    src = memory.get_perform_data(cur_task_exe_data.this_task_id)[d.sourse.id];
+                    break;
+                }
+                case MESSAGE_SOURCE::TASK_ARG_C:
+                {
+                    src = memory.get_perform_const_data(cur_task_exe_data.this_task_id)[d.sourse.id];
+                    break;
+                }
+                case MESSAGE_SOURCE::INIT:
+                {
+                    src = messages_init_id[d.sourse.id];
+                    break;
+                }
+                case MESSAGE_SOURCE::INIT_A:
+                {
+                    src = added_m_init[d.sourse.id];
+                    break;
+                }
+                case MESSAGE_SOURCE::CHILD:
+                {
+                    src = messages_childs_id[d.sourse.id].second;
+                    break;
+                }
+                case MESSAGE_SOURCE::CHILD_A:
+                {
+                    src = added_m_child[d.sourse.id].second;
+                    break;
+                }
+                default:
+                    comm.abort(767);
+                }
+                messages_childs_id.push_back({ src, memory.create_message_child(d.type, src, d.pi) });
+                break;
+            }
+            default:
+                comm.abort(767);
             }
         }
 
         instruction res;
-        res.add_task_result(memory.get_task_id(id));
+        res.add_task_result(memory.get_task_id(cur_task_exe_data.this_task_id));
         res.add_add_result_to_memory(added_m_init, added_m_child);
         res.add_add_result_to_memory(messages_init_id, messages_childs_id);
 
         request_block req;
         instr_comm.send<message>(&res, main_proc);
-        comm.isend<message>(&env, main_proc, req);
+        comm.isend<message>(&cur_task_exe_data.this_task_environment, main_proc, req);
         req.wait_all();
+    }
+
+    void parallelizer::execute_task(perform_id id)
+    {
+        task_execution_queue_data current_data{ id, memory.get_task(memory.get_task_id(id).mi), memory.get_perform_type(id) };
+        for (message_id j: memory.get_perform_data(id))
+            current_data.args.push_back(memory.get_message(j));
+        for (message_id j: memory.get_perform_const_data(id))
+            current_data.const_args.push_back(memory.get_message(j));
+
+        task_queue_mutex.lock();
+        task_queue.push(std::move(current_data));
+        task_queue_mutex.unlock();
     }
 
     process parallelizer::get_current_proc()
