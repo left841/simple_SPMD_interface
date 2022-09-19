@@ -15,6 +15,16 @@ namespace apl
     task_environment::task_environment(task_data&& td): this_task(std::move(td)), this_task_id({{0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL}), proc_count(0)
     { set_all_task_data(); }
 
+    task_environment::task_environment(perform_type type, size_t args_count, size_t const_args_count, size_t processes_count): this_task_id({ {0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL }), proc_count(processes_count)
+    {
+        for (size_t j = 0; j < args_count; ++j)
+            this_task.data.push_back({ j, MESSAGE_SOURCE::TASK_ARG });
+        for (size_t j = 0; j < const_args_count; ++j)
+            this_task.c_data.push_back({ j, MESSAGE_SOURCE::TASK_ARG_C });
+        this_task.type = type;
+        set_all_task_data();
+    }
+
     void task_environment::set_all_task_data()
     {
         size_t i = 0, j = 0;
