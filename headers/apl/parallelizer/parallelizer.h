@@ -6,6 +6,8 @@
 #include <map>
 #include <set>
 #include <limits>
+#include <thread>
+#include <mutex>
 #include "mpi.h"
 #include "apl/parallel_defs.h"
 #include "apl/parallel_core.h"
@@ -22,6 +24,21 @@ namespace apl
     {
     private:
 
+        struct task_execution_queue_data
+        {
+            perform_id this_task_id;
+            task* this_task;
+            perform_type task_type;
+            std::vector<message*> args;
+            std::vector<const message*> const_args;
+        };
+
+        struct finished_task_execution_queue_data
+        {
+            perform_id this_task_id;
+            task_environment this_task_environment;
+        };
+
         intracomm comm;
         intracomm instr_comm;
 
@@ -29,6 +46,11 @@ namespace apl
         std::vector<perform_id> tasks_to_del;
         std::vector<size_t> comm_workload;
         memory_manager memory;
+
+        std::mutex task_queue_mutex;
+        std::queue<task_execution_queue_data> task_queue;
+        std::mutex finished_task_queue_mutex;
+        std::queue<finished_task_execution_queue_data> finished_task_queue;
 
         void master();
         void worker();
@@ -39,6 +61,7 @@ namespace apl
         void send_instruction(instruction& ins);
         void end_main_task(perform_id tid, task_environment& te, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<perform_id>>& con_t);
         void wait_task(process proc, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<perform_id>>& con_t);
+        void task_execution_thread_function(size_t processes_count);
 
 
         void update_ready_tasks(perform_id tid);

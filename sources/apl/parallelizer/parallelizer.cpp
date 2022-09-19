@@ -35,14 +35,14 @@ namespace apl
 
     void parallelizer::master()
     {
-        std::vector<std::set<message_id>> versions(comm.size());
-        versions[0] = memory.get_messages_set();
+        std::vector<std::set<message_id>> versions_of_messages(comm.size());
+        versions_of_messages[0] = memory.get_messages_set();
         for (process i = 1; i < comm.size(); ++i)
-            versions[i] = versions[0];
+            versions_of_messages[i] = versions_of_messages[0];
 
-        std::vector<std::set<message_id>> contained(comm.size());
+        std::vector<std::set<message_id>> contained_messages(comm.size());
         for (process i = 0; i < comm.size(); ++i)
-            contained[i] = versions[0];
+            contained_messages[i] = versions_of_messages[0];
 
         std::vector<std::set<perform_id>> contained_tasks(comm.size());
         contained_tasks[0] = memory.get_performs_set();
@@ -52,6 +52,8 @@ namespace apl
         std::vector<instruction> ins(comm.size());
         std::vector<std::vector<perform_id>> assigned(comm.size());
         size_t all_assigned = 0;
+
+        std::thread task_execution_thread(&parallelizer::task_execution_thread_function, this, comm.size());
 
         ready_tasks = std::move(memory.get_ready_tasks());
 
@@ -80,10 +82,10 @@ namespace apl
 
                 for (process j = 0; j < comm.size(); ++j)
                 {
-                    if (contained[j].find(i) != contained[j].end())
+                    if (contained_messages[j].find(i) != contained_messages[j].end())
                     {
-                        contained[j].erase(i);
-                        versions[j].erase(i);
+                        contained_messages[j].erase(i);
+                        versions_of_messages[j].erase(i);
                         ins[j].add_message_del(i);
                     }
                 }
@@ -96,7 +98,7 @@ namespace apl
                 size_t px = sub + ((i < per) ? 1: 0);
                 for (size_t j = 0; j < px; ++j)
                 {
-                    send_task_data(ready_tasks.front(), i, ins.data(), versions, contained);
+                    send_task_data(ready_tasks.front(), i, ins.data(), versions_of_messages, contained_messages);
                     assigned[i].push_back(ready_tasks.front());
                     ready_tasks.pop();
                     ++all_assigned;
@@ -119,41 +121,111 @@ namespace apl
             send_instruction(ins[0]);
             ins[0].clear();
 
-            while (all_assigned > 0)
+            for (perform_id i: assigned[0])
             {
-                if (assigned[0].size() > 0)
-                {
-                    perform_id i = assigned[0].back();
-                    std::vector<local_message_id> data, c_data;
-                    for (size_t j = 0; j < memory.get_perform_data(i).size(); ++j)
-                        data.push_back({j, MESSAGE_SOURCE::TASK_ARG});
-                    for (size_t j = 0; j < memory.get_perform_const_data(i).size(); ++j)
-                        c_data.push_back({j, MESSAGE_SOURCE::TASK_ARG_C});
-                    task_data td = {memory.get_perform_type(i), data, c_data};
-                    task_environment te(td);
-                    te.set_proc_count(comm.size());
+                task_execution_queue_data current_data {i, memory.get_task(memory.get_task_id(i).mi), memory.get_perform_type(i)};
+                for (message_id j: memory.get_perform_data(i))
+                    current_data.args.push_back(memory.get_message(j));
+                for (message_id j: memory.get_perform_const_data(i))
+                    current_data.const_args.push_back(memory.get_message(j));
 
-                    memory.perform_task(i, te);
-                    end_main_task(i, te, versions, contained, contained_tasks);
-                    assigned[0].pop_back();
-                    --all_assigned;
-                }
-                for (process i = 1; i < comm.size(); ++i)
+                task_queue_mutex.lock();
+                task_queue.push(std::move(current_data));
+                task_queue_mutex.unlock();
+            }
+
+            while ((all_assigned > 0) && (assigned[0].size() > 0))
+            {
+                bool queue_try = false;
+                bool comm_try = false;
+                
+                queue_try = finished_task_queue_mutex.try_lock();
+                if (queue_try)
                 {
-                    if (assigned[i].size() > 0)
+                    if (finished_task_queue.empty())
                     {
-                        wait_task(i, versions, contained, contained_tasks);
-                        assigned[i].pop_back();
+                        queue_try = false;
+                        finished_task_queue_mutex.unlock();
+                    }
+                    else
+                    {
+                        finished_task_execution_queue_data current_finished_task_data {finished_task_queue.front()};
+                        finished_task_queue.pop();
+                        finished_task_queue_mutex.unlock();
+
+                        end_main_task(current_finished_task_data.this_task_id, current_finished_task_data.this_task_environment, versions_of_messages, contained_messages, contained_tasks);
+                        assigned[0].pop_back();
                         --all_assigned;
                     }
                 }
+                process current_proc = instr_comm.test_any_process();
+                if (current_proc != MPI_PROC_NULL)
+                {
+                    comm_try = true;
+
+                    wait_task(current_proc, versions_of_messages, contained_messages, contained_tasks);
+                    --all_assigned;
+                }
+
+                if (!comm_try && !queue_try)
+                    std::this_thread::yield();
             }
+
+            while (all_assigned > 0)
+            {
+                process current_proc = instr_comm.wait_any_process();
+                wait_task(current_proc, versions_of_messages, contained_messages, contained_tasks);
+                --all_assigned;
+            }
+
+            for (auto& i: assigned)
+            {
+                i.clear();
+            }
+
         }
 
         instruction end;
         end.add_end();
         for (process i = 1; i < instr_comm.size(); ++i)
             instr_comm.send<message>(&end, i);
+
+        task_queue_mutex.lock();
+        task_execution_queue_data exe_thread_end_data;
+        exe_thread_end_data.this_task = nullptr;
+        task_queue.push(exe_thread_end_data);
+        task_queue_mutex.unlock();
+        task_execution_thread.join();
+    }
+
+    void parallelizer::task_execution_thread_function(size_t processes_count)
+    {
+        while (true)
+        {
+            task_queue_mutex.lock();
+            if (task_queue.empty())
+            {
+                task_queue_mutex.unlock();
+                std::this_thread::yield();
+                continue;
+            }
+            task_execution_queue_data current_execution_data{task_queue.front()};
+            task_queue.pop();
+            task_queue_mutex.unlock();
+
+            if (current_execution_data.this_task == nullptr)
+                break;
+
+            finished_task_execution_queue_data current_output_data {current_execution_data.this_task_id, {current_execution_data.task_type,
+                current_execution_data.args.size(), current_execution_data.const_args.size(), processes_count}};
+            current_execution_data.this_task->set_environment(&current_output_data.this_task_environment);
+            task_factory::perform(current_execution_data.task_type, current_execution_data.this_task, current_execution_data.args, current_execution_data.const_args);
+            current_execution_data.this_task->set_environment(nullptr);
+
+            finished_task_queue_mutex.lock();
+            finished_task_queue.push(std::move(current_output_data));
+            finished_task_queue_mutex.unlock();
+        }
     }
 
     void parallelizer::send_task_data(perform_id tid, process proc, instruction* inss, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con)
