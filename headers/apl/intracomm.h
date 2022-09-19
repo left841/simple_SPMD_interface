@@ -56,6 +56,8 @@ namespace apl
 
         process wait_any_process() const;
         process test_any_process() const;
+        void wait_process(process proc) const;
+        bool test_process(process proc) const;
 
     };
 

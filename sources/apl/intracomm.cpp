@@ -49,6 +49,20 @@ namespace apl
         return MPI_PROC_NULL;
     }
 
+    void intracomm::wait_process(process proc) const
+    {
+        MPI_Status status;
+        apl_MPI_CHECKER(MPI_Probe(proc, MPI_ANY_TAG, comm, &status));
+    }
+
+    bool intracomm::test_process(process proc) const
+    {
+        int flag = 0;
+        MPI_Status status;
+        apl_MPI_CHECKER(MPI_Iprobe(proc, MPI_ANY_TAG, comm, &flag, &status));
+        return flag;
+    }
+
     global_intracomm::global_intracomm(): intracomm()
     { }
 
