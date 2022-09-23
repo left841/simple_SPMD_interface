@@ -227,6 +227,7 @@ int main(int argc, char** argv)
     parallel_engine pe(&argc, &argv);
 
     size_t sz = 100000;
+    size_t threads_count = 1;
     for (int i = 1; i < argc; ++i)
     {
         if ((strcmp(argv[i], "-s") == 0) || (strcmp(argv[i], "-size") == 0))
@@ -242,11 +243,15 @@ int main(int argc, char** argv)
         {
             checking = true;
         }
+        else if ((strcmp(argv[i], "-t") == 0) || (strcmp(argv[i], "-threads") == 0))
+        {
+            threads_count = atoll(argv[++i]);
+        }
     }
 
-    parallelizer pz;
+    parallelizer pz(threads_count);
 
-    size_t comm_size = pz.get_proc_count();
+    size_t comm_size = pz.get_workers_count();
     if (!pred_initialized)
         quick_task::pred = std::max(sz / (comm_size * 3 / 2), size_t(2));
 

@@ -107,6 +107,7 @@ int main(int argc, char** argv)
 {
     parallel_engine pe(&argc, &argv);
 
+    size_t threads_count = 1;
     for (int i = 1; i < argc; ++i)
     {
         if (strcmp(argv[i], "-t") == 0)
@@ -125,9 +126,13 @@ int main(int argc, char** argv)
         {
             inf_runtime = true;
         }
+        else if (strcmp(argv[i], "-threads") == 0)
+        {
+            threads_count = atoll(argv[++i]);
+        }
     }
 
-    parallelizer pz;
+    parallelizer pz(threads_count);
 
     int t_count = average_task_count, m_count = average_message_count;
     long long gen = time(0);

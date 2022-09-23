@@ -111,9 +111,9 @@ public:
         mes_id<my_vector> output_id = create_message<my_vector>(new size_t(size));
 
         size_t offset = 0;
-        for (int i = 0; i < working_processes(); ++i)
+        for (int i = 0; i < get_workers_count(); ++i)
         {
-            size_t new_size = size / working_processes() + ((size % working_processes() > i) ? 1 : 0);
+            size_t new_size = size / get_workers_count() + ((size % get_workers_count() > i) ? 1 : 0);
 
             mes_id<my_vector> first_child = create_message_child<my_vector>(first_id, new size_t(new_size), new size_t(offset));
             mes_id<my_vector> second_child = create_message_child<my_vector>(second_id, new size_t(new_size), new size_t(offset));

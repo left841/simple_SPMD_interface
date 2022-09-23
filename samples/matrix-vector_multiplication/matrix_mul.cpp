@@ -192,9 +192,9 @@ public:
         t = MPI_Wtime();
 
         size_t offset = 0;
-        for (size_t i = 0; i < working_processes(); i++)
+        for (size_t i = 0; i < get_workers_count(); i++)
         {
-            size_t h = n / working_processes() + ((i < n % working_processes()) ? 1: 0);
+            size_t h = n / get_workers_count() + ((i < n % get_workers_count()) ? 1: 0);
             mes_id<matrix<int>> a_child = create_message_child<matrix<int>>(a_id, new size_t(h), new size_t(m), new size_t(offset), new size_t(0));
             mes_id<vector<int>> c_child = create_message_child<vector<int>>(c_id, new size_t(h), new size_t(offset));
             create_child_task<multiply_task<int>>(a_child.as_const(), b_id.as_const(), c_child);
@@ -216,6 +216,7 @@ int main(int argc, char** argv)
     parallel_engine pe(&argc, &argv);
 
     size_t n(100), m(50);
+    size_t threads_count = 1;
     for (int i = 1; i < argc; ++i)
     {
         if ((strcmp(argv[i], "-s") == 0) || (strcmp(argv[i], "-size") == 0))
@@ -227,8 +228,12 @@ int main(int argc, char** argv)
         {
             checking = true;
         }
+        else if ((strcmp(argv[i], "-t") == 0) || (strcmp(argv[i], "-threads") == 0))
+        {
+            threads_count = atoll(argv[++i]);
+        }
     }
-    parallelizer pz;
+    parallelizer pz(threads_count);
 
     double time;
     init_task ti;

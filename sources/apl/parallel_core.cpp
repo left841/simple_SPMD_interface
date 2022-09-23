@@ -31,9 +31,9 @@ namespace apl
             int flag;
             apl_MPI_CHECKER(MPI_Initialized(&flag));
             if (!flag)
-                apl_MPI_CHECKER(MPI_Init_thread(argc, argv, MPI_THREAD_MULTIPLE, &thread_support_level));
-            if (thread_support_level != MPI_THREAD_MULTIPLE)
-                throw std::runtime_error("library need MPI_THREAD_MULTIPLE level of thread support");
+                apl_MPI_CHECKER(MPI_Init_thread(argc, argv, MPI_THREAD_SERIALIZED, &thread_support_level));
+            if (thread_support_level < MPI_THREAD_SERIALIZED)
+                throw std::runtime_error("library need MPI_THREAD_SERIALIZED level of thread support");
             start_time = MPI_Wtime();
             comm_world.assign(MPI_COMM_WORLD);
             comm_self.assign(MPI_COMM_SELF);

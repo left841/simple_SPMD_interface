@@ -41,6 +41,7 @@ namespace apl
 
         intracomm comm;
         intracomm instr_comm;
+        size_t execution_thread_count;
 
         std::queue<perform_id> ready_tasks;
         std::vector<perform_id> tasks_to_del;
@@ -75,12 +76,12 @@ namespace apl
 
         const static process main_proc;
 
-        parallelizer(const intracomm& _comm = comm_world);
-        parallelizer(task_graph& _tg, const intracomm& _comm = comm_world);
+        parallelizer(size_t thread_count = 1, const intracomm& _comm = comm_world);
+        parallelizer(task_graph& _tg, size_t thread_count = 1, const intracomm& _comm = comm_world);
         ~parallelizer();
 
         process get_current_proc();
-        int get_proc_count();
+        size_t get_workers_count();
 
         void init(task_graph& _tg);
 
