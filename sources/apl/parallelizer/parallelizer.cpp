@@ -5,10 +5,10 @@ namespace apl
 
     const process parallelizer::main_proc = 0;
 
-    parallelizer::parallelizer(const intracomm& _comm): comm(_comm), instr_comm(comm)
+    parallelizer::parallelizer(size_t thread_count, const intracomm& _comm): comm(_comm), instr_comm(comm), execution_thread_count(thread_count)
     { }
 
-    parallelizer::parallelizer(task_graph& _tg, const intracomm& _comm): comm(_comm), instr_comm(comm), memory(_tg)
+    parallelizer::parallelizer(task_graph& _tg, size_t thread_count, const intracomm& _comm): comm(_comm), instr_comm(comm), memory(_tg), execution_thread_count(thread_count)
     { }
 
     parallelizer::~parallelizer()
@@ -53,7 +53,9 @@ namespace apl
         std::vector<std::vector<perform_id>> assigned(comm.size());
         size_t all_assigned = 0;
 
-        std::thread task_execution_thread(&parallelizer::task_execution_thread_function, this, comm.size());
+        std::vector<std::unique_ptr<std::thread>> task_execution_thread_v(execution_thread_count);
+        for (auto& i: task_execution_thread_v)
+            i.reset(new std::thread(&parallelizer::task_execution_thread_function, this, comm.size()));
 
         ready_tasks = std::move(memory.get_ready_tasks());
 
@@ -195,7 +197,8 @@ namespace apl
         exe_thread_end_data.this_task = nullptr;
         task_queue.push(exe_thread_end_data);
         task_queue_mutex.unlock();
-        task_execution_thread.join();
+        for (auto& i: task_execution_thread_v)
+            i->join();
     }
 
     void parallelizer::task_execution_thread_function(size_t processes_count)
@@ -217,7 +220,7 @@ namespace apl
                 break;
 
             finished_task_execution_queue_data current_output_data {current_execution_data.this_task_id, {current_execution_data.task_type,
-                current_execution_data.args.size(), current_execution_data.const_args.size(), processes_count}};
+                current_execution_data.args.size(), current_execution_data.const_args.size(), processes_count * execution_thread_count}};
             current_execution_data.this_task->set_environment(&current_output_data.this_task_environment);
             task_factory::perform(current_execution_data.task_type, current_execution_data.this_task, current_execution_data.args, current_execution_data.const_args);
             current_execution_data.this_task->set_environment(nullptr);
@@ -226,6 +229,12 @@ namespace apl
             finished_task_queue.push(std::move(current_output_data));
             finished_task_queue_mutex.unlock();
         }
+
+        task_queue_mutex.lock();
+        task_execution_queue_data exe_thread_end_data;
+        exe_thread_end_data.this_task = nullptr;
+        task_queue.push(exe_thread_end_data);
+        task_queue_mutex.unlock();
     }
 
     void parallelizer::send_task_data(perform_id tid, process proc, instruction* inss, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con)
@@ -1157,7 +1166,9 @@ namespace apl
 
     void parallelizer::worker()
     {
-        std::thread task_execution_thread(&parallelizer::task_execution_thread_function, this, comm.size());
+        std::vector<std::unique_ptr<std::thread>> task_execution_thread_v(execution_thread_count);
+        for (auto& i : task_execution_thread_v)
+            i.reset(new std::thread(&parallelizer::task_execution_thread_function, this, comm.size()));
 
         instruction cur_inst;
         while(1)
@@ -1285,7 +1296,8 @@ namespace apl
         task_queue_mutex.lock();
         task_queue.push(finish_queue_data);
         task_queue_mutex.unlock();
-        task_execution_thread.join();
+        for (auto& i: task_execution_thread_v)
+            i->join();
     }
 
     void parallelizer::worker_task_finishing(finished_task_execution_queue_data& cur_task_exe_data)
@@ -1426,8 +1438,8 @@ namespace apl
     process parallelizer::get_current_proc()
     { return comm.rank(); }
 
-    int parallelizer::get_proc_count()
-    { return comm.size(); }
+    size_t parallelizer::get_workers_count()
+    { return comm.size() * execution_thread_count; }
 
     void parallelizer::clear()
     { memory.clear(); }

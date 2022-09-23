@@ -140,7 +140,7 @@ public:
 
     void operator()(const array& in, const array& out)
     {
-        if ((depth << 1) > working_processes())
+        if ((depth << 1) > get_workers_count())
             create_child_task<merge_all_task>(arg_id<0, array>(), arg_id<1, array>());
         else
         {
@@ -225,6 +225,7 @@ int main(int argc, char** argv)
 {
     parallel_engine pe(&argc, &argv);
     size_t size = 100000;
+    size_t threads_count = 1;
     for (int i = 1; i < argc; ++i)
     {
         if ((strcmp(argv[i], "-s") == 0) || (strcmp(argv[i], "-size") == 0))
@@ -235,9 +236,13 @@ int main(int argc, char** argv)
         {
             checking = true;
         }
+        else if ((strcmp(argv[i], "-t") == 0) || (strcmp(argv[i], "-threads") == 0))
+        {
+            threads_count = atoll(argv[++i]);
+        }
     }
 
-    parallelizer pz;
+    parallelizer pz(threads_count);
 
     double time = 0;
     init_task ti;

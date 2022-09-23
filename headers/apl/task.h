@@ -158,7 +158,7 @@ namespace apl
     {
     private:
 
-        size_t proc_count;
+        size_t workers_count;
         task_data this_task;
         std::vector<local_message_id> all_task_data;
         local_task_id this_task_id;
@@ -214,8 +214,8 @@ namespace apl
         task_data get_this_task_data() const;
         local_task_id get_this_task_id() const;
 
-        void set_proc_count(size_t sz);
-        size_t working_processes() const;
+        void set_workers_count(size_t sz);
+        size_t get_workers_count() const;
 
         void send(const sender& se) const override;
         void recv(const receiver& re) override;
@@ -302,7 +302,7 @@ namespace apl
         template<class Type>
         new_task_id<Type> this_task_id() const;
 
-        size_t working_processes() const;
+        size_t get_workers_count() const;
 
     public:
 

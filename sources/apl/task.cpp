@@ -3,19 +3,19 @@
 namespace apl
 {
 
-    task_environment::task_environment(): this_task_id({{0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL}), proc_count(0)
+    task_environment::task_environment(): this_task_id({{0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL}), workers_count(0)
     { }
 
-    task_environment::task_environment(task_data& td): this_task_id({{0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL}), proc_count(0)
+    task_environment::task_environment(task_data& td): this_task_id({{0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL}), workers_count(0)
     {
         this_task = td;
         set_all_task_data();
     }
 
-    task_environment::task_environment(task_data&& td): this_task(std::move(td)), this_task_id({{0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL}), proc_count(0)
+    task_environment::task_environment(task_data&& td): this_task(std::move(td)), this_task_id({{0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL}), workers_count(0)
     { set_all_task_data(); }
 
-    task_environment::task_environment(perform_type type, size_t args_count, size_t const_args_count, size_t processes_count): this_task_id({ {0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL }), proc_count(processes_count)
+    task_environment::task_environment(perform_type type, size_t args_count, size_t const_args_count, size_t processes_count): this_task_id({ {0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL }), workers_count(processes_count)
     {
         for (size_t j = 0; j < args_count; ++j)
             this_task.data.push_back({ j, MESSAGE_SOURCE::TASK_ARG });
@@ -132,11 +132,11 @@ namespace apl
     local_task_id task_environment::get_this_task_id() const
     { return this_task_id; }
 
-    void task_environment::set_proc_count(size_t sz)
-    { proc_count = sz; }
+    void task_environment::set_workers_count(size_t sz)
+    { workers_count = sz; }
 
-    size_t task_environment::working_processes() const
-    { return proc_count; }
+    size_t task_environment::get_workers_count() const
+    { return workers_count; }
 
     void task_environment::send(const sender& se) const
     {
@@ -468,8 +468,8 @@ namespace apl
     void task::add_dependence(local_task_id parent, local_task_id child) const
     { env->add_dependence(parent, child); }
 
-    size_t task::working_processes() const
-    { return env->working_processes(); }
+    size_t task::get_workers_count() const
+    { return env->get_workers_count(); }
 
     void task::send(const sender& se) const
     { }

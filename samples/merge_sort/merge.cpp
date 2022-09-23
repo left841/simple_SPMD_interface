@@ -119,6 +119,7 @@ int main(int argc, char** argv)
     size_t layers = 2;
     size_t size = 100000;
     bool checks = false;
+    size_t threads_count = 1;
     for (int i = 1; i < argc; ++i)
     {
         if ((strcmp(argv[i], "-s") == 0) || (strcmp(argv[i], "-size") == 0))
@@ -132,6 +133,10 @@ int main(int argc, char** argv)
         else if (strcmp(argv[i], "-check") == 0)
         {
             checks = true;
+        }
+        else if ((strcmp(argv[i], "-t") == 0) || (strcmp(argv[i], "-threads") == 0))
+        {
+            threads_count = atoll(argv[++i]);
         }
     }
 
@@ -151,10 +156,10 @@ int main(int argc, char** argv)
     }
     
     double true_start_time = MPI_Wtime();
-    parallelizer pz;
+    parallelizer pz(threads_count);
     task_graph tg;
 
-    int comm_size = pz.get_proc_count();
+    int comm_size = pz.get_workers_count();
     {
         int j = 1;
         size_t i = 0;
