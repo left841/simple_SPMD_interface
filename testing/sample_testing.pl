@@ -4,211 +4,143 @@ open $output_file, ">", "result_output.txt" or die;
 @ARGV;
 if (@ARGV < 1)
 {
-    print "usage (windows): sample_testing.pl <max_number_of_processes>\n";
-    print "usage (linux): sample_testing.pl <max_number_of_processes> linux\n";
+    print "usage (windows): sample_testing.pl -exe_vec number_of_setups <max_number_of_processes> <max_number_of_threads>\n";
+    print "usage (linux): sample_testing.pl -exe_vec number_of_setups <max_number_of_processes> <max_number_of_threads> -linux\n";
     exit;
 }
 
 $prefix = "";
-$posfix = ".exe";
-if (@ARGV > 1)
+$postfix = ".exe";
+$check_try = 5;
+$check_work = 0;
+
+$i = 0;
+while ($i < @ARGV)
 {
-    if ($ARGV[1] eq "linux")
+    if ($ARGV[$i] eq "-exe_vec")
+    {
+        $setups = $ARGV[$i + 1];
+        for ($j = 0; $j < $setups; ++$j)
+        {
+            $i += 2;
+            push @processes, $ARGV[$i];
+            push @threads, $ARGV[$i + 1];
+        }
+        ++$i;
+    }
+    elsif (($ARGV[$i] eq "-t") or ($ARGV[$i] eq "-trys"))
+    {
+        $check_try = $ARGV[++$i];
+    }
+    elsif (($ARGV[$i] eq "-c") or ($ARGV[$i] eq "-check"))
+    {
+        $check_work = 1;
+    }
+    elsif ($ARGV[$i] eq "-linux")
     {
         $prefix = "./";
-        $posfix = "";
+        $postfix = "";
     }
-}
-
-for ($i = 1; $i < $ARGV[0]; $i *= 2)
-{
-    push @processes, $i;
-}
-push @processes, $ARGV[0];
-
-$check_try = 5;
-
-# matrix-matrix multiplication
-@matrix_mul_array = (1000, 2000, 5000, 10000);
-
-print $output_file "matrix-matrix_multiplication ";
-print "matrix-matrix multiplication\n";
-
-$execute_name = $prefix."matrix-matrix_multiplication".$posfix;
-
-for ($i = 0; $i < @matrix_mul_array; ++$i)
-{
-    print $output_file $matrix_mul_array[$i]." ";
-}
-print $output_file "\n";
-
-for ($i = 0; $i < @processes; ++$i)
-{
-    $proc_count = $processes[$i];
-    print $output_file "${proc_count} ";
-    for ($j = 0; $j < @matrix_mul_array; ++$j)
+    elsif ($ARGV[$i] eq "-windows")
     {
-        $size_param = $matrix_mul_array[$j];
-        print "count: ${size_param}, processes: ${proc_count} start\n";
-        $time = 0;
-        for ($k = 0; $k < $check_try; ++$k)
+        $prefix = "";
+        $postfix = ".exe";
+    }
+    ++$i;
+}
+
+@execution_tasks =
+(
+    {
+        'name' => "matrix-matrix multiplication",
+        'exe_name' => "matrix-matrix_multiplication",
+        'size_params' => ["500 500 500", "1000 1000 1000", "1500 1500 1500", "2000 2000 2000"],
+        'other_params' => "",
+        'check' => "false"
+    },
+    {
+        'name' => "matrix-vector multiplication",
+        'exe_name' => "matrix-vector_multiplication",
+        'size_params' => ["5000 5000", "10000 10000", "20000 20000"],
+        'other_params' => "",
+        'check' => "false"
+    },
+    {
+        'name' => "merge sort",
+        'exe_name' => "merge_sort",
+        'size_params' => ["10000000", "50000000", "100000000"],
+        'other_params' => "",
+        'check' => "false"
+    },
+    {
+        'name' => "dynamic merge sort",
+        'exe_name' => "dynamic_merge_sort",
+        'size_params' => ["10000000", "50000000", "100000000"],
+        'other_params' => "",
+        'check' => "false"
+    },
+    {
+        'name' => "quick sort",
+        'exe_name' => "quick_sort",
+        'size_params' => ["10000000", "50000000", "100000000"],
+        'other_params' => "",
+        'check' => "false"
+    }
+);
+
+for ($exe_data = 0; $exe_data < @execution_tasks; ++$exe_data)
+{
+    print $output_file $execution_tasks[$exe_data]{"name"}."\n";
+    print $output_file "processes;threads;";
+    print $execution_tasks[$exe_data]{"name"}."\n";
+
+    $execute_name = $prefix.$execution_tasks[$exe_data]{"exe_name"}.$postfix;
+
+    $size_array = $execution_tasks[$exe_data]{"size_params"};
+
+    for ($i = 0; $i < @{$size_array}; ++$i)
+    {
+        print $output_file ${$size_array}[$i].";";
+    }
+    print $output_file "\n";
+
+    for ($i = 0; $i < @processes; ++$i)
+    {
+        $proc_count = $processes[$i];
+        $thread_count = $threads[$i];
+        print $output_file "${proc_count};${thread_count};";
+
+        $other_params = $prefix.$execution_tasks[$exe_data]{"other_params"};
+        for ($j = 0; $j < @{$size_array}; ++$j)
         {
-            $res = `mpiexec -n ${proc_count} ${execute_name} -s ${size_param} ${size_param} ${size_param}`;
-            # @arr = split(/\n/, $res);
-            # if ($arr[0] ne "correct")
-            # {
-            #     print "error ".$arr[0]."\n";
-            #     die;
-            # }
-            # $time += $arr[1];
-            $time += $res;
+            $size_param = ${$size_array}[$j];
+            print "size: ${size_param}, processes: ${proc_count}, threads: ${thread_count} start\n";
+            if (($execution_tasks[$exe_data]{"check"} eq "true") or $check_work)
+            {
+                $res = `mpiexec -n ${proc_count} ${execute_name} -s ${size_param} ${other_params} -check`;
+                @arr = split(/\n/, $res);
+                if ($arr[0] ne "correct")
+                {
+                    print "error: ".$arr[0]."\n";
+                }
+                $out_tmp = $arr[0];
+                print $output_file "${out_tmp};";
+            }
+            else
+            {
+                $all_time = 0;
+                for ($k = 0; $k < $check_try; ++$k)
+                {
+                    $res = `mpiexec -n ${proc_count} ${execute_name} -s ${size_param} ${other_params}`;
+                    $all_time += $res;
+                }
+                $all_time /= $check_try;
+                print $output_file "${all_time};";
+            }
         }
-        $time /= $check_try;
-        print $output_file "${time} ";
+        print $output_file "\n";
     }
     print $output_file "\n";
 }
-print $output_file "\n";
 
-# matrix-vector multiplication
-@matrix_vec_array = (5000, 10000, 20000);
-
-print $output_file "matrix-vector_multiplication ";
-print "matrix-vector multiplication\n";
-
-$execute_name = $prefix."matrix-vector_multiplication".$posfix;
-
-for ($i = 0; $i < @matrix_vec_array; ++$i)
-{
-    print $output_file $matrix_vec_array[$i]." ";
-}
-print $output_file "\n";
-
-for ($i = 0; $i < @processes; ++$i)
-{
-    $proc_count = $processes[$i];
-    print $output_file "${proc_count} ";
-    for ($j = 0; $j < @matrix_vec_array; ++$j)
-    {
-        $size_param = $matrix_vec_array[$j];
-        print "count: ${size_param}, processes: ${proc_count} start\n";
-        $time = 0;
-        for ($k = 0; $k < $check_try; ++$k)
-        {
-            $res = `mpiexec -n ${proc_count} ${execute_name} -s ${size_param} ${size_param}`;
-            $time += $res;
-        }
-        $time /= $check_try;
-        print $output_file "${time} ";
-    }
-    print $output_file "\n";
-}
-print $output_file "\n";
-
-# merge sort
-@merge_sort_array = (10000000, 50000000, 100000000);
-
-print $output_file "merge_sort ";
-print "merge sort\n";
-
-$execute_name = $prefix."merge_sort".$posfix;
-
-for ($i = 0; $i < @merge_sort_array; ++$i)
-{
-    print $output_file $merge_sort_array[$i]." ";
-}
-print $output_file "\n";
-
-for ($i = 0; $i < @processes; ++$i)
-{
-    $proc_count = $processes[$i];
-    print $output_file "${proc_count} ";
-    for ($j = 0; $j < @merge_sort_array; ++$j)
-    {
-        $size_param = $merge_sort_array[$j];
-        print "count: ${size_param}, processes: ${proc_count} start\n";
-        $time = 0;
-        for ($k = 0; $k < $check_try; ++$k)
-        {
-            $res = `mpiexec -n ${proc_count} ${execute_name} -s ${size_param}`;
-            $time += $res;
-        }
-        $time /= $check_try;
-        print $output_file "${time} ";
-    }
-    print $output_file "\n";
-}
-print $output_file "\n";
-
-# dynamic merge sort
-@dmerge_array = (10000000, 50000000, 100000000);
-
-print $output_file "dynamic_merge_sort ";
-print "dynamic merge sort\n";
-
-$execute_name = $prefix."dynamic_merge_sort".$posfix;
-
-for ($i = 0; $i < @dmerge_array; ++$i)
-{
-    print $output_file $dmerge_array[$i]." ";
-}
-print $output_file "\n";
-
-for ($i = 0; $i < @processes; ++$i)
-{
-    $proc_count = $processes[$i];
-    print $output_file "${proc_count} ";
-    for ($j = 0; $j < @dmerge_array; ++$j)
-    {
-        $size_param = $dmerge_array[$j];
-        print "count: ${size_param}, processes: ${proc_count} start\n";
-        $time = 0;
-        for ($k = 0; $k < $check_try; ++$k)
-        {
-            $res = `mpiexec -n ${proc_count} ${execute_name} -s ${size_param}`;
-            $time += $res;
-        }
-        $time /= $check_try;
-        print $output_file "${time} ";
-    }
-    print $output_file "\n";
-}
-print $output_file "\n";
-
-# quick sort
-@quick_sort_array = (10000000, 50000000, 100000000);
-
-print $output_file "quick_sort ";
-print "quick sort\n";
-
-$execute_name = $prefix."quick_sort".$posfix;
-
-for ($i = 0; $i < @quick_sort_array; ++$i)
-{
-    print $output_file $quick_sort_array[$i]." ";
-}
-print $output_file "\n";
-
-for ($i = 0; $i < @processes; ++$i)
-{
-    $proc_count = $processes[$i];
-    print $output_file "${proc_count} ";
-    for ($j = 0; $j < @quick_sort_array; ++$j)
-    {
-        $size_param = $quick_sort_array[$j];
-        print "count: ${size_param}, processes: ${proc_count} start\n";
-        $time = 0;
-        for ($k = 0; $k < $check_try; ++$k)
-        {
-            $res = `mpiexec -n ${proc_count} ${execute_name} -s ${size_param}`;
-            $time += $res;
-        }
-        $time /= $check_try;
-        print $output_file "${time} ";
-    }
-    print $output_file "\n";
-}
-print $output_file "\n";
-
-# end
 close $output_file;
