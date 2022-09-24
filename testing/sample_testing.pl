@@ -117,7 +117,7 @@ for ($exe_data = 0; $exe_data < @execution_tasks; ++$exe_data)
             print "size: ${size_param}, processes: ${proc_count}, threads: ${thread_count} start\n";
             if (($execution_tasks[$exe_data]{"check"} eq "true") or $check_work)
             {
-                $res = `mpiexec -n ${proc_count} ${execute_name} -s ${size_param} ${other_params} -check`;
+                $res = `mpiexec -n ${proc_count} ${execute_name} -s ${size_param} -t ${thread_count} ${other_params} -check`;
                 @arr = split(/\n/, $res);
                 if ($arr[0] ne "correct")
                 {
@@ -131,7 +131,7 @@ for ($exe_data = 0; $exe_data < @execution_tasks; ++$exe_data)
                 $all_time = 0;
                 for ($k = 0; $k < $check_try; ++$k)
                 {
-                    $res = `mpiexec -n ${proc_count} ${execute_name} -s ${size_param} ${other_params}`;
+                    $res = `mpiexec -n ${proc_count} ${execute_name} -s ${size_param} -t ${thread_count} ${other_params}`;
                     $all_time += $res;
                 }
                 $all_time /= $check_try;
