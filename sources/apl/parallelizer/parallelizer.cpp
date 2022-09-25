@@ -53,7 +53,7 @@ namespace apl
         std::vector<std::vector<perform_id>> assigned(comm.size());
         size_t all_assigned = 0;
 
-        std::vector<std::unique_ptr<std::thread>> task_execution_thread_v(execution_thread_count);
+        std::vector<std::unique_ptr<std::thread>> task_execution_thread_v(execution_thread_count - 1);
         for (auto& i: task_execution_thread_v)
             i.reset(new std::thread(&parallelizer::task_execution_thread_function, this, comm.size()));
 
@@ -170,7 +170,29 @@ namespace apl
                 }
 
                 if (!comm_try && !queue_try)
-                    std::this_thread::yield();
+                {
+                    task_queue_mutex.lock();
+                    if (task_queue.empty())
+                    {
+                        task_queue_mutex.unlock();
+                        std::this_thread::yield();
+                        continue;
+                    }
+
+                    task_execution_queue_data current_execution_data{ task_queue.front() };
+                    task_queue.pop();
+                    task_queue_mutex.unlock();
+
+                    finished_task_execution_queue_data current_output_data{ current_execution_data.this_task_id, {current_execution_data.task_type,
+                        current_execution_data.args.size(), current_execution_data.const_args.size(), comm.size() * execution_thread_count} };
+                    current_execution_data.this_task->set_environment(&current_output_data.this_task_environment);
+                    task_factory::perform(current_execution_data.task_type, current_execution_data.this_task, current_execution_data.args, current_execution_data.const_args);
+                    current_execution_data.this_task->set_environment(nullptr);
+
+                    finished_task_queue_mutex.lock();
+                    finished_task_queue.push(std::move(current_output_data));
+                    finished_task_queue_mutex.unlock();
+                }
             }
 
             while (all_assigned > 0)
@@ -1166,7 +1188,7 @@ namespace apl
 
     void parallelizer::worker()
     {
-        std::vector<std::unique_ptr<std::thread>> task_execution_thread_v(execution_thread_count);
+        std::vector<std::unique_ptr<std::thread>> task_execution_thread_v(execution_thread_count - 1);
         for (auto& i : task_execution_thread_v)
             i.reset(new std::thread(&parallelizer::task_execution_thread_function, this, comm.size()));
 
@@ -1288,7 +1310,29 @@ namespace apl
             }
 
             if (!queue_try && !comm_try)
-                std::this_thread::yield();
+            {
+                task_queue_mutex.lock();
+                if (task_queue.empty())
+                {
+                    task_queue_mutex.unlock();
+                    std::this_thread::yield();
+                    continue;
+                }
+
+                task_execution_queue_data current_execution_data{ task_queue.front() };
+                task_queue.pop();
+                task_queue_mutex.unlock();
+
+                finished_task_execution_queue_data current_output_data{ current_execution_data.this_task_id, {current_execution_data.task_type,
+                    current_execution_data.args.size(), current_execution_data.const_args.size(), comm.size() * execution_thread_count} };
+                current_execution_data.this_task->set_environment(&current_output_data.this_task_environment);
+                task_factory::perform(current_execution_data.task_type, current_execution_data.this_task, current_execution_data.args, current_execution_data.const_args);
+                current_execution_data.this_task->set_environment(nullptr);
+
+                finished_task_queue_mutex.lock();
+                finished_task_queue.push(std::move(current_output_data));
+                finished_task_queue_mutex.unlock();
+            }
         }
         end:
         task_execution_queue_data finish_queue_data;
