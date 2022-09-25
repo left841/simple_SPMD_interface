@@ -61,8 +61,6 @@ namespace apl
 
         while (ready_tasks.size())
         {
-            size_t sub = ready_tasks.size() / comm.size();
-            size_t per = ready_tasks.size() % comm.size();
 
             for (perform_id i: tasks_to_del)
             {
@@ -94,19 +92,75 @@ namespace apl
             }
             tasks_to_del.clear();
 
-            comm_workload.resize(comm.size());
-            for (process i = 0; i < comm.size(); ++i)
             {
-                size_t px = sub + ((i < per) ? 1: 0);
-                for (size_t j = 0; j < px; ++j)
+                size_t comm_size_quotient = ready_tasks.size() / comm.size();
+                size_t comm_size_remainder = ready_tasks.size() % comm.size();
+                for (process i = 0; i < comm.size(); ++i)
                 {
-                    send_task_data(ready_tasks.front(), i, ins.data(), versions_of_messages, contained_messages);
-                    assigned[i].push_back(ready_tasks.front());
+                    size_t max_assigned_tasks_count = comm_size_quotient + ((i < comm_size_remainder) ? 1 : 0);
+                    assigned[i].resize(max_assigned_tasks_count);
+                    assigned[i].assign(max_assigned_tasks_count, PERFORM_ID_UNDEFINED);
+                }
+                std::vector<size_t> assigned_current_position(comm.size(), 0);
+
+                comm_workload.resize(comm.size());
+                while (ready_tasks.size())
+                {
+                    perform_id current_id = ready_tasks.front();
                     ready_tasks.pop();
+
+                    std::vector<process> decision_vector;
+                    std::vector<size_t> contained_task_data_counts(comm.size(), 0.0);
+                    std::vector<message_id>& cur_task_data_ids = memory.get_perform_data(current_id);
+                    std::vector<message_id>& cur_task_const_data_ids = memory.get_perform_const_data(current_id);
+                    for (process i = 0; i < comm.size(); ++i)
+                    {
+                        if (assigned_current_position[i] < assigned[i].size())
+                        {
+                            decision_vector.push_back(i);
+                            for (auto j: cur_task_data_ids)
+                            {
+                                message_id current = j;
+                                while (j != MESSAGE_ID_UNDEFINED)
+                                {
+                                    if (versions_of_messages[i].find(current) != versions_of_messages[i].end())
+                                    {
+                                        ++contained_task_data_counts[i];
+                                        break;
+                                    }
+                                    j = memory.get_message_parent(j);
+                                }
+                            }
+                            for (auto j: cur_task_const_data_ids)
+                            {
+                                message_id current = j;
+                                while (j != MESSAGE_ID_UNDEFINED)
+                                {
+                                    if (versions_of_messages[i].find(current) != versions_of_messages[i].end())
+                                    {
+                                        ++contained_task_data_counts[i];
+                                        break;
+                                    }
+                                    j = memory.get_message_parent(j);
+                                }
+                            }
+                        }
+                    }
+
+                    std::sort(decision_vector.begin(), decision_vector.end(), [&](process a, process b)->bool
+                    {
+                        if (contained_task_data_counts[a] != contained_task_data_counts[b])
+                            return contained_task_data_counts[a] > contained_task_data_counts[b];
+                        return a < b;
+                    });
+
+                    process current_proc = decision_vector[0];
+                    assigned[current_proc][assigned_current_position[current_proc]++] = current_id;
+                    send_task_data(current_id, current_proc, ins.data(), versions_of_messages, contained_messages);
                     ++all_assigned;
                 }
+                comm_workload.clear();
             }
-            comm_workload.clear();
 
             for (process i = 1; i < comm.size(); ++i)
                 for (perform_id j: assigned[i])
