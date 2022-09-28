@@ -110,7 +110,7 @@ namespace apl
                     ready_tasks.pop();
 
                     std::vector<process> decision_vector;
-                    std::vector<size_t> contained_task_data_counts(comm.size(), 0.0);
+                    std::vector<double> contained_task_data_counts(comm.size(), 0.0);
                     std::vector<message_id>& cur_task_data_ids = memory.get_perform_data(current_id);
                     std::vector<message_id>& cur_task_const_data_ids = memory.get_perform_const_data(current_id);
                     for (process i = 0; i < comm.size(); ++i)
@@ -120,28 +120,32 @@ namespace apl
                             decision_vector.push_back(i);
                             for (auto j: cur_task_data_ids)
                             {
+                                size_t depth = 0;
                                 message_id current = j;
-                                while (j != MESSAGE_ID_UNDEFINED)
+                                while ((current != MESSAGE_ID_UNDEFINED) && (depth < comm.size()))
                                 {
                                     if (versions_of_messages[i].find(current) != versions_of_messages[i].end())
                                     {
-                                        ++contained_task_data_counts[i];
+                                        contained_task_data_counts[i] += 1.0 - static_cast<double>(depth) / static_cast<double>(comm.size());
                                         break;
                                     }
-                                    j = memory.get_message_parent(j);
+                                    ++depth;
+                                    current = memory.get_message_parent(current);
                                 }
                             }
                             for (auto j: cur_task_const_data_ids)
                             {
+                                size_t depth = 0;
                                 message_id current = j;
-                                while (j != MESSAGE_ID_UNDEFINED)
+                                while (current != MESSAGE_ID_UNDEFINED)
                                 {
                                     if (versions_of_messages[i].find(current) != versions_of_messages[i].end())
                                     {
-                                        ++contained_task_data_counts[i];
+                                        contained_task_data_counts[i] += 1.0 - static_cast<double>(depth) / static_cast<double>(comm.size());
                                         break;
                                     }
-                                    j = memory.get_message_parent(j);
+                                    ++depth;
+                                    current = memory.get_message_parent(current);
                                 }
                             }
                         }
@@ -151,7 +155,7 @@ namespace apl
                     {
                         if (contained_task_data_counts[a] != contained_task_data_counts[b])
                             return contained_task_data_counts[a] > contained_task_data_counts[b];
-                        return a < b;
+                        return a > b;
                     });
 
                     process current_proc = decision_vector[0];
@@ -214,11 +218,11 @@ namespace apl
                         --all_assigned;
                     }
                 }
+
                 process current_proc = instr_comm.test_any_process();
                 if (current_proc != MPI_PROC_NULL)
                 {
                     comm_try = true;
-
                     wait_task(current_proc, versions_of_messages, contained_messages, contained_tasks);
                     --all_assigned;
                 }

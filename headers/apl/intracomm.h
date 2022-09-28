@@ -32,6 +32,8 @@ namespace apl
         template<typename Type>
         void isend(const Type* ptr, process proc, request_block& req) const;
         template<typename Type>
+        void cisend(const Type* ptr, process proc, request_block& req, size_t condition_size) const;
+        template<typename Type>
         void bsend(const Type* ptr, process proc) const;
         template<typename Type>
         void ibsend(const Type* ptr, process proc, request_block& req) const;
@@ -47,6 +49,8 @@ namespace apl
         void recv(Type* ptr, process proc) const;
         template<typename Type>
         void irecv(Type* ptr, process proc, request_block& req) const;
+        template<typename Type>
+        void cirecv(Type* ptr, process proc, request_block& req, size_t condition_size) const;
         template<typename Type>
         void bcast(Type* ptr, process root) const;
         template<typename Type>
@@ -72,6 +76,13 @@ namespace apl
     void intracomm::isend(const Type* ptr, process proc, request_block& req) const
     {
         standard_sender se(comm, proc);
+        se.isend(*ptr, req);
+    }
+
+    template<typename Type>
+    inline void intracomm::cisend(const Type* ptr, process proc, request_block& req, size_t condition_size) const
+    {
+        condition_sender se(comm, proc, condition_size);
         se.isend(*ptr, req);
     }
 
@@ -128,6 +139,13 @@ namespace apl
     void intracomm::irecv(Type* ptr, process proc, request_block& req) const
     {
         standard_receiver re(comm, proc);
+        re.irecv(*ptr, req);
+    }
+
+    template<typename Type>
+    inline void intracomm::cirecv(Type* ptr, process proc, request_block& req, size_t condition_size) const
+    {
+        condition_receiver re(comm, proc, condition_size);
         re.irecv(*ptr, req);
     }
 

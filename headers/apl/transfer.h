@@ -323,6 +323,41 @@ namespace apl
 
     };
 
+    class condition_sender: public sender
+    {
+    private:
+
+        MPI_Comm comm;
+        process proc;
+        size_t condition_size;
+
+        void send_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const;
+        MPI_Request isend_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const;
+
+    public:
+
+        condition_sender(MPI_Comm _comm, process _proc, size_t _condition_size);
+
+    };
+
+    class condition_receiver: public receiver
+    {
+    private:
+
+        MPI_Comm comm;
+        process proc;
+        size_t condition_size;
+
+        MPI_Status recv_impl(void* buf, size_t size, const simple_datatype& type, TAG tg) const;
+        MPI_Request irecv_impl(void* buf, size_t size, const simple_datatype& type, TAG tg) const;
+        MPI_Status probe_impl(TAG tg) const;
+
+    public:
+
+        condition_receiver(MPI_Comm _comm, process _proc, size_t _condition_size);
+
+    };
+
     struct byte_map
     {
         static const simple_datatype& get()
