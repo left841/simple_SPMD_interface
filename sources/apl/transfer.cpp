@@ -254,4 +254,52 @@ namespace apl
         return req;
     }
 
+    condition_sender::condition_sender(MPI_Comm _comm, process _proc, size_t _condition_size): sender(), comm(_comm), proc(_proc), condition_size(_condition_size)
+    { }
+
+    void condition_sender::send_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const
+    {
+        apl_MPI_CHECKER(MPI_Send(const_cast<void*>(buf), static_cast<int>(size), type.type, proc, static_cast<int>(tg), comm));
+    }
+
+    MPI_Request condition_sender::isend_impl(const void* buf, size_t size, const simple_datatype& type, TAG tg) const
+    {
+        MPI_Request req = MPI_REQUEST_NULL;
+        if (size * type.size_in_bytes < condition_size)
+            apl_MPI_CHECKER(MPI_Send(const_cast<void*>(buf), static_cast<int>(size), type.type, proc, static_cast<int>(tg), comm));
+        else
+            apl_MPI_CHECKER(MPI_Isend(const_cast<void*>(buf), static_cast<int>(size), type.type, proc, static_cast<int>(tg), comm, &req));
+        return req;
+    }
+
+    condition_receiver::condition_receiver(MPI_Comm _comm, process _proc, size_t _condition_size): receiver(), comm(_comm), proc(_proc), condition_size(_condition_size)
+    { }
+
+    MPI_Status condition_receiver::recv_impl(void* buf, size_t size, const simple_datatype& type, TAG tg = TAG::UNDEFINED) const
+    {
+        MPI_Status status {};
+        apl_MPI_CHECKER(MPI_Recv(buf, static_cast<int>(size), type.type, proc, static_cast<int>(tg), comm, &status));
+        return status;
+    }
+
+    MPI_Request condition_receiver::irecv_impl(void* buf, size_t size, const simple_datatype& type, TAG tg = TAG::UNDEFINED) const
+    {
+        MPI_Request req = MPI_REQUEST_NULL;
+        if (size * type.size_in_bytes < condition_size)
+        {
+            MPI_Status status {};
+            apl_MPI_CHECKER(MPI_Recv(buf, static_cast<int>(size), type.type, proc, static_cast<int>(tg), comm, &status));
+        }
+        else
+            apl_MPI_CHECKER(MPI_Irecv(buf, static_cast<int>(size), type.type, proc, static_cast<int>(tg), comm, &req));
+        return req;
+    }
+
+    MPI_Status condition_receiver::probe_impl(TAG tg) const
+    {
+        MPI_Status status{};
+        apl_MPI_CHECKER(MPI_Probe(proc, static_cast<int>(tg), comm, &status));
+        return status;
+    }
+
 }
