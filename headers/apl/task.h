@@ -158,7 +158,8 @@ namespace apl
     {
     private:
 
-        size_t workers_count;
+        size_t processes_count;
+        size_t threads_count;
         task_data this_task;
         std::vector<local_message_id> all_task_data;
         local_task_id this_task_id;
@@ -182,7 +183,7 @@ namespace apl
         task_environment();
         task_environment(task_data& td);
         task_environment(task_data&& td);
-        task_environment(perform_type type, size_t args_count, size_t const_args_count, size_t processes_count);
+        task_environment(perform_type type, size_t args_count, size_t const_args_count, size_t _processes_count, size_t _threads_count);
 
         local_message_id create_message_init(message_type type, const std::vector<message*>& info);
         local_message_id create_message_child(message_type type, local_message_id source, const std::vector<message*>& info);
@@ -214,8 +215,10 @@ namespace apl
         task_data get_this_task_data() const;
         local_task_id get_this_task_id() const;
 
-        void set_workers_count(size_t sz);
+        void set_workers_count(size_t _processes_count, size_t _threads_count);
         size_t get_workers_count() const;
+        size_t get_processes_count() const;
+        size_t get_threads_count() const;
 
         void send(const sender& se) const override;
         void recv(const receiver& re) override;
@@ -303,6 +306,8 @@ namespace apl
         new_task_id<Type> this_task_id() const;
 
         size_t get_workers_count() const;
+        size_t get_processes_count() const;
+        size_t get_threads_count() const;
 
     public:
 
