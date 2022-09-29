@@ -35,17 +35,10 @@ namespace apl
     }
 
     template<>
-    void instruction::write<perform_id>(const perform_id& val)
+    void instruction::write<task_id>(const task_id& val)
     {
         v.push_back(val.num);
         v.push_back(val.proc);
-    }
-
-    template<>
-    void instruction::write<task_id>(const task_id& val)
-    {
-        write(val.mi);
-        write(val.pi);
     }
 
     template<>
@@ -334,10 +327,10 @@ namespace apl
     { }
 
     size_t instruction_task_execute::size() const
-    { return 5; }
+    { return 3; }
 
     task_id instruction_task_execute::id() const
-    { return {{ins[1], static_cast<process>(ins[2])}, {ins[3], static_cast<process>(ins[4])}}; }
+    { return {ins[1], static_cast<process>(ins[2])}; }
 
     void instruction::add_task_execution(task_id id)
     {
@@ -356,9 +349,12 @@ namespace apl
     }
 
     task_id instruction_task_create::id() const
-    { return {{ins[1], static_cast<process>(ins[2])}, {ins[3], static_cast<process>(ins[4])}}; }
+    { return {ins[1], static_cast<process>(ins[2])}; }
 
-    perform_type instruction_task_create::type() const
+    message_id instruction_task_create::base_id() const
+    { return {ins[3], static_cast<process>(ins[4])}; }
+
+    task_type instruction_task_create::type() const
     { return ins[5]; }
 
     std::vector<message_id> instruction_task_create::data() const
@@ -373,10 +369,11 @@ namespace apl
         return read_vector<message_id>(pos);
     }
 
-    void instruction::add_task_creation(task_id id, perform_type type, std::vector<message_id> data, std::vector<message_id> c_data)
+    void instruction::add_task_creation(task_id id, message_id base_id, task_type type, std::vector<message_id> data, std::vector<message_id> c_data)
     {
         add_cmd(INSTRUCTION::TASK_CREATE);
         write(id);
+        write(base_id);
         v.push_back(type);
         write_vector(data);
         write_vector(c_data);
@@ -387,10 +384,10 @@ namespace apl
     { }
 
     size_t instruction_task_result::size() const
-    { return 5; }
+    { return 3; }
 
     task_id instruction_task_result::id() const
-    { return {{ins[1], static_cast<process>(ins[2])}, {ins[3], static_cast<process>(ins[4])}}; }
+    { return {ins[1], static_cast<process>(ins[2])}; }
 
     void instruction::add_task_result(task_id id)
     {
@@ -451,10 +448,10 @@ namespace apl
     size_t instruction_task_delete::size() const
     { return 3; }
 
-    perform_id instruction_task_delete::id() const
+    task_id instruction_task_delete::id() const
     { return {ins[1], static_cast<process>(ins[2])}; }
 
-    void instruction::add_task_del(perform_id id)
+    void instruction::add_task_del(task_id id)
     {
         add_cmd(INSTRUCTION::TASK_DEL);
         write(id);
