@@ -16,7 +16,7 @@ namespace apl
     {
         clear();
 
-        std::map<task*, perform_id> tmp;
+        std::map<task*, task_id> tmp;
         std::map<message*, message_id> dmp;
 
         for (auto it = _tg.d_map.begin(); it != _tg.d_map.end(); ++it)
@@ -36,7 +36,7 @@ namespace apl
                 else
                     data.push_back(dmp[it->second.data[i]]);
             }
-            add_perform_with_id({dmp[it->first], it->second.id}, it->second.type, data, c_data);
+            add_task_with_id(it->second.id, dmp[it->first], it->second.type, data, c_data);
             tmp[it->first] = it->second.id;
             task_map[it->second.id].parents_count = it->second.parents.size();
         }
@@ -52,9 +52,9 @@ namespace apl
         _tg.clear();
     }
 
-    std::queue<perform_id> memory_manager::get_ready_tasks()
+    std::queue<task_id> memory_manager::get_ready_tasks()
     {
-        std::queue<perform_id> q;
+        std::queue<task_id> q;
         for (auto it = task_map.begin(); it != task_map.end(); ++it)
             if (it->parents_count == 0)
                 q.push(it.key());
@@ -72,9 +72,9 @@ namespace apl
         return s;
     }
 
-    std::set<perform_id> memory_manager::get_performs_set()
+    std::set<task_id> memory_manager::get_tasks_set()
     {
-        std::set<perform_id> s;
+        std::set<task_id> s;
         for (auto it = task_map.begin(); it != task_map.end(); ++it)
             s.insert(it.key());
         return s;
@@ -112,11 +112,11 @@ namespace apl
         return new_id;
     }
 
-    perform_id memory_manager::add_perform(message_id mes, perform_type type, const std::vector<message_id>& data, const std::vector<message_id>& const_data)
+    task_id memory_manager::add_task(message_id mes, task_type type, const std::vector<message_id>& data, const std::vector<message_id>& const_data)
     {
-        std::vector<perform_id> childs;
-        perform_id new_id = {base_task_id++, parallel_engine::global_rank()};
-        task_map[new_id] = {mes, type, PERFORM_ID_UNDEFINED, 0, 0, childs, data, const_data};
+        std::vector<task_id> childs;
+        task_id new_id = {base_task_id++, parallel_engine::global_rank()};
+        task_map[new_id] = {mes, type, TASK_ID_UNDEFINED, 0, 0, childs, data, const_data};
 
         inc_ref_count(mes);
         for (message_id i: data)
@@ -128,23 +128,11 @@ namespace apl
         return new_id;
     }
 
-    task_id memory_manager::add_task(task* ptr, task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info)
-    {
-        message_id m_id = add_message_init(ptr, type.mt, info);
-        return {m_id, add_perform(m_id, type.pt, data, const_data)};
-    }
-
     message_id memory_manager::create_message_init(message_type type, std::vector<message*>& info)
     { return add_message_init(nullptr, type, info); }
 
     message_id memory_manager::create_message_child(message_type type, message_id parent, std::vector<message*>& info)
     { return add_message_child(nullptr, type, parent, info); }
-
-    task_id memory_manager::create_task(task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info)
-    {
-        message_id m_id = create_message_init(type.mt, info);
-        return {m_id, add_perform(m_id, type.pt, data, const_data)};
-    }
 
     void memory_manager::add_message_to_graph(message_id id, message_type type)
     {
@@ -214,23 +202,17 @@ namespace apl
         }
     }
 
-    void memory_manager::add_perform_with_id(task_id id, perform_type type, const std::vector<message_id>& data, const std::vector<message_id>& const_data)
+    void memory_manager::add_task_with_id(task_id id, message_id base_id, task_type type, const std::vector<message_id>& data, const std::vector<message_id>& const_data)
     {
-        std::vector<perform_id> childs;
-        task_map[id.pi] = {id.mi, type, PERFORM_ID_UNDEFINED, 0, 0, childs, data, const_data};
+        std::vector<task_id> childs;
+        task_map[id] = {base_id, type, TASK_ID_UNDEFINED, 0, 0, childs, data, const_data};
 
-        inc_ref_count(id.mi);
+        inc_ref_count(base_id);
         for (message_id i: data)
             inc_ref_count(i);
 
         for (message_id i: const_data)
             inc_ref_count(i);
-    }
-
-    void memory_manager::add_task_with_id(task* ptr, task_id id, task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info)
-    {
-        add_message_init_with_id(ptr, id.mi, type.mt, info);
-        add_perform_with_id(id, type.pt, data, const_data);
     }
 
     void memory_manager::create_message_init_with_id(message_id id, message_type type, std::vector<message*>& info)
@@ -239,13 +221,7 @@ namespace apl
     void memory_manager::create_message_child_with_id(message_id id, message_type type, message_id parent, std::vector<message*>& info)
     { return add_message_child_with_id(nullptr, id, type, parent, info); }
 
-    void memory_manager::create_task_with_id(task_id id, task_type type, std::vector<message_id>& data, std::vector<message_id>& const_data, std::vector<message*>& info)
-    {
-        create_message_init_with_id(id.mi, type.mt, info);
-        add_perform_with_id(id, type.pt, data, const_data);
-    }
-
-    void memory_manager::update_message_versions(perform_id id)
+    void memory_manager::update_message_versions(task_id id)
     {
         t_info& ti = task_map[id];
         for (message_id i: ti.data)
@@ -255,32 +231,26 @@ namespace apl
     void memory_manager::update_version(message_id id, size_t new_version)
     { mes_map[id].version = new_version; }
 
-    void memory_manager::add_dependence(perform_id parent, perform_id child)
+    void memory_manager::add_dependence(task_id parent, task_id child)
     {
         task_map[parent].childs.push_back(child);
         ++task_map[child].parents_count;
     }
 
-    void memory_manager::add_dependence(task_id parent, task_id child)
-    { 
-        task_map[parent.pi].childs.push_back(child.pi);
-        ++task_map[child.pi].parents_count;
-    }
-
-    void memory_manager::perform_task(perform_id id, task_environment& te)
+    void memory_manager::perform_task(task_id id, task_environment& te)
     {
         std::vector<message*> args;
-        for (message_id i: get_perform_data(id))
+        for (message_id i: get_task_data(id))
             args.push_back(get_message(i));
 
         std::vector<const message*> c_args;
-        for (message_id i: get_perform_const_data(id))
+        for (message_id i: get_task_const_data(id))
             c_args.push_back(get_message(i));
 
         t_info& ti = task_map[id];
 
-        get_task(ti.m_id)->set_environment(&te);
-        task_factory::perform(ti.type, get_task(ti.m_id), args, c_args);
+        get_message_as_task(ti.m_id)->set_environment(&te);
+        task_factory::perform(ti.type, get_message_as_task(ti.m_id), args, c_args);
     }
 
     void memory_manager::inc_ref_count(message_id id)
@@ -339,7 +309,7 @@ namespace apl
         delete_message_from_graph(id);
     }
 
-    void memory_manager::delete_perform(perform_id id)
+    void memory_manager::delete_task(task_id id)
     {
         t_info& ti = task_map[id];
 
@@ -354,12 +324,6 @@ namespace apl
         ti.data.clear();
         ti.const_data.clear();
         task_map.erase(id);
-    }
-
-    void memory_manager::delete_task(task_id id)
-    {
-        delete_perform(id.pi);
-        delete_message(id.mi);
     }
 
     void memory_manager::clear()
@@ -415,38 +379,26 @@ namespace apl
             messages_to_del.insert(id);
     }
 
-    void memory_manager::set_task(task_id id, task* new_task)
-    { mes_map[id.mi].d = new_task; }
-
     void memory_manager::set_task_type(task_id id, task_type new_type)
-    {
-        mes_graph[id.mi].type = new_type.mt;
-        task_map[id.pi].type = new_type.pt;
-    }
+    { task_map[id].type = new_type; }
 
     void memory_manager::set_task_parent(task_id id, task_id new_parent)
-    { task_map[id.pi].parent = new_parent.pi; }
-
-    void memory_manager::set_perform_parents_count(perform_id id, size_t new_parents_count)
-    { task_map[id].parents_count = new_parents_count; }
+    { task_map[id].parent = new_parent; }
 
     void memory_manager::set_task_parents_count(task_id id, size_t new_parents_count)
-    { task_map[id.pi].parents_count = new_parents_count; }
-
-    void memory_manager::set_perform_created_childs(perform_id id, size_t new_created_childs)
-    { task_map[id].created_childs = new_created_childs; }
+    { task_map[id].parents_count = new_parents_count; }
 
     void memory_manager::set_task_created_childs(task_id id, size_t new_created_childs)
-    { task_map[id.pi].created_childs = new_created_childs; }
+    { task_map[id].created_childs = new_created_childs; }
 
-    void memory_manager::set_task_childs(task_id id, std::vector<perform_id> new_childs)
-    { task_map[id.pi].childs = new_childs; }
+    void memory_manager::set_task_childs(task_id id, std::vector<task_id> new_childs)
+    { task_map[id].childs = new_childs; }
 
     void memory_manager::set_task_data(task_id id, std::vector<message_id> new_data)
-    { task_map[id.pi].data = new_data; }
+    { task_map[id].data = new_data; }
 
     void memory_manager::set_task_const_data(task_id id, std::vector<message_id> new_const_data)
-    { task_map[id.pi].const_data = new_const_data; }
+    { task_map[id].const_data = new_const_data; }
 
     size_t memory_manager::message_count()
     { return mes_map.size(); }
@@ -514,56 +466,32 @@ namespace apl
     size_t memory_manager::task_count()
     { return task_map.size(); }
 
-    task_id memory_manager::get_task_id(perform_id id)
-    { return { task_map[id].m_id, id}; }
+    message_id memory_manager::get_task_base_message(task_id id)
+    { return task_map[id].m_id; }
 
-    task* memory_manager::get_task(message_id id)
+    task* memory_manager::get_message_as_task(message_id id)
     { return dynamic_cast<task*>(get_message(id)); }
 
-    task* memory_manager::get_task(task_id id)
-    { return dynamic_cast<task*>(get_message(id.mi)); }
-
-    perform_type memory_manager::get_perform_type(perform_id id)
+    task_type memory_manager::get_task_type(task_id id)
     { return task_map[id].type; }
 
-    task_type memory_manager::get_task_type(task_id id)
-    { return {mes_graph[id.mi].type, task_map[id.pi].type}; }
-
-    perform_id memory_manager::get_perform_parent(perform_id id)
+    task_id memory_manager::get_task_parent(task_id id)
     { return task_map[id].parent; }
 
-    task_id memory_manager::get_task_parent(task_id id)
-    { return {task_map[task_map[id.pi].parent].m_id, task_map[id.pi].parent}; }
-
-    size_t memory_manager::get_perform_parents_count(perform_id id)
+    size_t memory_manager::get_task_parents_count(task_id id)
     { return task_map[id].parents_count; }
 
-    size_t memory_manager::get_task_parents_count(task_id id)
-    { return task_map[id.pi].parents_count; }
-
-    size_t memory_manager::get_perform_created_childs(perform_id id)
+    size_t memory_manager::get_task_created_childs(task_id id)
     { return task_map[id].created_childs; }
 
-    size_t memory_manager::get_task_created_childs(task_id id)
-    { return task_map[id.pi].created_childs; }
-
-    std::vector<perform_id>& memory_manager::get_perform_childs(perform_id id)
+    std::vector<task_id>& memory_manager::get_task_childs(task_id id)
     { return task_map[id].childs; }
 
-    std::vector<perform_id>& memory_manager::get_task_childs(task_id id)
-    { return task_map[id.pi].childs; }
-
-    std::vector<message_id>& memory_manager::get_perform_data(perform_id id)
+    std::vector<message_id>& memory_manager::get_task_data(task_id id)
     { return task_map[id].data; }
 
-    std::vector<message_id>& memory_manager::get_task_data(task_id id)
-    { return task_map[id.pi].data; }
-
-    std::vector<message_id>& memory_manager::get_perform_const_data(perform_id id)
-    { return task_map[id].const_data; }
-
     std::vector<message_id>& memory_manager::get_task_const_data(task_id id)
-    { return task_map[id.pi].const_data; }
+    { return task_map[id].const_data; }
 
     bool memory_manager::message_contained(message_id id)
     { return mes_map.contains(id); }
@@ -574,10 +502,7 @@ namespace apl
     bool memory_manager::message_has_parent(message_id id)
     { return mes_graph[id].parent != MESSAGE_ID_UNDEFINED; }
 
-    bool memory_manager::perform_has_parent(perform_id id)
-    { return task_map[id].parent != PERFORM_ID_UNDEFINED; }
-
     bool memory_manager::task_has_parent(task_id id)
-    { return task_map[id.pi].parent != PERFORM_ID_UNDEFINED; }
+    { return task_map[id].parent != TASK_ID_UNDEFINED; }
 
 }

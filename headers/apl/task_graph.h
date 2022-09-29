@@ -20,19 +20,10 @@ namespace apl
         bool operator<(const message_id& other) const;
     };
 
-    struct perform_id
+    struct task_id
     {
         size_t num;
         process proc;
-
-        bool operator!=(const perform_id& other) const;
-        bool operator<(const perform_id& other) const;
-    };
-
-    struct task_id
-    {
-        message_id mi;
-        perform_id pi;
 
         bool operator!=(const task_id& other) const;
         bool operator<(const task_id& other) const;
@@ -42,7 +33,7 @@ namespace apl
     {
     protected:
 
-        size_t base_perform_id;
+        size_t base_task_id;
         size_t base_message_id;
 
         struct d_id
@@ -55,8 +46,8 @@ namespace apl
 
         struct t_id
         {
-            perform_id id;
-            perform_type type;
+            task_id id;
+            task_type type;
             std::vector<message*> data;
             std::set<task*> childs;
             std::set<task*> parents;
@@ -71,7 +62,7 @@ namespace apl
         task_graph(const task_graph& _tg);
         task_graph& operator=(const task_graph& _tg);
 
-        void add_task(task* t, task_type type, const std::vector<message*>& data, const std::vector<message*>& info);
+        void add_task(task* t, message_type m_type, task_type type, const std::vector<message*>& data, const std::vector<message*>& info);
         template<typename Type, typename... Args>
         void add_task(task* t, const std::vector<message*>& data);
 
@@ -96,7 +87,7 @@ namespace apl
 
     template<typename Type, typename... Args>
     void task_graph::add_task(task* t, const std::vector<message*>& data)
-    { add_task(t, {message_init_factory::get_type<Type>(), task_factory::get_type<Type, Args...>()}, data, {}); }
+    { add_task(t, message_init_factory::get_type<Type>(), task_factory::get_type<Type, Args...>(), data, {}); }
 
     template<typename Type, typename... InfoTypes>
     void task_graph::add_message(message* m, const std::vector<message*>& info)

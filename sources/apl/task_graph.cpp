@@ -6,28 +6,22 @@ namespace apl
     bool message_id::operator!=(const message_id& other) const
     { return (num != other.num) || (proc != other.proc); }
 
-    bool perform_id::operator!=(const perform_id& other) const
-    { return (num != other.num) || (proc != other.proc); }
-
     bool task_id::operator!=(const task_id& other) const
-    { return (mi != other.mi) || (pi != other.pi); }
+    { return (num != other.num) || (proc != other.proc); }
 
     bool message_id::operator<(const message_id& other) const
     { return (num != other.num) ? (num < other.num): (proc < other.proc); }
 
-    bool perform_id::operator<(const perform_id& other) const
+    bool task_id::operator<(const task_id& other) const
     { return (num != other.num) ? (num < other.num): (proc < other.proc); }
 
-    bool task_id::operator<(const task_id& other) const
-    { return (mi != other.mi) ? (mi < other.mi): (pi < other.pi); }
-
     task_graph::task_graph()
-    { base_message_id = base_perform_id = 0; }
+    { base_message_id = base_task_id = 0; }
 
     task_graph::task_graph(const task_graph& _tg)
     {
         base_message_id = _tg.base_message_id;
-        base_perform_id = _tg.base_perform_id;
+        base_task_id = _tg.base_task_id;
         t_map = _tg.t_map;
         d_map = _tg.d_map;
     }
@@ -37,13 +31,13 @@ namespace apl
         if (&_tg == this)
             return *this;
         base_message_id = _tg.base_message_id;
-        base_perform_id = _tg.base_perform_id;
+        base_task_id = _tg.base_task_id;
         t_map = _tg.t_map;
         d_map = _tg.d_map;
         return *this;
     }
 
-    void task_graph::add_task(task* t, task_type type, const std::vector<message*>& data, const std::vector<message*>& info)
+    void task_graph::add_task(task* t, message_type m_type, task_type type, const std::vector<message*>& data, const std::vector<message*>& info)
     {
         for (message* i: data)
         {
@@ -58,10 +52,10 @@ namespace apl
         std::set<task*> childs;
         std::set<task*> parents;
         if (d_map.find(t) == d_map.end())
-            d_map.insert({t, {{base_message_id++, MPI_PROC_NULL}, type.mt, 1, info}});
+            d_map.insert({t, {{base_message_id++, MPI_PROC_NULL}, m_type, 1, info}});
         else
             ++d_map[t].ref_count;
-        t_map.insert({t, {{base_perform_id++, MPI_PROC_NULL}, type.pt, data, childs, parents}});
+        t_map.insert({t, {{base_task_id++, MPI_PROC_NULL}, type, data, childs, parents}});
     }
 
     void task_graph::add_message(message* m, message_type type, const std::vector<message*>& info)

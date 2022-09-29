@@ -145,7 +145,8 @@ namespace apl
 
         size_t size() const;
         task_id id() const;
-        perform_type type() const;
+        message_id base_id() const;
+        task_type type() const;
         std::vector<message_id> data() const;
         std::vector<message_id> const_data() const;
     };
@@ -186,7 +187,7 @@ namespace apl
         instruction_task_delete(const size_t* const p);
 
         size_t size() const;
-        perform_id id() const;
+        task_id id() const;
     };
 
     class instruction: public message
@@ -250,11 +251,11 @@ namespace apl
         void add_message_part_creation(message_id id, message_type type, message_id source, process proc);
         void add_include_child_to_parent(message_id parent, message_id child);
         void add_task_execution(task_id id);
-        void add_task_creation(task_id id, perform_type type, std::vector<message_id> data, std::vector<message_id> c_data);
+        void add_task_creation(task_id id, message_id base_id, task_type type, std::vector<message_id> data, std::vector<message_id> c_data);
         void add_task_result(task_id id);
         void add_add_result_to_memory(const std::vector<message_id>& mes, const std::vector<std::pair<message_id, message_id>>& mes_c);
         void add_message_del(message_id id);
-        void add_task_del(perform_id id);
+        void add_task_del(task_id id);
 
         const_iterator begin() const;
         const_iterator end() const;

@@ -44,13 +44,13 @@ namespace apl
         for (process i = 0; i < comm.size(); ++i)
             contained_messages[i] = versions_of_messages[0];
 
-        std::vector<std::set<perform_id>> contained_tasks(comm.size());
-        contained_tasks[0] = memory.get_performs_set();
+        std::vector<std::set<task_id>> contained_tasks(comm.size());
+        contained_tasks[0] = memory.get_tasks_set();
         for (process i = 1; i < comm.size(); ++i)
             contained_tasks[i] = contained_tasks[0];
 
         std::vector<instruction> ins(comm.size());
-        std::vector<std::vector<perform_id>> assigned(comm.size());
+        std::vector<std::vector<task_id>> assigned(comm.size());
         size_t all_assigned = 0;
 
         std::vector<std::unique_ptr<std::thread>> task_execution_thread_v(execution_thread_count - 1);
@@ -62,10 +62,10 @@ namespace apl
         while (ready_tasks.size())
         {
 
-            for (perform_id i: tasks_to_del)
+            for (task_id i: tasks_to_del)
             {
                 contained_tasks[0].erase(i);
-                memory.delete_perform(i);
+                memory.delete_task(i);
                 for (process j = 1; j < comm.size(); ++j)
                 {
                     if (contained_tasks[j].find(i) != contained_tasks[j].end())
@@ -99,20 +99,20 @@ namespace apl
                 {
                     size_t max_assigned_tasks_count = comm_size_quotient + ((i < comm_size_remainder) ? 1 : 0);
                     assigned[i].resize(max_assigned_tasks_count);
-                    assigned[i].assign(max_assigned_tasks_count, PERFORM_ID_UNDEFINED);
+                    assigned[i].assign(max_assigned_tasks_count, TASK_ID_UNDEFINED);
                 }
                 std::vector<size_t> assigned_current_position(comm.size(), 0);
 
                 comm_workload.resize(comm.size());
                 while (ready_tasks.size())
                 {
-                    perform_id current_id = ready_tasks.front();
+                    task_id current_id = ready_tasks.front();
                     ready_tasks.pop();
 
                     std::vector<process> decision_vector;
                     std::vector<double> contained_task_data_counts(comm.size(), 0.0);
-                    std::vector<message_id>& cur_task_data_ids = memory.get_perform_data(current_id);
-                    std::vector<message_id>& cur_task_const_data_ids = memory.get_perform_const_data(current_id);
+                    std::vector<message_id>& cur_task_data_ids = memory.get_task_data(current_id);
+                    std::vector<message_id>& cur_task_const_data_ids = memory.get_task_const_data(current_id);
                     for (process i = 0; i < comm.size(); ++i)
                     {
                         if (assigned_current_position[i] < assigned[i].size())
@@ -167,8 +167,8 @@ namespace apl
             }
 
             for (process i = 1; i < comm.size(); ++i)
-                for (perform_id j: assigned[i])
-                    assign_task(memory.get_task_id(j), i, ins[i], contained_tasks);
+                for (task_id j: assigned[i])
+                    assign_task(j, i, ins[i], contained_tasks);
 
             for (process i = 1; i < comm.size(); ++i)
             {
@@ -181,12 +181,12 @@ namespace apl
             send_instruction(ins[0]);
             ins[0].clear();
 
-            for (perform_id i: assigned[0])
+            for (task_id i: assigned[0])
             {
-                task_execution_queue_data current_data {i, memory.get_task(memory.get_task_id(i).mi), memory.get_perform_type(i)};
-                for (message_id j: memory.get_perform_data(i))
+                task_execution_queue_data current_data {i, memory.get_message_as_task(memory.get_task_base_message(i)), memory.get_task_type(i)};
+                for (message_id j: memory.get_task_data(i))
                     current_data.args.push_back(memory.get_message(j));
-                for (message_id j: memory.get_perform_const_data(i))
+                for (message_id j: memory.get_task_const_data(i))
                     current_data.const_args.push_back(memory.get_message(j));
 
                 task_queue_mutex.lock();
@@ -317,15 +317,15 @@ namespace apl
         task_queue_mutex.unlock();
     }
 
-    void parallelizer::send_task_data(perform_id tid, process proc, instruction* inss, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con)
+    void parallelizer::send_task_data(task_id tid, process proc, instruction* inss, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con)
     {
-        for (message_id i: memory.get_perform_data(tid))
+        for (message_id i: memory.get_task_data(tid))
             send_message(i, proc, inss, ver, con);
 
-        for (message_id i: memory.get_perform_const_data(tid))
+        for (message_id i: memory.get_task_const_data(tid))
             send_message(i, proc, inss, ver, con);
 
-        message_id m_tid = memory.get_task_id(tid).mi;
+        message_id m_tid = memory.get_task_base_message(tid);
         send_message(m_tid, proc, inss, ver, con);
     }
 
@@ -399,12 +399,12 @@ namespace apl
         }
     }
 
-    void parallelizer::assign_task(task_id tid, process proc, instruction& ins, std::vector<std::set<perform_id>>& com)
+    void parallelizer::assign_task(task_id tid, process proc, instruction& ins, std::vector<std::set<task_id>>& com)
     {
-        if (com[proc].find(tid.pi) == com[proc].end())
+        if (com[proc].find(tid) == com[proc].end())
         {
-            ins.add_task_creation(tid, memory.get_perform_type(tid.pi), memory.get_task_data(tid), memory.get_task_const_data(tid));
-            com[proc].insert(tid.pi);
+            ins.add_task_creation(tid, memory.get_task_base_message(tid), memory.get_task_type(tid), memory.get_task_data(tid), memory.get_task_const_data(tid));
+            com[proc].insert(tid);
         }
         ins.add_task_execution(tid);
     }
@@ -481,7 +481,7 @@ namespace apl
         }
     }
 
-    void parallelizer::end_main_task(perform_id tid, task_environment& env, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<perform_id>>& con_t)
+    void parallelizer::end_main_task(task_id tid, task_environment& env, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<task_id>>& con_t)
     {
         std::vector<message_id> messages_init_id;
         std::vector<message_id> messages_init_add_id;
@@ -491,7 +491,7 @@ namespace apl
         std::vector<task_id> tasks_id;
         std::vector<task_id> tasks_child_id;
 
-        for (message_id i: memory.get_perform_data(tid))
+        for (message_id i: memory.get_task_data(tid))
         {
             for (process k = 0; k < comm.size(); ++k)
                 ver[k].erase(i);
@@ -507,7 +507,7 @@ namespace apl
             }
         }
 
-        message_id t_mes_id = memory.get_task_id(tid).mi;
+        message_id t_mes_id = memory.get_task_base_message(tid);
 
         for (process k = 0; k < comm.size(); ++k)
             ver[k].erase(t_mes_id);
@@ -541,12 +541,12 @@ namespace apl
                     {
                         case MESSAGE_SOURCE::TASK_ARG:
                         {
-                            src = memory.get_perform_data(tid)[d.sourse.id];
+                            src = memory.get_task_data(tid)[d.sourse.id];
                             break;
                         }
                         case MESSAGE_SOURCE::TASK_ARG_C:
                         {
-                            src = memory.get_perform_const_data(tid)[d.sourse.id];
+                            src = memory.get_task_const_data(tid)[d.sourse.id];
                             break;
                         }
                         case MESSAGE_SOURCE::INIT:
@@ -585,12 +585,12 @@ namespace apl
                     {
                         case MESSAGE_SOURCE::TASK_ARG:
                         {
-                            src = memory.get_perform_data(tid)[d.sourse.id];
+                            src = memory.get_task_data(tid)[d.sourse.id];
                             break;
                         }
                         case MESSAGE_SOURCE::TASK_ARG_C:
                         {
-                            src = memory.get_perform_const_data(tid)[d.sourse.id];
+                            src = memory.get_task_const_data(tid)[d.sourse.id];
                             break;
                         }
                         case MESSAGE_SOURCE::INIT:
@@ -658,12 +658,12 @@ namespace apl
             {
                 case MESSAGE_SOURCE::TASK_ARG:
                 {
-                    mes_t_id = memory.get_perform_data(tid)[i.mes.id];
+                    mes_t_id = memory.get_task_data(tid)[i.mes.id];
                     break;
                 }
                 case MESSAGE_SOURCE::TASK_ARG_C:
                 {
-                    mes_t_id = memory.get_perform_const_data(tid)[i.mes.id];
+                    mes_t_id = memory.get_task_const_data(tid)[i.mes.id];
                     break;
                 }
                 case MESSAGE_SOURCE::INIT:
@@ -698,12 +698,12 @@ namespace apl
                 {
                     case MESSAGE_SOURCE::TASK_ARG:
                     {
-                        data_id.push_back(memory.get_perform_data(tid)[k.id]);
+                        data_id.push_back(memory.get_task_data(tid)[k.id]);
                         break;
                     }
                     case MESSAGE_SOURCE::TASK_ARG_C:
                     {
-                        data_id.push_back(memory.get_perform_const_data(tid)[k.id]);
+                        data_id.push_back(memory.get_task_const_data(tid)[k.id]);
                         break;
                     }
                     case MESSAGE_SOURCE::INIT:
@@ -739,12 +739,12 @@ namespace apl
                 {
                     case MESSAGE_SOURCE::TASK_ARG:
                     {
-                        const_data_id.push_back(memory.get_perform_data(tid)[k.id]);
+                        const_data_id.push_back(memory.get_task_data(tid)[k.id]);
                         break;
                     }
                     case MESSAGE_SOURCE::TASK_ARG_C:
                     {
-                        const_data_id.push_back(memory.get_perform_const_data(tid)[k.id]);
+                        const_data_id.push_back(memory.get_task_const_data(tid)[k.id]);
                         break;
                     }
                     case MESSAGE_SOURCE::INIT:
@@ -777,17 +777,17 @@ namespace apl
                 case TASK_SOURCE::INIT:
                 {
                     task_data& t = env.created_tasks_simple()[i.id];
-                    perform_id id = memory.add_perform(mes_t_id, t.type, data_id, const_data_id);
-                    tasks_id.push_back({mes_t_id, id});
+                    task_id id = memory.add_task(mes_t_id, t.type, data_id, const_data_id);
+                    tasks_id.push_back(id);
                     con_t[main_proc].insert(id);
                     break;
                 }
                 case TASK_SOURCE::CHILD:
                 {
                     task_data& t = env.created_child_tasks()[i.id];
-                    perform_id id = memory.add_perform(mes_t_id, t.type, data_id, const_data_id);
-                    tasks_child_id.push_back({mes_t_id, id});
-                    memory.set_task_parent({mes_t_id, id}, memory.get_task_id(tid));
+                    task_id id = memory.add_task(mes_t_id, t.type, data_id, const_data_id);
+                    tasks_child_id.push_back(id);
+                    memory.set_task_parent(id, tid);
                     con_t[main_proc].insert(id);
                     break;
                 }
@@ -795,22 +795,22 @@ namespace apl
                     comm.abort(767);
             }
         }
-        memory.set_perform_created_childs(tid, memory.get_perform_created_childs(tid) + tid_childs);
+        memory.set_task_created_childs(tid, memory.get_task_created_childs(tid) + tid_childs);
 
         for (const task_dependence& i: env.created_dependences())
         {
-            perform_id parent {};
-            perform_id child {};
+            task_id parent {};
+            task_id child {};
             switch (i.parent.src)
             {
                 case TASK_SOURCE::INIT:
                 {
-                    parent = tasks_id[i.parent.id].pi;
+                    parent = tasks_id[i.parent.id];
                     break;
                 }
                 case TASK_SOURCE::CHILD:
                 {
-                    parent = tasks_child_id[i.parent.id].pi;
+                    parent = tasks_child_id[i.parent.id];
                     break;
                 }
                 case TASK_SOURCE::GLOBAL:
@@ -825,12 +825,12 @@ namespace apl
             {
                 case TASK_SOURCE::INIT:
                 {
-                    child = tasks_id[i.child.id].pi;
+                    child = tasks_id[i.child.id];
                     break;
                 }
                 case TASK_SOURCE::CHILD:
                 {
-                    child = tasks_child_id[i.child.id].pi;
+                    child = tasks_child_id[i.child.id];
                     break;
                 }
                 case TASK_SOURCE::GLOBAL:
@@ -847,19 +847,19 @@ namespace apl
         for (const task_id& i: tasks_id)
         {
             if (memory.get_task_parents_count(i) == 0)
-                ready_tasks.push(i.pi);
+                ready_tasks.push(i);
         }
 
         for (const task_id& i: tasks_child_id)
         {
             if (memory.get_task_parents_count(i) == 0)
-                ready_tasks.push(i.pi);
+                ready_tasks.push(i);
         }
 
         update_ready_tasks(tid);
     }
 
-    void parallelizer::wait_task(process proc, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<perform_id>>& con_t)
+    void parallelizer::wait_task(process proc, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con, std::vector<std::set<task_id>>& con_t)
     {
         instruction res_ins;
         instr_comm.recv<message>(&res_ins, proc);
@@ -871,6 +871,7 @@ namespace apl
             comm.abort(111);
         const instruction_task_result& result = dynamic_cast<const instruction_task_result&>(ins);
         task_id tid = result.id();
+        message_id tid_base = memory.get_task_base_message(tid);
 
         std::vector<message_id> messages_init_id;
         std::vector<message_id> messages_init_add_id;
@@ -918,8 +919,8 @@ namespace apl
         }
 
         for (process k = 0; k < comm.size(); ++k)
-            ver[k].erase(tid.mi);
-        ver[proc].insert(tid.mi);
+            ver[k].erase(tid_base);
+        ver[proc].insert(tid_base);
 
         std::vector<message_type> messages_init_id_type;
         std::vector<message_type> messages_init_add_id_type;
@@ -1015,12 +1016,12 @@ namespace apl
             {
                 case MESSAGE_SOURCE::TASK_ARG:
                 {
-                    mes_t_id = memory.get_perform_data(tid.pi)[i.mes.id];
+                    mes_t_id = memory.get_task_data(tid)[i.mes.id];
                     break;
                 }
                 case MESSAGE_SOURCE::TASK_ARG_C:
                 {
-                    mes_t_id = memory.get_perform_const_data(tid.pi)[i.mes.id];
+                    mes_t_id = memory.get_task_const_data(tid)[i.mes.id];
                     break;
                 }
                 case MESSAGE_SOURCE::INIT:
@@ -1055,12 +1056,12 @@ namespace apl
                 {
                     case MESSAGE_SOURCE::TASK_ARG:
                     {
-                        data_id.push_back(memory.get_perform_data(tid.pi)[k.id]);
+                        data_id.push_back(memory.get_task_data(tid)[k.id]);
                         break;
                     }
                     case MESSAGE_SOURCE::TASK_ARG_C:
                     {
-                        data_id.push_back(memory.get_perform_const_data(tid.pi)[k.id]);
+                        data_id.push_back(memory.get_task_const_data(tid)[k.id]);
                         break;
                     }
                     case MESSAGE_SOURCE::INIT:
@@ -1096,12 +1097,12 @@ namespace apl
                 {
                     case MESSAGE_SOURCE::TASK_ARG:
                     {
-                        const_data_id.push_back(memory.get_perform_data(tid.pi)[k.id]);
+                        const_data_id.push_back(memory.get_task_data(tid)[k.id]);
                         break;
                     }
                     case MESSAGE_SOURCE::TASK_ARG_C:
                     {
-                        const_data_id.push_back(memory.get_perform_const_data(tid.pi)[k.id]);
+                        const_data_id.push_back(memory.get_task_const_data(tid)[k.id]);
                         break;
                     }
                     case MESSAGE_SOURCE::INIT:
@@ -1134,17 +1135,17 @@ namespace apl
                 case TASK_SOURCE::INIT:
                 {
                     task_data& t = env.created_tasks_simple()[i.id];
-                    perform_id id = memory.add_perform(mes_t_id, t.type, data_id, const_data_id);
-                    tasks_id.push_back({mes_t_id, id});
+                    task_id id = memory.add_task(mes_t_id, t.type, data_id, const_data_id);
+                    tasks_id.push_back(id);
                     con_t[main_proc].insert(id);
                     break;
                 }
                 case TASK_SOURCE::CHILD:
                 {
                     task_data& t = env.created_child_tasks()[i.id];
-                    perform_id id = memory.add_perform(mes_t_id, t.type, data_id, const_data_id);
-                    tasks_child_id.push_back({mes_t_id, id});
-                    memory.set_task_parent({mes_t_id, id}, tid);
+                    task_id id = memory.add_task(mes_t_id, t.type, data_id, const_data_id);
+                    tasks_child_id.push_back(id);
+                    memory.set_task_parent(id, tid);
                     break;
                 }
                 default:
@@ -1205,41 +1206,41 @@ namespace apl
         for (const task_id& i: tasks_id)
         {
             if (memory.get_task_parents_count(i) == 0)
-                ready_tasks.push(i.pi);
+                ready_tasks.push(i);
         }
 
         for (const task_id& i: tasks_child_id)
         {
             if (memory.get_task_parents_count(i) == 0)
-                ready_tasks.push(i.pi);
+                ready_tasks.push(i);
         }
 
-        update_ready_tasks(tid.pi);
+        update_ready_tasks(tid);
     }
 
-    void parallelizer::update_ready_tasks(perform_id tid)
+    void parallelizer::update_ready_tasks(task_id tid)
     {
-        perform_id c_t = tid;
+        task_id c_t = tid;
         while (1)
         {
-            if (memory.get_perform_created_childs(c_t) == 0)
+            if (memory.get_task_created_childs(c_t) == 0)
             {
-                for (perform_id i: memory.get_perform_childs(c_t))
+                for (task_id i: memory.get_task_childs(c_t))
                 {
-                    memory.set_perform_parents_count(i, memory.get_perform_parents_count(i) - 1);
-                    if (memory.get_perform_parents_count(i) == 0)
+                    memory.set_task_parents_count(i, memory.get_task_parents_count(i) - 1);
+                    if (memory.get_task_parents_count(i) == 0)
                         ready_tasks.push(i);
                 }
                 tasks_to_del.push_back(c_t);
             }
             else
                 break;
-            if (!memory.perform_has_parent(c_t))
+            if (!memory.task_has_parent(c_t))
                 break;
             else
             {
-                c_t = memory.get_perform_parent(c_t);
-                memory.set_perform_created_childs(c_t, memory.get_perform_created_childs(c_t) - 1);
+                c_t = memory.get_task_parent(c_t);
+                memory.set_task_created_childs(c_t, memory.get_task_created_childs(c_t) - 1);
             }
         }
     }
@@ -1315,13 +1316,13 @@ namespace apl
                     case INSTRUCTION::TASK_CREATE:
                     {
                         const instruction_task_create& j = dynamic_cast<const instruction_task_create&>(i);
-                        memory.add_perform_with_id(j.id(), j.type(), j.data(), j.const_data());
+                        memory.add_task_with_id(j.id(), j.base_id(), j.type(), j.data(), j.const_data());
                         break;
                     }
                     case INSTRUCTION::TASK_EXE:
                     {
                         const instruction_task_execute& j = dynamic_cast<const instruction_task_execute&>(i);
-                        execute_task(j.id().pi);
+                        execute_task(j.id());
                         break;
                     }
                     case INSTRUCTION::MES_DEL:
@@ -1333,7 +1334,7 @@ namespace apl
                     case INSTRUCTION::TASK_DEL:
                     {
                         const instruction_task_delete& j = dynamic_cast<const instruction_task_delete&>(i);
-                        memory.delete_perform(j.id());
+                        memory.delete_task(j.id());
                         break;
                     }
                     case INSTRUCTION::END:
@@ -1425,12 +1426,12 @@ namespace apl
                 {
                 case MESSAGE_SOURCE::TASK_ARG:
                 {
-                    src = memory.get_perform_data(cur_task_exe_data.this_task_id)[d.sourse.id];
+                    src = memory.get_task_data(cur_task_exe_data.this_task_id)[d.sourse.id];
                     break;
                 }
                 case MESSAGE_SOURCE::TASK_ARG_C:
                 {
-                    src = memory.get_perform_const_data(cur_task_exe_data.this_task_id)[d.sourse.id];
+                    src = memory.get_task_const_data(cur_task_exe_data.this_task_id)[d.sourse.id];
                     break;
                 }
                 case MESSAGE_SOURCE::INIT:
@@ -1474,12 +1475,12 @@ namespace apl
                 {
                 case MESSAGE_SOURCE::TASK_ARG:
                 {
-                    src = memory.get_perform_data(cur_task_exe_data.this_task_id)[d.sourse.id];
+                    src = memory.get_task_data(cur_task_exe_data.this_task_id)[d.sourse.id];
                     break;
                 }
                 case MESSAGE_SOURCE::TASK_ARG_C:
                 {
-                    src = memory.get_perform_const_data(cur_task_exe_data.this_task_id)[d.sourse.id];
+                    src = memory.get_task_const_data(cur_task_exe_data.this_task_id)[d.sourse.id];
                     break;
                 }
                 case MESSAGE_SOURCE::INIT:
@@ -1514,7 +1515,7 @@ namespace apl
         }
 
         instruction res;
-        res.add_task_result(memory.get_task_id(cur_task_exe_data.this_task_id));
+        res.add_task_result(cur_task_exe_data.this_task_id);
         res.add_add_result_to_memory(added_m_init, added_m_child);
         res.add_add_result_to_memory(messages_init_id, messages_childs_id);
 
@@ -1524,12 +1525,12 @@ namespace apl
         req.wait_all();
     }
 
-    void parallelizer::execute_task(perform_id id)
+    void parallelizer::execute_task(task_id id)
     {
-        task_execution_queue_data current_data{ id, memory.get_task(memory.get_task_id(id).mi), memory.get_perform_type(id) };
-        for (message_id j: memory.get_perform_data(id))
+        task_execution_queue_data current_data{ id, memory.get_message_as_task(memory.get_task_base_message(id)), memory.get_task_type(id) };
+        for (message_id j: memory.get_task_data(id))
             current_data.args.push_back(memory.get_message(j));
-        for (message_id j: memory.get_perform_const_data(id))
+        for (message_id j: memory.get_task_const_data(id))
             current_data.const_args.push_back(memory.get_message(j));
 
         task_queue_mutex.lock();

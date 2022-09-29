@@ -15,7 +15,7 @@ namespace apl
     task_environment::task_environment(task_data&& td): this_task(std::move(td)), this_task_id({{0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL}), processes_count(0), threads_count(0)
     { set_all_task_data(); }
 
-    task_environment::task_environment(perform_type type, size_t args_count, size_t const_args_count, size_t _processes_count, size_t _threads_count): this_task_id({ {0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL }), processes_count(_processes_count), threads_count(_threads_count)
+    task_environment::task_environment(task_type type, size_t args_count, size_t const_args_count, size_t _processes_count, size_t _threads_count): this_task_id({ {0, MESSAGE_SOURCE::GLOBAL}, 0, TASK_SOURCE::GLOBAL }), processes_count(_processes_count), threads_count(_threads_count)
     {
         for (size_t j = 0; j < args_count; ++j)
             this_task.data.push_back({ j, MESSAGE_SOURCE::TASK_ARG });
@@ -98,28 +98,28 @@ namespace apl
         return created_messages_v.back();
     }
 
-    local_task_id task_environment::create_task(task_type type, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data, const std::vector<message*>& info)
+    local_task_id task_environment::create_task(message_type m_type, task_type type, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data, const std::vector<message*>& info)
     {
-        tasks_v.push_back({type.pt, data, const_data});
-        created_tasks_v.push_back({create_message_init(type.mt, info) ,tasks_v.size() - 1, TASK_SOURCE::INIT});
+        tasks_v.push_back({type, data, const_data});
+        created_tasks_v.push_back({create_message_init(m_type, info) ,tasks_v.size() - 1, TASK_SOURCE::INIT});
         return created_tasks_v.back();
     }
 
-    local_task_id task_environment::create_child_task(task_type type, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data, const std::vector<message*>& info)
+    local_task_id task_environment::create_child_task(message_type m_type, task_type type, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data, const std::vector<message*>& info)
     {
-        tasks_child_v.push_back({type.pt, data, const_data});
-        created_tasks_v.push_back({create_message_init(type.mt, info), tasks_child_v.size() - 1, TASK_SOURCE::CHILD});
+        tasks_child_v.push_back({type, data, const_data});
+        created_tasks_v.push_back({create_message_init(m_type, info), tasks_child_v.size() - 1, TASK_SOURCE::CHILD});
         return created_tasks_v.back();
     }
 
-    local_task_id task_environment::add_task(perform_type type, local_message_id t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
+    local_task_id task_environment::add_task(task_type type, local_message_id t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
     {
         tasks_v.push_back({type, data, const_data});
         created_tasks_v.push_back({t, tasks_v.size() - 1, TASK_SOURCE::INIT});
         return created_tasks_v.back();
     }
 
-    local_task_id task_environment::add_child_task(perform_type type, local_message_id t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
+    local_task_id task_environment::add_child_task(task_type type, local_message_id t, const std::vector<local_message_id>& data, const std::vector<local_message_id>& const_data)
     {
         tasks_child_v.push_back({type, data, const_data});
         created_tasks_v.push_back({t, tasks_child_v.size() - 1, TASK_SOURCE::CHILD});
@@ -511,10 +511,10 @@ namespace apl
     std::vector<message*> task_factory::get_info(message_type id)
     { return message_init_factory::get_info(id); }
 
-    void task_factory::perform(perform_type id, task* t, const std::vector<message*>& args, const std::vector<const message*>& c_args)
+    void task_factory::perform(task_type id, task* t, const std::vector<message*>& args, const std::vector<const message*>& c_args)
     { task_vec().at(id)->perform(t, args, c_args); }
 
-    const std::vector<bool>& task_factory::const_map(perform_type id)
+    const std::vector<bool>& task_factory::const_map(task_type id)
     { return task_vec().at(id)->const_map(); }
 
 }
