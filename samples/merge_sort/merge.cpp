@@ -159,7 +159,7 @@ int main(int argc, char** argv)
     parallelizer pz(threads_count);
     task_graph tg;
 
-    int comm_size = pz.get_workers_count();
+    size_t comm_size = pz.get_workers_count();
     {
         int j = 1;
         size_t i = 0;

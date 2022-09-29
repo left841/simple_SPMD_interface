@@ -242,7 +242,7 @@ namespace apl
                     task_queue_mutex.unlock();
 
                     finished_task_execution_queue_data current_output_data{ current_execution_data.this_task_id, {current_execution_data.task_type,
-                        current_execution_data.args.size(), current_execution_data.const_args.size(), comm.size() * execution_thread_count} };
+                        current_execution_data.args.size(), current_execution_data.const_args.size(), static_cast<size_t>(comm.size()), execution_thread_count} };
                     current_execution_data.this_task->set_environment(&current_output_data.this_task_environment);
                     task_factory::perform(current_execution_data.task_type, current_execution_data.this_task, current_execution_data.args, current_execution_data.const_args);
                     current_execution_data.this_task->set_environment(nullptr);
@@ -300,7 +300,7 @@ namespace apl
                 break;
 
             finished_task_execution_queue_data current_output_data {current_execution_data.this_task_id, {current_execution_data.task_type,
-                current_execution_data.args.size(), current_execution_data.const_args.size(), processes_count * execution_thread_count}};
+                current_execution_data.args.size(), current_execution_data.const_args.size(), processes_count, execution_thread_count}};
             current_execution_data.this_task->set_environment(&current_output_data.this_task_environment);
             task_factory::perform(current_execution_data.task_type, current_execution_data.this_task, current_execution_data.args, current_execution_data.const_args);
             current_execution_data.this_task->set_environment(nullptr);
@@ -1382,7 +1382,7 @@ namespace apl
                 task_queue_mutex.unlock();
 
                 finished_task_execution_queue_data current_output_data{ current_execution_data.this_task_id, {current_execution_data.task_type,
-                    current_execution_data.args.size(), current_execution_data.const_args.size(), comm.size() * execution_thread_count} };
+                    current_execution_data.args.size(), current_execution_data.const_args.size(), static_cast<size_t>(comm.size()), execution_thread_count} };
                 current_execution_data.this_task->set_environment(&current_output_data.this_task_environment);
                 task_factory::perform(current_execution_data.task_type, current_execution_data.this_task, current_execution_data.args, current_execution_data.const_args);
                 current_execution_data.this_task->set_environment(nullptr);
