@@ -39,7 +39,7 @@ namespace apl
             task_environment this_task_environment;
         };
 
-        intracomm comm;
+        intracomm main_comm;
         intracomm instr_comm;
         size_t execution_thread_count;
 
