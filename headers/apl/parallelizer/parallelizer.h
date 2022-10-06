@@ -8,6 +8,7 @@
 #include <limits>
 #include <thread>
 #include <mutex>
+#include <condition_variable>
 #include "mpi.h"
 #include "apl/parallel_defs.h"
 #include "apl/parallel_core.h"
@@ -48,6 +49,7 @@ namespace apl
         std::vector<size_t> comm_workload;
         memory_manager memory;
 
+        std::condition_variable exe_threads_cv;
         std::mutex task_queue_mutex;
         std::queue<task_execution_queue_data> task_queue;
         std::mutex finished_task_queue_mutex;

@@ -193,6 +193,10 @@ namespace apl
                 task_queue.push(std::move(current_data));
                 task_queue_mutex.unlock();
             }
+            {
+                std::unique_lock<std::mutex> cv_lk(task_queue_mutex);
+                exe_threads_cv.notify_all();
+            }
 
             while ((all_assigned_tasks_count > 0) && (assigned_tasks[0].size() > 0))
             {
@@ -272,49 +276,67 @@ namespace apl
         for (process i = 1; i < instr_comm.size(); ++i)
             instr_comm.send<message>(&end, i);
 
-        task_queue_mutex.lock();
-        task_execution_queue_data exe_thread_end_data;
-        exe_thread_end_data.this_task = nullptr;
-        task_queue.push(exe_thread_end_data);
-        task_queue_mutex.unlock();
+        {
+            std::unique_lock<std::mutex> cv_ul(task_queue_mutex);
+            task_execution_queue_data exe_thread_end_data;
+            exe_thread_end_data.this_task = nullptr;
+            task_queue.push(exe_thread_end_data);
+            exe_threads_cv.notify_one();
+        }
         for (auto& i: task_execution_thread_v)
             i->join();
     }
 
     void parallelizer::task_execution_thread_function(size_t processes_count)
     {
-        while (true)
+        bool execution_continued = true;
+        while (execution_continued)
         {
-            task_queue_mutex.lock();
-            if (task_queue.empty())
             {
-                task_queue_mutex.unlock();
-                std::this_thread::yield();
-                continue;
+                std::unique_lock<std::mutex> cv_ul(task_queue_mutex);
+                exe_threads_cv.wait(cv_ul, [&]()
+                {
+                    return !task_queue.empty();
+                });
             }
-            task_execution_queue_data current_execution_data{task_queue.front()};
-            task_queue.pop();
-            task_queue_mutex.unlock();
 
-            if (current_execution_data.this_task == nullptr)
-                break;
+            while (true)
+            {
+                task_queue_mutex.lock();
+                if (task_queue.empty())
+                {
+                    task_queue_mutex.unlock();
+                    break;
+                }
+                task_execution_queue_data current_execution_data{ task_queue.front() };
+                task_queue.pop();
+                task_queue_mutex.unlock();
 
-            finished_task_execution_queue_data current_output_data {current_execution_data.this_task_id, {current_execution_data.task_type,
-                current_execution_data.args.size(), current_execution_data.const_args.size(), processes_count, execution_thread_count}};
-            current_execution_data.this_task->set_environment(&current_output_data.this_task_environment);
-            task_factory::perform(current_execution_data.task_type, current_execution_data.this_task, current_execution_data.args, current_execution_data.const_args);
-            current_execution_data.this_task->set_environment(nullptr);
+                if (current_execution_data.this_task == nullptr)
+                {
+                    execution_continued = false;
+                    break;
+                }
 
-            finished_task_queue_mutex.lock();
-            finished_task_queue.push(std::move(current_output_data));
-            finished_task_queue_mutex.unlock();
+                finished_task_execution_queue_data current_output_data{ current_execution_data.this_task_id, {current_execution_data.task_type,
+                    current_execution_data.args.size(), current_execution_data.const_args.size(), processes_count, execution_thread_count} };
+                current_execution_data.this_task->set_environment(&current_output_data.this_task_environment);
+                task_factory::perform(current_execution_data.task_type, current_execution_data.this_task, current_execution_data.args, current_execution_data.const_args);
+                current_execution_data.this_task->set_environment(nullptr);
+
+                finished_task_queue_mutex.lock();
+                finished_task_queue.push(std::move(current_output_data));
+                finished_task_queue_mutex.unlock();
+            }
         }
 
-        task_queue_mutex.lock();
-        task_execution_queue_data exe_thread_end_data;
-        exe_thread_end_data.this_task = nullptr;
-        task_queue.push(exe_thread_end_data);
-        task_queue_mutex.unlock();
+        {
+            std::unique_lock<std::mutex> cv_ul(task_queue_mutex);
+            task_execution_queue_data exe_thread_end_data;
+            exe_thread_end_data.this_task = nullptr;
+            task_queue.push(exe_thread_end_data);
+            exe_threads_cv.notify_one();
+        }
     }
 
     void parallelizer::send_task_data(task_id tid, process proc, instruction* inss, std::vector<std::set<message_id>>& ver, std::vector<std::set<message_id>>& con)
@@ -1393,11 +1415,13 @@ namespace apl
             }
         }
         end:
-        task_execution_queue_data finish_queue_data;
-        finish_queue_data.this_task = nullptr;
-        task_queue_mutex.lock();
-        task_queue.push(finish_queue_data);
-        task_queue_mutex.unlock();
+        {
+            std::unique_lock<std::mutex> cv_ul(task_queue_mutex);
+            task_execution_queue_data exe_thread_end_data;
+            exe_thread_end_data.this_task = nullptr;
+            task_queue.push(exe_thread_end_data);
+            exe_threads_cv.notify_one();
+        }
         for (auto& i: task_execution_thread_v)
             i->join();
     }
@@ -1535,6 +1559,11 @@ namespace apl
         task_queue_mutex.lock();
         task_queue.push(std::move(current_data));
         task_queue_mutex.unlock();
+
+        {
+            std::unique_lock<std::mutex> cv_lk(task_queue_mutex);
+            exe_threads_cv.notify_all();
+        }
     }
 
     process parallelizer::get_current_proc()
