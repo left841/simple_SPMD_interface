@@ -29,7 +29,7 @@ namespace apl
         {
             task_id this_task_id;
             task* this_task;
-            task_type task_type;
+            task_type this_task_type;
             std::vector<message*> args;
             std::vector<const message*> const_args;
         };
