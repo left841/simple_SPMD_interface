@@ -16,7 +16,7 @@ namespace apl
     {
         UNDEFINED, END, MES_SEND, MES_RECV, MES_INFO_SEND, MES_CREATE,
         MES_P_CREATE, INCLUDE_MES_CHILD, TASK_EXE, TASK_CREATE, TASK_RES, ADD_RES_TO_MEMORY,
-        MES_DEL, TASK_DEL
+        MES_DEL, TASK_DEL, CHANGE_OWNER, INDEPENDENT_EXE
     };
 
     class instruction_block
@@ -190,6 +190,24 @@ namespace apl
         task_id id() const;
     };
 
+    class instruction_change_owner: public instruction_block
+    {
+    public:
+        instruction_change_owner(const size_t* const p);
+
+        size_t size() const;
+        process new_owner() const;
+        size_t new_processes_count() const;
+    };
+
+    class instruction_independent_exe: public instruction_block
+    {
+    public:
+        instruction_independent_exe(const size_t* const p);
+
+        size_t size() const;
+    };
+
     class instruction: public message
     {
     private:
@@ -256,6 +274,8 @@ namespace apl
         void add_add_result_to_memory(const std::vector<message_id>& mes, const std::vector<std::pair<message_id, message_id>>& mes_c);
         void add_message_del(message_id id);
         void add_task_del(task_id id);
+        void add_change_owner(process new_owner, size_t processes_count);
+        void add_independent_exe();
 
         const_iterator begin() const;
         const_iterator end() const;

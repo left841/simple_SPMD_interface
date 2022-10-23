@@ -129,7 +129,13 @@ namespace apl
         { return new instruction_message_delete(p); },
 
         [](const size_t* const p)->const instruction_block*
-        { return new instruction_task_delete(p); }
+        { return new instruction_task_delete(p); },
+
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_change_owner(p); },
+
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_independent_exe(p); }
     };
 
     const instruction_block* instruction::block_factory::get(const size_t* const p)
@@ -456,5 +462,35 @@ namespace apl
         add_cmd(INSTRUCTION::TASK_DEL);
         write(id);
     }
+
+    // CHANGE_OWNER
+    instruction_change_owner::instruction_change_owner(const size_t* const p): instruction_block(p)
+    { }
+
+    size_t instruction_change_owner::size() const
+    { return 3; }
+
+    process instruction_change_owner::new_owner() const
+    { return static_cast<process>(ins[1]); }
+
+    size_t instruction_change_owner::new_processes_count() const
+    { return ins[2]; }
+
+    void instruction::add_change_owner(process new_owner, size_t processes_count)
+    {
+        add_cmd(INSTRUCTION::CHANGE_OWNER);
+        v.push_back(new_owner);
+        v.push_back(processes_count);
+    }
+
+    // INDEPENDENT_EXE
+    instruction_independent_exe::instruction_independent_exe(const size_t* const p) : instruction_block(p)
+    { }
+
+    size_t instruction_independent_exe::size() const
+    { return 1; }
+
+    void instruction::add_independent_exe()
+    { add_cmd(INSTRUCTION::INDEPENDENT_EXE); }
 
 }

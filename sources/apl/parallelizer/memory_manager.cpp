@@ -52,12 +52,12 @@ namespace apl
         _tg.clear();
     }
 
-    std::queue<task_id> memory_manager::get_ready_tasks()
+    std::queue<task_with_process_count> memory_manager::get_ready_tasks()
     {
-        std::queue<task_id> q;
+        std::queue<task_with_process_count> q;
         for (auto it = task_map.begin(); it != task_map.end(); ++it)
             if (it->parents_count == 0)
-                q.push(it.key());
+                q.push({ it.key(), it->preferred_processes_count});
         return q;
     }
 
@@ -400,6 +400,9 @@ namespace apl
     void memory_manager::set_task_const_data(task_id id, std::vector<message_id> new_const_data)
     { task_map[id].const_data = new_const_data; }
 
+    void memory_manager::set_task_preferred_processes_count(task_id id, size_t new_count)
+    { task_map[id].preferred_processes_count = new_count; }
+
     size_t memory_manager::message_count()
     { return mes_map.size(); }
 
@@ -492,6 +495,9 @@ namespace apl
 
     std::vector<message_id>& memory_manager::get_task_const_data(task_id id)
     { return task_map[id].const_data; }
+
+    size_t memory_manager::get_task_preferred_processes_count(task_id id)
+    { return task_map[id].preferred_processes_count; }
 
     bool memory_manager::message_contained(message_id id)
     { return mes_map.contains(id); }

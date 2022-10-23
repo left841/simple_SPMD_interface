@@ -111,6 +111,16 @@ namespace apl
     struct simple_datatype_map<task_dependence>
     { using map = type_map<type_offset<local_task_id, offsetof(task_dependence, parent)>, type_offset<local_task_id, offsetof(task_dependence, child)>>; };
 
+    struct separate_task_proc_count
+    {
+        local_task_id id;
+        size_t processes_count;
+    };
+
+    template<>
+    struct simple_datatype_map<separate_task_proc_count>
+    { using map = type_map<type_offset<local_task_id, offsetof(separate_task_proc_count, id)>, type_offset<size_t, offsetof(separate_task_proc_count, processes_count)>>; };
+
     class task;
 
     struct message_init_data
@@ -168,6 +178,7 @@ namespace apl
         std::vector<task_data> tasks_child_v;
 
         std::vector<task_dependence> dependence_v;
+        std::vector<separate_task_proc_count> separate_exe_v;
 
         void set_all_task_data();
 
@@ -192,6 +203,8 @@ namespace apl
 
         void add_dependence(local_task_id parent, local_task_id child);
 
+        void separate_execution(local_task_id sep_task, size_t processes_count);
+
         std::vector<local_task_id>& result_task_ids();
         std::vector<task_data>& created_tasks_simple();
         std::vector<task_data>& created_child_tasks();
@@ -203,6 +216,7 @@ namespace apl
         std::vector<message_child_add_data>& added_messages_child();
 
         std::vector<task_dependence>& created_dependences();
+        std::vector<separate_task_proc_count>& separate_tasks();
 
         local_message_id arg_id(size_t n) const;
         task_data get_this_task_data() const;
@@ -291,6 +305,8 @@ namespace apl
         new_task_id<Type> add_child_task(Type* t, mes_id<ArgTypes>... args) const;
 
         void add_dependence(local_task_id parent, local_task_id child) const;
+
+        void separate_execution(local_task_id sep_task, size_t processes_count) const;
 
         template<size_t Index, class Type>
         mes_id<Type> arg_id() const;

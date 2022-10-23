@@ -250,7 +250,7 @@ int main(int argc, char** argv)
 
     pz.execution();
 
-    if (pz.get_current_proc() == parallelizer::main_proc)
+    if (pz.get_current_proc() == 0)
     {
         double dt = MPI_Wtime();
         if (checks)

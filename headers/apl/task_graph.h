@@ -20,6 +20,12 @@ namespace apl
         bool operator<(const message_id& other) const;
     };
 
+    template<>
+    struct simple_datatype_map<message_id>
+    {
+        using map = type_map<type_offset<size_t, offsetof(message_id, num)>, type_offset<process, offsetof(message_id, proc)>>;
+    };
+
     struct task_id
     {
         size_t num;

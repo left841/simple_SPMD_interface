@@ -32,6 +32,12 @@ namespace apl
         NEWER
     };
 
+    struct task_with_process_count
+    {
+        task_id this_task;
+        size_t preferred_processes_count;
+    };
+
     class memory_manager
     {
     private:
@@ -55,6 +61,7 @@ namespace apl
             std::vector<task_id> childs;
             std::vector<message_id> data;
             std::vector<message_id> const_data;
+            size_t preferred_processes_count = 0;
         };
 
         struct message_graph
@@ -87,7 +94,7 @@ namespace apl
 
         void init(task_graph& _tg);
 
-        std::queue<task_id> get_ready_tasks();
+        std::queue<task_with_process_count> get_ready_tasks();
         std::set<message_id>& get_unreferenced_messages();
         std::set<message_id> get_messages_set();
         std::set<task_id> get_tasks_set();
@@ -134,6 +141,7 @@ namespace apl
         void set_task_childs(task_id id, std::vector<task_id> new_childs);
         void set_task_data(task_id id, std::vector<message_id> new_data);
         void set_task_const_data(task_id id, std::vector<message_id> new_const_data);
+        void set_task_preferred_processes_count(task_id id, size_t new_count);
 
         size_t message_count();
         message* get_message(message_id id);
@@ -157,6 +165,7 @@ namespace apl
         std::vector<task_id>& get_task_childs(task_id id);
         std::vector<message_id>& get_task_data(task_id id);
         std::vector<message_id>& get_task_const_data(task_id id);
+        size_t get_task_preferred_processes_count(task_id id);
 
         bool message_contained(message_id id);
         bool message_created(message_id id);

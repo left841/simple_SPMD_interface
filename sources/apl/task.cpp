@@ -64,6 +64,9 @@ namespace apl
     std::vector<task_dependence>& task_environment::created_dependences()
     { return dependence_v; }
 
+    std::vector<separate_task_proc_count>& task_environment::separate_tasks()
+    { return separate_exe_v; }
+
     local_message_id task_environment::arg_id(size_t n) const
     { return all_task_data[n]; }
 
@@ -128,6 +131,9 @@ namespace apl
 
     void task_environment::add_dependence(local_task_id parent, local_task_id child)
     { dependence_v.push_back({parent, child}); }
+
+    void task_environment::separate_execution(local_task_id sep_task, size_t processes_count)
+    { separate_exe_v.push_back({ sep_task, processes_count }); }
 
     local_task_id task_environment::get_this_task_id() const
     { return this_task_id; }
@@ -212,6 +218,7 @@ namespace apl
             }
         }
         se.send(dependence_v.data(), dependence_v.size());
+        se.send(separate_exe_v.data(), separate_exe_v.size());
     }
 
     void task_environment::recv(const receiver& re)
@@ -304,6 +311,8 @@ namespace apl
         }
         dependence_v.resize(re.probe<task_dependence>());
         re.recv(dependence_v.data(), dependence_v.size());
+        separate_exe_v.resize(re.probe<separate_task_proc_count>());
+        re.recv(separate_exe_v.data(), separate_exe_v.size());
     }
 
     void task_environment::isend(const sender& se, request_block& req) const
@@ -371,6 +380,7 @@ namespace apl
             }
         }
         se.isend(dependence_v.data(), dependence_v.size(), req);
+        se.isend(separate_exe_v.data(), separate_exe_v.size(), req);
     }
 
     void task_environment::irecv(const receiver& re, request_block& req)
@@ -463,6 +473,8 @@ namespace apl
         }
         dependence_v.resize(re.probe<task_dependence>());
         re.irecv(dependence_v.data(), dependence_v.size(), req);
+        separate_exe_v.resize(re.probe<separate_task_proc_count>());
+        re.irecv(separate_exe_v.data(), separate_exe_v.size(), req);
     }
 
     task::task(): env(nullptr)
@@ -476,6 +488,9 @@ namespace apl
 
     void task::add_dependence(local_task_id parent, local_task_id child) const
     { env->add_dependence(parent, child); }
+
+    void task::separate_execution(local_task_id sep_task, size_t processes_count) const
+    { env->separate_execution(sep_task, processes_count); }
 
     size_t task::get_workers_count() const
     { return env->get_workers_count(); }
