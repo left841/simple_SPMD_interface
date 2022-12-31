@@ -8,6 +8,7 @@
 #include "apl/task.h"
 #include "apl/transfer.h"
 #include "apl/task_graph.h"
+#include "apl/parallelizer/memory_manager.h"
 
 namespace apl
 {
@@ -16,7 +17,7 @@ namespace apl
     {
         UNDEFINED, END, MES_SEND, MES_RECV, MES_INFO_SEND, MES_CREATE,
         MES_P_CREATE, INCLUDE_MES_CHILD, TASK_EXE, TASK_CREATE, TASK_RES, ADD_RES_TO_MEMORY,
-        MES_DEL, TASK_DEL, CHANGE_OWNER, INDEPENDENT_EXE
+        MES_DEL, TASK_DEL, CHANGE_OWNER, INDEPENDENT_EXE, PACKED_MESSAGE_GRAPH
     };
 
     class instruction_block
@@ -206,6 +207,22 @@ namespace apl
         instruction_independent_exe(const size_t* const p);
 
         size_t size() const;
+        task_id start_task() const;
+    };
+
+    class instruction_packed_message_graph: public instruction_block
+    {
+    public:
+        instruction_packed_message_graph(const size_t* const p);
+
+        size_t size() const;
+        message_id id() const;
+        message_type type() const;
+        MESSAGE_FACTORY_TYPE f_type() const;
+        message_id parent() const;
+        std::set<message_id> childs() const;
+        size_t refs_count() const;
+        CHILD_STATE ch_state() const;
     };
 
     class instruction: public message
@@ -275,7 +292,8 @@ namespace apl
         void add_message_del(message_id id);
         void add_task_del(task_id id);
         void add_change_owner(process new_owner, size_t processes_count);
-        void add_independent_exe();
+        void add_independent_exe(task_id start_task);
+        void add_packed_message_graph(message_id id, message_type type, MESSAGE_FACTORY_TYPE f_type, message_id parent, const std::set<message_id>& childs, size_t refs_count, CHILD_STATE ch_state);
 
         const_iterator begin() const;
         const_iterator end() const;

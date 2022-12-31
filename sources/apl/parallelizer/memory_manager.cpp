@@ -460,6 +460,9 @@ namespace apl
     std::set<message_id>& memory_manager::get_message_childs(message_id id)
     { return mes_graph[id].childs; }
 
+    size_t memory_manager::get_message_refs_count(message_id id)
+    { return mes_graph[id].refs_count; }
+
     request_block& memory_manager::get_message_request_block(message_id id)
     { return mes_map[id].d_req; }
 

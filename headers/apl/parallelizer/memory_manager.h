@@ -152,6 +152,7 @@ namespace apl
         size_t get_message_version(message_id id);
         CHILD_STATE get_message_child_state(message_id id);
         std::set<message_id>& get_message_childs(message_id id);
+        size_t get_message_refs_count(message_id id);
         request_block& get_message_request_block(message_id id);
         request_block& get_message_info_request_block(message_id id);
 

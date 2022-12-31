@@ -135,7 +135,10 @@ namespace apl
         { return new instruction_change_owner(p); },
 
         [](const size_t* const p)->const instruction_block*
-        { return new instruction_independent_exe(p); }
+        { return new instruction_independent_exe(p); },
+
+        [](const size_t* const p)->const instruction_block*
+        { return new instruction_packed_message_graph(p); }
     };
 
     const instruction_block* instruction::block_factory::get(const size_t* const p)
@@ -488,9 +491,64 @@ namespace apl
     { }
 
     size_t instruction_independent_exe::size() const
-    { return 1; }
+    { return 3; }
 
-    void instruction::add_independent_exe()
-    { add_cmd(INSTRUCTION::INDEPENDENT_EXE); }
+    task_id instruction_independent_exe::start_task() const
+    { return {ins[1], static_cast<process>(ins[2])}; }
+
+    void instruction::add_independent_exe(task_id start_task)
+    {
+        add_cmd(INSTRUCTION::INDEPENDENT_EXE);
+        write(start_task);
+    }
+
+    // PACKED_MESSAGE_GRAPH
+    instruction_packed_message_graph::instruction_packed_message_graph(const size_t* const p): instruction_block(p)
+    { }
+
+    size_t instruction_packed_message_graph::size() const
+    { return ins[9] * 2 + 10; }
+
+    message_id instruction_packed_message_graph::id() const
+    { return {ins[1], static_cast<process>(ins[2])}; }
+
+    message_type instruction_packed_message_graph::type() const
+    { return ins[3]; }
+
+    MESSAGE_FACTORY_TYPE instruction_packed_message_graph::f_type() const
+    { return static_cast<MESSAGE_FACTORY_TYPE>(ins[4]); }
+
+    message_id instruction_packed_message_graph::parent() const
+    { return { ins[5], static_cast<process>(ins[6]) }; }
+
+    std::set<message_id> instruction_packed_message_graph::childs() const
+    {
+        std::set<message_id> s;
+        size_t pos = 10;
+        size_t size = ins[9];
+        for (size_t i = 0; i < size; ++i)
+            s.insert(read<message_id>(pos));
+        return s;
+    }
+
+    size_t instruction_packed_message_graph::refs_count() const
+    { return ins[7]; }
+
+    CHILD_STATE instruction_packed_message_graph::ch_state() const
+    { return static_cast<CHILD_STATE>(ins[8]); }
+
+    void instruction::add_packed_message_graph(message_id id, message_type type, MESSAGE_FACTORY_TYPE f_type, message_id parent, const std::set<message_id>& childs, size_t refs_count, CHILD_STATE ch_state)
+    {
+        add_cmd(INSTRUCTION::PACKED_MESSAGE_GRAPH);
+        write(id);
+        v.push_back(type);
+        v.push_back(static_cast<size_t>(f_type));
+        write(parent);
+        v.push_back(refs_count);
+        v.push_back(static_cast<size_t>(ch_state));
+        v.push_back(childs.size());
+        for (const auto& i: childs)
+            write(i);
+    }
 
 }

@@ -38,7 +38,7 @@ namespace apl
                 i.insert(j);
             tmp_vec.clear();
         }
-        versions_of_messages.resize(versions_of_messages.size());
+        versions_of_messages.resize(process_workgroup.size());
         for (auto& i: versions_of_messages)
         {
             tmp_vec.resize(re.probe<message_id>());
@@ -146,13 +146,14 @@ namespace apl
 
         while (exe)
         {
-            //std::cout << "lul" << std::endl;
-            for (task_id i: tasks_to_del)
+            //std::cout << comm_world.rank() << ": " << "master start_cycle" << std::endl;
+            /*for (task_id i: tasks_to_del)
                 memory.delete_task(i);
             tasks_to_del.clear();
             while (memory.get_unreferenced_messages().size())
             {
                 message_id i = *memory.get_unreferenced_messages().begin();
+                std::cout << comm_world.rank() << ": " << "deleting message: " << i.num << '_' << i.proc << std::endl;
                 memory.delete_message_from_graph(i);
 
                 for (size_t j = 0; j < info.process_workgroup.size(); ++j)
@@ -164,8 +165,8 @@ namespace apl
                         info.instructions_for_processes[j].add_message_del(i);
                     }
                 }
-            }
-
+            }*/
+            //std::cout << comm_world.rank() << ": " << "delete_tasks" << std::endl;
             {
                 std::vector<size_t> comm_workload(info.process_workgroup.size());
 
@@ -184,6 +185,7 @@ namespace apl
                         ready_task_with_proc_count_v.push_back(info.ready_tasks.front());
                     info.ready_tasks.pop();
                 }
+                //std::cout << comm_world.rank() << ": " << "info.ready_tasks emptyed" << std::endl;
 
                 //if (ready_task_with_proc_count_v.size() > 0)
                     //main_comm.abort(651);
@@ -197,7 +199,10 @@ namespace apl
                 for (task_with_process_count& current_task: ready_task_with_proc_count_v)
                 {
                     if (current_task.preferred_processes_count >= current_workgroup.size())
+                    {
                         ready_task_v.push_back(current_task.this_task);
+                        continue;
+                    }
 
                     std::vector<size_t> decision_vector;
                     std::vector<double> contained_task_data_counts(current_workgroup.size(), 0.0);
@@ -238,21 +243,36 @@ namespace apl
                             }
                         }
                     }
-
+                    //std::cout << comm_world.rank() << ": " << "checked_task_data_contained: " << current_task.this_task.num << '_' << current_task.this_task.proc << std::endl;
                     std::sort(decision_vector.begin(), decision_vector.end(), [&](size_t a, size_t b)->bool
                     {
                         if (contained_task_data_counts[a] != contained_task_data_counts[b])
                             return contained_task_data_counts[a] > contained_task_data_counts[b];
                         return a > b;
                     });
-
+                    //std::cout << comm_world.rank() << ": " << "sorted_processes_for_task: " << current_task.this_task.num << '_' << current_task.this_task.proc << std::endl;
                     std::vector<size_t> new_task_group;
                     std::set<size_t> new_group;
-                    for (size_t i = 0; i < current_task.preferred_processes_count; ++i)
+                    //std::cout << comm_world.rank() << ": " << "adding_prefered_processes: " << current_task.preferred_processes_count << " to size: " << decision_vector.size() << std::endl;
+                    
+                    //std::cout << comm_world.rank() << ": " << "decesion_vector: ";
+                    //for (auto& i: decision_vector)
+                    //    std::cout << i << ' ';
+                    //std::cout << std::endl;
+                    //std::cout << comm_world.rank() << ": " << "current_workgroup: ";
+                    //for (auto& i: current_workgroup)
+                    //    std::cout << i << ' ';
+                    //std::cout << std::endl;
+
+                    for (size_t i = 0; (i < decision_vector.size()) && (i < current_task.preferred_processes_count); ++i)
                     {
                         new_task_group.push_back(current_workgroup[decision_vector[i]]);
                         new_group.insert(current_workgroup[decision_vector[i]]);
                     }
+                    //std::cout << comm_world.rank() << ": " << "added_prefered_processes" << std::endl;
+                    //std::cout << comm_world.rank() << ": " << "sending_task_data to group: " << current_workgroup[decision_vector[0]] << std::endl;
+                    send_task_data(current_task.this_task, current_workgroup[decision_vector[0]], comm_workload, info);
+                    //std::cout << comm_world.rank() << ": " << "sended_task_data: " << current_task.this_task.num << '_' << current_task.this_task.proc << std::endl;
 
                     std::vector<size_t> new_current_workgroup;
                     for (auto i: current_workgroup)
@@ -261,10 +281,10 @@ namespace apl
                             new_current_workgroup.push_back(i);
                     }
                     std::swap(current_workgroup, new_current_workgroup);
-                    send_task_data(current_task.this_task, current_workgroup[decision_vector[0]], comm_workload, info);
+
                     task_with_group_v.push_back({current_task.this_task, new_task_group});
                 }
-                //std::cout << "lol" << std::endl;
+                //std::cout << comm_world.rank() << ": " << "lol" << std::endl;
                 size_t comm_size_quotient = ready_task_v.size() / current_workgroup.size();
                 size_t comm_size_remainder = ready_task_v.size() % current_workgroup.size();
                 assigned_tasks.resize(current_workgroup.size());
@@ -274,16 +294,26 @@ namespace apl
                     assigned_tasks[i].resize(max_assigned_tasks_count);
                     assigned_tasks[i].assign(max_assigned_tasks_count, TASK_ID_UNDEFINED);
                 }
-
+                //std::cout << comm_world.rank() << ": " << "resized_assigned_tasks: " << assigned_tasks.size() << std::endl;
                 std::vector<size_t> assigned_current_position(current_workgroup.size(), 0);
                 for (task_id current_id: ready_task_v)
                 {
+                    //std::cout << comm_world.rank() << ": " << "processing_task_id: " << current_id.num << '_' << current_id.proc << std::endl;
+
                     std::vector<size_t> decision_vector;
                     std::vector<double> contained_task_data_counts(current_workgroup.size(), 0.0);
                     std::vector<message_id>& cur_task_data_ids = memory.get_task_data(current_id);
                     std::vector<message_id>& cur_task_const_data_ids = memory.get_task_const_data(current_id);
+
+                    //std::cout << comm_world.rank() << ": " << "current_workgroup: ";
+                    //for (auto& i: current_workgroup)
+                    //    std::cout << i << ' ';
+                    //std::cout << std::endl;
+
                     for (size_t i = 0; i < current_workgroup.size(); ++i)
                     {
+                        //std::cout << comm_world.rank() << ": " << "assigned_position: " << assigned_current_position.size() << ' ' << assigned_tasks.size() << std::endl;
+
                         if (assigned_current_position[i] < assigned_tasks[i].size())
                         {
                             decision_vector.push_back(i);
@@ -291,14 +321,20 @@ namespace apl
                             {
                                 size_t depth = 0;
                                 message_id current = j;
+                                //std::cout << comm_world.rank() << ": " << "current_message: " << current.num << '_' << current.proc << std::endl;
                                 while ((current != MESSAGE_ID_UNDEFINED) && (depth < current_workgroup.size()))
                                 {
+                                    //std::cout << comm_world.rank() << ": " << "current_message: " << current.num << '_' << current.proc << std::endl;
+                                    //std::cout << comm_world.rank() << ": " << "versions_of_messages_size: " << info.versions_of_messages.size() << std::endl;
+
                                     if (info.versions_of_messages[current_workgroup[i]].find(current) != info.versions_of_messages[current_workgroup[i]].end())
                                     {
+                                        //std::cout << comm_world.rank() << ": " << "current_message_found: " << current.num << '_' << current.proc << std::endl;
                                         contained_task_data_counts[i] += 1.0 - static_cast<double>(depth) / static_cast<double>(current_workgroup.size());
                                         break;
                                     }
                                     ++depth;
+                                    //std::cout << comm_world.rank() << ": " << "finding_parent_for: " << current.num << '_' << current.proc << std::endl;
                                     current = memory.get_message_parent(current);
                                 }
                             }
@@ -319,7 +355,7 @@ namespace apl
                             }
                         }
                     }
-
+                    //std::cout << comm_world.rank() << ": " << "sorting_decesion_vector: " << std::endl;
                     std::sort(decision_vector.begin(), decision_vector.end(), [&](size_t a, size_t b)->bool
                     {
                         if (contained_task_data_counts[a] != contained_task_data_counts[b])
@@ -327,21 +363,26 @@ namespace apl
                         return a > b;
                     });
 
+                    //std::cout << comm_world.rank() << ": " << "decesion_vector: ";
+                    //for (auto& i : decision_vector)
+                    //    std::cout << i << ' ';
+                    //std::cout << std::endl;
+
                     size_t current_proc = decision_vector[0];
                     assigned_tasks[current_proc][assigned_current_position[current_proc]++] = current_id;
                     send_task_data(current_id, current_workgroup[current_proc], comm_workload, info);
                     ++all_assigned_tasks_count;
                 }
                 comm_workload.clear();
-                //std::cout << "lal" << std::endl;
-                for (size_t i = 1; i < info.process_workgroup.size(); ++i)
+                //std::cout << comm_world.rank() << ": " << "lal" << std::endl;
+                for (size_t i = 1; i < current_workgroup.size(); ++i)
                     for (task_id j: assigned_tasks[i])
                     {
-                        info.instructions_for_processes[i].add_task_creation(j, memory.get_task_base_message(j), memory.get_task_type(j), memory.get_task_data(j), memory.get_task_const_data(j));
-                        info.instructions_for_processes[i].add_task_execution(j);
+                        info.instructions_for_processes[current_workgroup[i]].add_task_creation(j, memory.get_task_base_message(j), memory.get_task_type(j), memory.get_task_data(j), memory.get_task_const_data(j));
+                        info.instructions_for_processes[current_workgroup[i]].add_task_execution(j);
                     }
-
-                for (size_t i = 1; i < info.process_workgroup.size(); ++i)
+                //std::cout << comm_world.rank() << ": " << "added_task_creation_for_all" << std::endl;
+                for (size_t i = 1; i < info.instructions_for_processes.size(); ++i)
                 {
                     if (info.instructions_for_processes[i].size() > 0)
                     {
@@ -351,13 +392,16 @@ namespace apl
                 }
                 send_instruction(info.instructions_for_processes[0]);
                 info.instructions_for_processes[0].clear();
+                //std::cout << comm_world.rank() << ": " << "sended_instructions" << std::endl;
 
                 std::set<size_t> groups_to_del;
                 for (auto i: task_with_group_v)
                 {
                     instruction cur_ins;
                     cur_ins.add_task_creation(i.this_task, memory.get_task_base_message(i.this_task), memory.get_task_type(i.this_task), memory.get_task_data(i.this_task), memory.get_task_const_data(i.this_task));
+                    cur_ins.add_independent_exe(i.this_task);
                     instr_comm.send<message>(&cur_ins, info.process_workgroup[i.group[0]]);
+                    cur_ins.clear();
 
                     master_exe_info this_group_exe_info;
                     for (size_t j = 0; j < i.group.size(); ++j)
@@ -373,9 +417,10 @@ namespace apl
                     {
                         cur_ins.add_change_owner(info.process_workgroup[i.group[0]], i.group.size());
                         instr_comm.send<message>(&cur_ins, info.process_workgroup[i.group[j]]);
+                        cur_ins.clear();
                     }
 
-                    external_tasks[i.group[0]] = i.this_task;
+                    external_tasks[info.process_workgroup[i.group[0]]] = i.this_task;
                 }
 
                 master_exe_info new_exe_info;
@@ -393,7 +438,7 @@ namespace apl
                 for (size_t i = 0; i < new_exe_info.process_workgroup.size(); ++i)
                     new_exe_info.process_positions[new_exe_info.process_workgroup[i]] = i;
                 std::swap(new_exe_info, info);
-                //std::cout << "lil" << std::endl;
+                //std::cout << comm_world.rank() << ": " << "lil" << std::endl;
             }
 
             for (task_id i: assigned_tasks[0])
@@ -412,10 +457,10 @@ namespace apl
                 std::unique_lock<std::mutex> cv_lk(task_queue_mutex);
                 exe_threads_cv.notify_all();
             }
-            //std::cout << "lool" << std::endl;
+            //std::cout << comm_world.rank() << ": " << "lool" << std::endl;
             while ((all_assigned_tasks_count > 0) && (assigned_tasks[0].size() > 0))
             {
-                //std::cout << "liil" << std::endl;
+                //std::cout << comm_world.rank() << ": " << "liil" << std::endl;
                 bool queue_try = false;
                 bool comm_try = false;
                 
@@ -432,9 +477,9 @@ namespace apl
                         finished_task_execution_queue_data current_finished_task_data {finished_task_queue.front()};
                         finished_task_queue.pop();
                         finished_task_queue_mutex.unlock();
-                        //std::cout << "loool" << std::endl;
+                        //std::cout << comm_world.rank() << ": " << "loool" << std::endl;
                         end_main_task(0, current_finished_task_data.this_task_id, current_finished_task_data.this_task_environment, tasks_to_del, info);
-                        //std::cout << "laaal" << std::endl;
+                        //std::cout << comm_world.rank() << ": " << "laaal" << std::endl;
                         assigned_tasks[0].pop_back();
                         --all_assigned_tasks_count;
                     }
@@ -443,15 +488,72 @@ namespace apl
                 process current_proc = instr_comm.test_any_process();
                 if (current_proc != MPI_PROC_NULL)
                 {
+                    //std::cout << comm_world.rank() << ": " << "found_proc: " << current_proc << std::endl;
+                    //std::cout << comm_world.rank() << ": " << "external_task_size: ";
+                    //for (auto& i: external_tasks)
+                    //    std::cout << i.first << '=' << i.second.num << '_' << i.second.proc << ' ' << std::endl;
+                    //std::cout << std::endl;
+
                     if (external_tasks.find(current_proc) != external_tasks.end())
                     {
+                        //std::cout << comm_world.rank() << ": " << "wut: " << current_proc << std::endl;
                         process current_process = current_proc;
                         {
                             instruction ins;
                             instr_comm.recv<message>(&ins, current_process);
+
+                            for (const instruction_block& i: ins)
+                            {
+                                switch (i.command())
+                                {
+                                case INSTRUCTION::PACKED_MESSAGE_GRAPH:
+                                {
+                                    const instruction_packed_message_graph& j = dynamic_cast<const instruction_packed_message_graph&>(i);
+                                    if (!memory.message_contained(j.id()));
+                                    {
+                                        if (j.f_type() == MESSAGE_FACTORY_TYPE::INIT)
+                                            memory.add_message_to_graph(j.id(), j.type());
+                                        else
+                                            memory.add_message_child_to_graph(j.id(), j.type(), j.parent());
+                                    }
+                                    memory.set_message_child_state(j.id(), j.ch_state());
+                                    std::set<message_id> s(std::move(j.childs()));
+                                    for (auto k: s)
+                                        memory.insert_message_child(j.id(), k);
+
+                                    break;
+                                }
+                                default:
+                                    main_comm.abort(576);
+                                }
+                            }
                         }
                         master_exe_info received_exe_info;
                         main_comm.recv<message>(&received_exe_info, current_process);
+
+                        task_id current_id = external_tasks.find(current_process)->second;
+                        external_tasks.erase(current_process);
+
+
+                        for (message_id i: memory.get_task_data(current_id))
+                        {
+                            for (size_t k = 0; k < info.process_workgroup.size(); ++k)
+                                info.versions_of_messages[k].erase(i);
+                            message_id j = i;
+                            while (memory.message_has_parent(j))
+                            {
+                                if (memory.get_message_factory_type(j) == MESSAGE_FACTORY_TYPE::CHILD)
+                                    memory.set_message_child_state(j, CHILD_STATE::NEWER);
+                                j = memory.get_message_parent(j);
+                                for (size_t k = 0; k < info.process_workgroup.size(); ++k)
+                                    info.versions_of_messages[k].erase(j);
+                            }
+                        }
+
+                        message_id tid_base = memory.get_task_base_message(current_id);
+                        for (size_t k = 0; k < info.process_workgroup.size(); ++k)
+                            info.versions_of_messages[k].erase(tid_base);
+
 
                         for (size_t i = 0; i < received_exe_info.process_workgroup.size(); ++i)
                         {
@@ -463,8 +565,6 @@ namespace apl
                             info.process_positions[received_exe_info.process_workgroup[i]] = info.process_workgroup.size() - 1;
                         }
 
-                        task_id current_id = external_tasks.find(current_process)->second;
-                        external_tasks.erase(current_process);
 
                         update_ready_tasks(current_id, tasks_to_del, info);
                     }
@@ -500,31 +600,159 @@ namespace apl
                     finished_task_queue.push(std::move(current_output_data));
                     finished_task_queue_mutex.unlock();
                 }
-                //std::cout << "laal" << std::endl;
+                //std::cout << comm_world.rank() << ": " << "laal" << std::endl;
             }
-            //std::cout << "lel" << std::endl;
+            //std::cout << comm_world.rank() << ": " << "lel" << std::endl;
             while (all_assigned_tasks_count > 0)
             {
                 process current_proc = instr_comm.wait_any_process();
-                wait_task(info.process_positions[current_proc], tasks_to_del, info);
-                --all_assigned_tasks_count;
+                //std::cout << comm_world.rank() << ": " << "waited_for_process: " << current_proc << std::endl;
+                if (external_tasks.find(current_proc) != external_tasks.end())
+                {
+                    process current_process = current_proc;
+                    {
+                        instruction ins;
+                        instr_comm.recv<message>(&ins, current_process);
+
+                        for (const instruction_block& i: ins)
+                        {
+                            switch (i.command())
+                            {
+                            case INSTRUCTION::PACKED_MESSAGE_GRAPH:
+                            {
+                                const instruction_packed_message_graph& j = dynamic_cast<const instruction_packed_message_graph&>(i);
+                                if (!memory.message_contained(j.id()));
+                                {
+                                    if (j.f_type() == MESSAGE_FACTORY_TYPE::INIT)
+                                        memory.add_message_to_graph(j.id(), j.type());
+                                    else
+                                        memory.add_message_child_to_graph(j.id(), j.type(), j.parent());
+                                }
+                                memory.set_message_child_state(j.id(), j.ch_state());
+                                std::set<message_id> s(std::move(j.childs()));
+                                for (auto k: s)
+                                    memory.insert_message_child(j.id(), k);
+                                
+                                break;
+                            }
+                            default:
+                                main_comm.abort(576);
+                            }
+                        }
+                    }
+                    master_exe_info received_exe_info;
+                    main_comm.recv<message>(&received_exe_info, current_process);
+
+                    task_id current_id = external_tasks.find(current_process)->second;
+                    external_tasks.erase(current_process);
+
+
+                    for (message_id i: memory.get_task_data(current_id))
+                    {
+                        for (size_t k = 0; k < info.process_workgroup.size(); ++k)
+                            info.versions_of_messages[k].erase(i);
+                        message_id j = i;
+                        while (memory.message_has_parent(j))
+                        {
+                            if (memory.get_message_factory_type(j) == MESSAGE_FACTORY_TYPE::CHILD)
+                                memory.set_message_child_state(j, CHILD_STATE::NEWER);
+                            j = memory.get_message_parent(j);
+                            for (size_t k = 0; k < info.process_workgroup.size(); ++k)
+                                info.versions_of_messages[k].erase(j);
+                        }
+                    }
+
+                    message_id tid_base = memory.get_task_base_message(current_id);
+                    for (size_t k = 0; k < info.process_workgroup.size(); ++k)
+                        info.versions_of_messages[k].erase(tid_base);
+
+
+                    for (size_t i = 0; i < received_exe_info.process_workgroup.size(); ++i)
+                    {
+                        info.process_workgroup.push_back(received_exe_info.process_workgroup[i]);
+                        instruction ins;
+                        info.instructions_for_processes.push_back(ins);
+                        info.contained_messages.push_back(received_exe_info.contained_messages[i]);
+                        info.versions_of_messages.push_back(received_exe_info.versions_of_messages[i]);
+                        info.process_positions[received_exe_info.process_workgroup[i]] = info.process_workgroup.size() - 1;
+                    }
+
+                    update_ready_tasks(current_id, tasks_to_del, info);
+                }
+                else
+                {
+                    wait_task(info.process_positions[current_proc], tasks_to_del, info);
+                    --all_assigned_tasks_count;
+                }
             }
 
             for (auto& i: assigned_tasks)
             {
                 i.clear();
             }
-
+            //std::cout << comm_world.rank() << ": " << "leeel" << std::endl;
             // waiting for external tasks
             if (info.ready_tasks.empty() && !external_tasks.empty())
             {
+                //std::cout << comm_world.rank() << ": " << "start_wait2_for_process ext_task_size: " << external_tasks.size() << std::endl;
                 process current_process = instr_comm.wait_any_process();
+                //std::cout << comm_world.rank() << ": " << "waited2_for_process: " << current_process << std::endl;
                 {
                     instruction ins;
                     instr_comm.recv<message>(&ins, current_process);
+
+                    for (const instruction_block& i : ins)
+                    {
+                        switch (i.command())
+                        {
+                        case INSTRUCTION::PACKED_MESSAGE_GRAPH:
+                        {
+                            const instruction_packed_message_graph& j = dynamic_cast<const instruction_packed_message_graph&>(i);
+                            if (!memory.message_contained(j.id()));
+                            {
+                                if (j.f_type() == MESSAGE_FACTORY_TYPE::INIT)
+                                    memory.add_message_to_graph(j.id(), j.type());
+                                else
+                                    memory.add_message_child_to_graph(j.id(), j.type(), j.parent());
+                            }
+                            memory.set_message_child_state(j.id(), j.ch_state());
+                            std::set<message_id> s(std::move(j.childs()));
+                            for (auto k: s)
+                                memory.insert_message_child(j.id(), k);
+
+                            break;
+                        }
+                        default:
+                            main_comm.abort(576);
+                        }
+                    }
                 }
                 master_exe_info received_exe_info;
                 main_comm.recv<message>(&received_exe_info, current_process);
+
+                task_id current_id = external_tasks.find(current_process)->second;
+                external_tasks.erase(current_process);
+
+
+                for (message_id i: memory.get_task_data(current_id))
+                {
+                    for (size_t k = 0; k < info.process_workgroup.size(); ++k)
+                        info.versions_of_messages[k].erase(i);
+                    message_id j = i;
+                    while (memory.message_has_parent(j))
+                    {
+                        if (memory.get_message_factory_type(j) == MESSAGE_FACTORY_TYPE::CHILD)
+                            memory.set_message_child_state(j, CHILD_STATE::NEWER);
+                        j = memory.get_message_parent(j);
+                        for (size_t k = 0; k < info.process_workgroup.size(); ++k)
+                            info.versions_of_messages[k].erase(j);
+                    }
+                }
+
+                message_id tid_base = memory.get_task_base_message(current_id);
+                for (size_t k = 0; k < info.process_workgroup.size(); ++k)
+                    info.versions_of_messages[k].erase(tid_base);
+
 
                 for (size_t i = 0; i < received_exe_info.process_workgroup.size(); ++i)
                 {
@@ -536,15 +764,13 @@ namespace apl
                     info.process_positions[received_exe_info.process_workgroup[i]] = info.process_workgroup.size() - 1;
                 }
 
-                task_id current_id = external_tasks.find(current_process)->second;
-                external_tasks.erase(current_process);
-
                 update_ready_tasks(current_id, tasks_to_del, info);
             }
 
             if (info.ready_tasks.empty() && external_tasks.empty())
                 exe = false;
         }
+        //std::cout << comm_world.rank() << ": " << "ended master: " << main_comm.rank() << std::endl;
     }
 
     void parallelizer::task_execution_thread_function(size_t processes_count)
@@ -601,6 +827,7 @@ namespace apl
 
     void parallelizer::send_task_data(task_id tid, size_t proc, std::vector<size_t>& comm_workload, master_exe_info& info)
     {
+        //std::cout << comm_world.rank() << ": " << "sending task data: " << tid.num << '_' << tid.proc << " to " << proc << std::endl;
         for (message_id i: memory.get_task_data(tid))
             send_message(i, proc, comm_workload, info);
 
@@ -658,7 +885,7 @@ namespace apl
             {
                 std::set<message_id>& ch = memory.get_message_childs(id);
                 if (ch.size() == 0)
-                    main_comm.abort(432);
+                    main_comm.abort(433);
                 for (message_id i: ch)
                 {
                     send_message(i, proc, comm_workload, info);
@@ -1567,18 +1794,28 @@ namespace apl
 
     void parallelizer::worker(size_t current_processes_count)
     {
+        //std::cout << comm_world.rank() << ": " << "started_worker_exe" << std::endl;
         instruction cur_inst;
         while(1)
         {
             bool queue_try = false;
             bool comm_try = false;
+            //std::cout << comm_world.rank() << ": " << "worker_cycle" << std::endl;
 
             if (instr_comm.test_process(main_proc))
             {
+                //std::cout << comm_world.rank() << ": " << "start instriction_receiving" << std::endl;
                 instr_comm.recv<message>(&cur_inst, main_proc);
+                //std::cout << comm_world.rank() << ": " << "instriction_received: ";
+                //for (size_t i = 0; i < cur_inst.size(); ++i)
+                //{
+                //    std::cout << cur_inst[i] << ' ';
+                //}
+                //std::cout << std::endl;
 
                 for (const instruction_block& i: cur_inst)
                 {
+                    //std::cout << comm_world.rank() << ": " << "command start: " << static_cast<size_t>(i.command()) << std::endl;
                     switch (i.command())
                     {
                     case INSTRUCTION::MES_SEND:
@@ -1633,6 +1870,7 @@ namespace apl
                     {
                         const instruction_task_create& j = dynamic_cast<const instruction_task_create&>(i);
                         memory.add_task_with_id(j.id(), j.base_id(), j.type(), j.data(), j.const_data());
+                        //std::cout << comm_world.rank() << ": " << "added_task_with_id: " << j.id().num << '_' << j.id().proc << std::endl;
                         break;
                     }
                     case INSTRUCTION::TASK_EXE:
@@ -1658,22 +1896,52 @@ namespace apl
                         const instruction_change_owner& j = dynamic_cast<const instruction_change_owner&>(i);
                         main_proc = j.new_owner();
                         current_processes_count = j.new_processes_count();
+                        break;
                     }
                     case INSTRUCTION::INDEPENDENT_EXE:
                     {
+                        const instruction_independent_exe& j = dynamic_cast<const instruction_independent_exe&>(i);
+                        //std::cout << comm_world.rank() << ": " << "started_independent_exe" << std::endl;
                         master_exe_info info;
                         main_comm.recv<message>(&info, main_proc);
-                        info.ready_tasks = std::move(memory.get_ready_tasks());
+                        info.ready_tasks.push({j.start_task(), memory.get_task_preferred_processes_count(j.start_task())});
+                        //info.ready_tasks = std::move(memory.get_ready_tasks());
+
+                        //std::cout << comm_world.rank() << ": " << "master_exe_info_sizes: " << info.process_workgroup.size() << ' ' << info.contained_messages.size() << ' '
+                        //    << info.versions_of_messages.size() << ' ' << info.process_positions.size() << ' ' << info.instructions_for_processes.size() << std::endl;
 
                         master(info);
 
-                        instruction end;
-                        end.add_change_owner(main_proc, current_processes_count);
-                        for (size_t i = 1; i < info.process_workgroup.size(); ++i)
-                            instr_comm.send<message>(&end, info.process_workgroup[i]);
+                        {
+                            instruction end;
+                            end.add_change_owner(main_proc, current_processes_count);
+                            for (size_t i = 1; i < info.process_workgroup.size(); ++i)
+                                instr_comm.send<message>(&end, info.process_workgroup[i]);
+                        }
 
-                        instr_comm.send<message>(&end, main_proc);
+                        //std::cout << comm_world.rank() << ": " << "start_sending_to_previous_master: " << main_proc << std::endl;
+                        {
+                            instruction end;
+
+                            std::function<void(message_id)> graph_recursive_f = [&](message_id cur_id)->void
+                            {
+                                end.add_packed_message_graph(cur_id, memory.get_message_type(cur_id), memory.get_message_factory_type(cur_id), memory.get_message_parent(cur_id),
+                                    memory.get_message_childs(cur_id), memory.get_message_refs_count(cur_id), memory.get_message_child_state(cur_id));
+                                const std::set<message_id>& s = memory.get_message_childs(cur_id);
+                                for (message_id k: s)
+                                    graph_recursive_f(k);
+                            };
+
+                            for (message_id k: memory.get_task_data(j.start_task()))
+                            {
+                                graph_recursive_f(k);
+                            }
+                            graph_recursive_f(memory.get_task_base_message(j.start_task()));
+                            instr_comm.send<message>(&end, main_proc);
+                        }
+                        //std::cout << comm_world.rank() << ": " << "start_sending_info_master: " << main_proc << std::endl;
                         main_comm.send<message>(&info, main_proc);
+                        break;
                     }
                     case INSTRUCTION::END:
 
